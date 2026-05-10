@@ -27,9 +27,20 @@ shared-test-helpers package under `packages/openui_test_helpers/`.
 
 ## Status
 
-v0.1 is in active development. Phase 0 (architectural decisions, spikes, and
-scaffold) is complete. Subsequent phases land the language core, renderer,
-components, chat layer, MCP integration, and example app.
+v0.1 is in active development.
+
+- **Phase 0** — architectural decisions, spikes, scaffold. Complete.
+- **Phase 1** — `openui_core` language and runtime. Complete. 461 tests at
+  100% line coverage. Public surface covers the lexer, streaming parser,
+  materializer, evaluator, four functional builtins, reactive `Store`,
+  `OpenUIError` hierarchy, `ActionPlan` + dispatcher, `mergeStatements`,
+  `ToolProvider` + `extractToolResult`, `Library` + `defineComponent` +
+  `reactive(schema)`, and a JS-compatible `parse(source, paramMap)`
+  integration entry with a contract suite ported from the JS reference.
+- **Phase 2** — `openui` Flutter package (`Renderer` widget, form-state
+  cache, error boundary). Not started.
+- **Phase 3** — `openui_components` and `openui_chat`. Not started.
+- **Phase 4** — `openui_mcp` + example app + polish for v0.1.0. Not started.
 
 See [`docs/architecture.md`](docs/architecture.md) for the package map and data
 flow, and [`docs/lang-reference.md`](docs/lang-reference.md) for the OpenUI

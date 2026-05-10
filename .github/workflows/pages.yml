@@ -49,6 +49,10 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Self-enable Pages with "GitHub Actions" source on first
+          # run so the deploy doesn't require a manual settings flip.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

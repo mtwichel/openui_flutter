@@ -71,7 +71,9 @@ root = Button(label: "Click", onClick: @Set($count, $count + 1))''',
         ),
       );
       await tester.tap(find.text('Click'));
-      await tester.pump();
+      // The renderer's dispatch is async (dispatchAction awaits each
+      // step). pumpAndSettle drains the microtask the closure chains.
+      await tester.pumpAndSettle();
       expect(events.length, 1);
       expect(events.first.plan.steps.first, isA<SetStep>());
     });

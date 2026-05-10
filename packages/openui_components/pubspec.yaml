@@ -14,10 +14,14 @@ environment:
   flutter: ^3.35.0
 
 dependencies:
+  fl_chart: ^1.2.0
   flutter:
     sdk: flutter
+  flutter_markdown_plus: ^1.0.7
+  meta: ^1.16.0
   openui: ^0.1.0
   openui_core: ^0.1.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

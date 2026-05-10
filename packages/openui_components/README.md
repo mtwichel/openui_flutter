@@ -6,21 +6,22 @@
 
 Builtin component library for OpenUI Flutter.
 
-Provides ~15 components in v0.1: `Stack`, `Card`, `CardHeader`, `TextContent`,
-`MarkDownRenderer`, `Callout`, `Image`, `Table`, `Tabs`, `Form`, `Input`,
-`Select`, `Button`, `Buttons`, `Separator`, `CodeBlock`, `BarChart`,
-`LineChart`. Each is wired to the renderer's reactive store and form-state
-cache.
+Ships 21 components ready to drop into the `openui` renderer:
 
-Two ready-made libraries:
+- **Layout** — `Stack`, `Card`, `CardHeader`, `Separator`, `Callout`
+- **Content** — `TextContent`, `MarkDownRenderer`, `Image`, `CodeBlock`
+- **Forms** — `Form`, `FormControl`, `Input`, `Select`, `Button`, `Buttons`
+- **Data** — `Table`, `Col`, `Tabs`, `TabItem`
+- **Charts** — `BarChart`, `LineChart`
 
-- `openuiLibrary()` — components only, no root wrapper.
-- `openuiChatLibrary()` — wraps every response in a `Card`, matching the JS
-  reference.
+Each component is wired to the renderer's reactive store and
+`FormStateCache`. Reactive inputs (`Input.value`, `Select.value`) are
+two-way bound to `$state` variables through the renderer's
+`ReactiveAssign` marker.
 
 ## Status
 
-v0.1 in development. Phase 0 scaffold only.
+v0.1, Phase 3 complete.
 
 ## Install
 
@@ -28,6 +29,44 @@ v0.1 in development. Phase 0 scaffold only.
 dependencies:
   openui_components: ^0.1.0
 ```
+
+## Quick start
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:openui/openui.dart';
+import 'package:openui_components/openui_components.dart';
+
+void main() => runApp(const MaterialApp(home: MyPage()));
+
+class MyPage extends StatelessWidget {
+  const MyPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Renderer(
+        response: r'''
+$count = 0
+root = Stack(children: [
+  TextContent(text: "Hello!", size: "large-heavy"),
+  Button(label: "Bump", onClick: @Set($count, $count + 1)),
+  TextContent(text: $count)
+])
+''',
+        library: openuiLibrary(),
+      ),
+    );
+  }
+}
+```
+
+## Two libraries
+
+| Factory | Behavior |
+| --- | --- |
+| `openuiLibrary()` | All 21 components, no root wrapper. |
+| `openuiChatLibrary()` | Same component set — drop-in for chat surfaces. |
 
 ## License
 

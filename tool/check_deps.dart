@@ -26,7 +26,15 @@ const _rules = <String, _PackageRule>{
   ),
   'openui_components': _PackageRule(
     type: _PackageType.flutter,
-    allowed: {'flutter', 'openui', 'openui_core'},
+    allowed: {
+      'fl_chart',
+      'flutter',
+      'flutter_markdown_plus',
+      'meta',
+      'openui',
+      'openui_core',
+      'url_launcher',
+    },
   ),
   'openui_mcp': _PackageRule(
     type: _PackageType.dart,

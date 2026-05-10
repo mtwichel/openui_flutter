@@ -1,0 +1,11 @@
+{
+  "name": "OpenUI Flutter",
+  "short_name": "OpenUI",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0175C2",
+  "theme_color": "#0175C2",
+  "description": "Streaming LLM-driven UI demo built with the OpenUI Flutter port.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false
+}

@@ -25,6 +25,15 @@ with VGV layered-architecture conventions.
 Plus a private example app under `apps/openui_flutter_example/` and a private
 shared-test-helpers package under `packages/openui_test_helpers/`.
 
+## Live demo
+
+The example app is published on every push to `main` at
+**[mtwichel.github.io/openui_flutter](https://mtwichel.github.io/openui_flutter/)**.
+Five recorded scripts (hello, counter, paginated table, two-way-bound form,
+multi-series charts) streamed token-by-token through the full controller +
+renderer pipeline. No real LLM call — the `StubLlmService` plays back from
+`assets/scripts/`.
+
 ## Status
 
 v0.1 feature-complete.

@@ -22,7 +22,7 @@ const _rules = <String, _PackageRule>{
   ),
   'openui_chat': _PackageRule(
     type: _PackageType.dart,
-    allowed: {'openui_core'},
+    allowed: {'http', 'meta', 'openui_core', 'uuid'},
   ),
   'openui_components': _PackageRule(
     type: _PackageType.flutter,

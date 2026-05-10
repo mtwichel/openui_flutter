@@ -1,0 +1,8 @@
+data: {"type":"text_message_start","messageId":"msg-1"}
+
+data: {"type":"text_message_content","delta":"root = "}
+
+data: {"type":"text_message_content","delta":"Text(text: \"hi\")"}
+
+data: {"type":"text_message_end"}
+

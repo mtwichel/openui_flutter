@@ -47,3 +47,4 @@ export 'src/parser/streaming.dart'
         StateDecl,
         StreamParser,
         createStreamingParser;
+export 'src/state/store.dart' show Store;

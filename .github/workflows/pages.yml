@@ -48,11 +48,10 @@ jobs:
         run: flutter build web --release --base-href /openui_flutter/
 
       - name: Configure Pages
+        # Requires Pages to be enabled with the "GitHub Actions" source
+        # in repo settings (Settings → Pages → Source). The
+        # GITHUB_TOKEN cannot create the Pages site itself.
         uses: actions/configure-pages@v5
-        with:
-          # Self-enable Pages with "GitHub Actions" source on first
-          # run so the deploy doesn't require a manual settings flip.
-          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

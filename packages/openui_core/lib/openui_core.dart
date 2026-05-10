@@ -7,6 +7,8 @@
 library;
 
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
+export 'src/parser/materialize.dart'
+    show ElementNode, MaterializedResult, materialize;
 export 'src/parser/parser.dart'
     show
         Argument,

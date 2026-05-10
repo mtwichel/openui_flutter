@@ -1,29 +1,37 @@
 import 'package:meta/meta.dart';
+import 'package:openui_core/src/parser/materialize.dart';
 import 'package:openui_core/src/parser/parser.dart';
 
 /// Output of one parse pass.
 ///
 /// The streaming parser produces a [ParseResult] every time
 /// [StreamParser.push] or [StreamParser.set] is called. The
-/// [statements] list is the parsed program (in source order); [meta]
-/// carries the side-channel information consumers need to drive UI,
-/// dispatch queries, and surface errors.
+/// [statements] list is the parsed program (in source order); [root]
+/// is the materialized render-tree entry point (or `null` when the
+/// root statement has not yet been parsed); [meta] carries the
+/// side-channel information consumers need to drive UI, dispatch
+/// queries, and surface errors.
 ///
-/// The [meta] field intentionally omits `unresolved`, `orphaned`, and
-/// the materialized `root` element tree. Those are produced by the
-/// materializer (separate Phase 1 task) and will be added back to this
-/// type once that lands. Marked `@experimental` per D12.
+/// Marked `@experimental` per D12.
 @experimental
 @immutable
 class ParseResult {
   /// Creates a [ParseResult].
-  ParseResult({required List<Statement> statements, required this.meta})
-    : statements = List.unmodifiable(statements);
+  ParseResult({
+    required List<Statement> statements,
+    required this.root,
+    required this.meta,
+  }) : statements = List.unmodifiable(statements);
 
   /// All successfully parsed statements, in source order. A statement
-  /// re-defined later in the buffer appears twice — overwrite semantics
-  /// are decided by downstream consumers (the materializer).
+  /// re-defined later in the buffer appears twice — last-write-wins is
+  /// applied at materialization time, not here.
   final List<Statement> statements;
+
+  /// The materialized render-tree root, or `null` when the configured
+  /// `rootName` does not match any parsed statement (typical mid-stream
+  /// before the first complete statement appears).
+  final ElementNode? root;
 
   /// Side-channel parse metadata.
   final ParseMeta meta;
@@ -38,11 +46,15 @@ class ParseMeta {
   /// Creates a [ParseMeta].
   ParseMeta({
     required List<String> incomplete,
+    required List<String> unresolved,
+    required List<String> orphaned,
     required List<ParseException> errors,
     required List<StateDecl> stateDecls,
     required List<QueryDecl> queries,
     required List<MutationDecl> mutations,
   }) : incomplete = List.unmodifiable(incomplete),
+       unresolved = List.unmodifiable(unresolved),
+       orphaned = List.unmodifiable(orphaned),
        errors = List.unmodifiable(errors),
        stateDecls = List.unmodifiable(stateDecls),
        queries = List.unmodifiable(queries),
@@ -55,6 +67,19 @@ class ParseMeta {
   /// terminator. UI should treat them as in-flight (e.g. disable taps,
   /// fade interactive controls).
   final List<String> incomplete;
+
+  /// Bare-identifier `Reference` names that did not bind to any parsed
+  /// statement. Mid-stream this is normal — the LLM has not yet
+  /// emitted the referenced statement; at end-of-input it indicates a
+  /// genuinely dead reference.
+  final List<String> unresolved;
+
+  /// Value-kind statement ids that are defined but unreachable from
+  /// the configured `rootName`. State, query, and mutation
+  /// declarations are excluded from this list since they are tracked
+  /// in their own meta fields and are not expected to flow through the
+  /// render-tree reachability walk.
+  final List<String> orphaned;
 
   /// Per-statement parse failures. The statement that errored is absent
   /// from [ParseResult.statements]; recovery skipped to the next
@@ -209,10 +234,19 @@ class StreamParser {
       }
     }
 
+    final materialized = materialize(
+      rootName: rootName,
+      statements: program.statements,
+      incomplete: incomplete.toSet(),
+    );
+
     return ParseResult(
       statements: program.statements,
+      root: materialized.root,
       meta: ParseMeta(
         incomplete: incomplete,
+        unresolved: materialized.unresolved,
+        orphaned: materialized.orphaned,
         errors: program.errors,
         stateDecls: stateDecls,
         queries: queries,

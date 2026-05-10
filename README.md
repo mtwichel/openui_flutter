@@ -41,6 +41,9 @@ v0.1 is in active development.
   cache, error boundary). Not started.
 - **Phase 3** — `openui_components` and `openui_chat`. Not started.
 - **Phase 4** — `openui_mcp` + example app + polish for v0.1.0. Not started.
+- **Phase 5** — Post-v0.1 polish backlog (multi-thread chat, persistence,
+  reconnect, extra adapters, more components, CLI brick). Deferred;
+  documented in the plan for visibility, not part of v0.1.
 
 See [`docs/architecture.md`](docs/architecture.md) for the package map and data
 flow, and [`docs/lang-reference.md`](docs/lang-reference.md) for the OpenUI

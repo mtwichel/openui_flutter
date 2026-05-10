@@ -88,7 +88,7 @@ void main() {
 
     test('multi-statement: only the in-flight tail is flagged', () {
       final parser = createStreamingParser();
-      final result = parser.push('a = 1\nb = "fo');
+      final result = parser.push('a = 1\nb = "hello');
       expect(result.statements.map((s) => s.name).toList(), ['a', 'b']);
       expect(result.meta.incomplete, ['b']);
     });

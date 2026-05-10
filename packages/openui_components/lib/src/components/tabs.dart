@@ -12,10 +12,19 @@ import 'package:openui_core/openui_core.dart';
 /// content widget).
 class TabsWidget extends StatelessWidget {
   /// Creates a [TabsWidget].
-  const TabsWidget({required this.items, super.key});
+  const TabsWidget({
+    required this.items,
+    this.bodyHeight = 240,
+    super.key,
+  });
 
   /// One entry per tab.
   final List<TabItemDescription> items;
+
+  /// Fixed height for the [TabBarView] body. The widget tree is
+  /// frequently inside an unbounded `Column`, so a `TabBarView` (which
+  /// requires bounded vertical space) needs a concrete height.
+  final double bodyHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +39,8 @@ class TabsWidget extends StatelessWidget {
             isScrollable: true,
             tabs: <Widget>[for (final item in items) Tab(text: item.label)],
           ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 120),
+          SizedBox(
+            height: bodyHeight,
             child: TabBarView(
               children: <Widget>[for (final item in items) item.content],
             ),

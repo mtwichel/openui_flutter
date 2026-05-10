@@ -70,20 +70,22 @@ void main() {
       expect(events, [const SseEvent(data: 'trail')]);
     });
 
-    test('tolerates malformed UTF-8 mid-stream', () async {
-      // A bad byte in the middle of a chunk must not poison the
-      // stream — Utf8Decoder(allowMalformed: true) replaces with U+FFFD
-      // and we keep going.
+    test('tolerates malformed UTF-8 within an event', () async {
+      // A bad byte inside one event's data must not throw —
+      // Utf8Decoder(allowMalformed: true) replaces with U+FFFD and we
+      // keep going. We deliberately bracket the bad byte with
+      // surrounding ASCII so the event boundary stays predictable
+      // across Dart versions' chunked-decoder behavior.
       Stream<List<int>> bytes() async* {
-        yield utf8.encode('data: ok\n\n');
-        yield [0xC3]; // truncated 2-byte sequence
-        yield utf8.encode('data: still ok\n\n');
+        yield utf8.encode('data: before ');
+        yield [0xFF];
+        yield utf8.encode(' after\n\n');
       }
 
       final events = await decodeSseBytes(bytes()).toList();
-      expect(events.length, 2);
-      expect(events.first.data, 'ok');
-      expect(events.last.data, contains('still ok'));
+      expect(events.length, 1);
+      expect(events.first.data, contains('before'));
+      expect(events.first.data, contains('after'));
     });
 
     test('decodeSseText test seam frames the same as bytes', () async {

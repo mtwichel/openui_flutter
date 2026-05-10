@@ -17,7 +17,6 @@ class _FakeClient extends http.BaseClient {
   _handler;
 
   bool closed = false;
-  StreamController<List<int>>? activeBody;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
@@ -27,13 +26,15 @@ class _FakeClient extends http.BaseClient {
   @override
   void close() {
     closed = true;
-    final body = activeBody;
-    if (body != null) unawaited(body.close());
   }
 }
 
-http.StreamedResponse _streamedResponse(StreamController<List<int>> body) {
-  return http.StreamedResponse(body.stream, 200);
+http.StreamedResponse _response(List<int> body) {
+  return http.StreamedResponse(Stream<List<int>>.fromIterable([body]), 200);
+}
+
+http.StreamedResponse _liveResponse(Stream<List<int>> body) {
+  return http.StreamedResponse(body, 200);
 }
 
 RequestBuilder _stubBuilder() {
@@ -46,11 +47,8 @@ RequestBuilder _stubBuilder() {
 void main() {
   group('OpenUiChatController', () {
     test('sendMessage appends user + assistant and streams deltas', () async {
-      final body = StreamController<List<int>>();
       final client = _FakeClient((_) async {
-        body.add(utf8.encode('data: root = Text(text: "x")\n\n'));
-        await body.close();
-        return _streamedResponse(body);
+        return _response(utf8.encode('data: root = Text(text: "x")\n\n'));
       });
       final controller = OpenUiChatController(
         requestBuilder: _stubBuilder(),
@@ -63,7 +61,6 @@ void main() {
       controller.stateStream.listen(states.add);
 
       await controller.sendMessage('hello');
-      await Future<void>.delayed(Duration.zero);
 
       expect(controller.messages.length, 2);
       expect(controller.messages.first, isA<UserMessage>());
@@ -77,9 +74,10 @@ void main() {
 
     test('cancelMessage closes only the active client', () async {
       final body = StreamController<List<int>>();
+      addTearDown(() async => body.close());
       final client = _FakeClient((_) async {
         // Don't close the body — simulate an in-flight stream.
-        return _streamedResponse(body);
+        return _liveResponse(body.stream);
       });
       final controller = OpenUiChatController(
         requestBuilder: _stubBuilder(),
@@ -93,7 +91,7 @@ void main() {
       expect(controller.isRunning, isTrue);
 
       controller.cancelMessage();
-      await body.close();
+      await Future<void>.delayed(Duration.zero);
 
       expect(client.closed, isTrue);
       expect(controller.isRunning, isFalse);
@@ -102,25 +100,19 @@ void main() {
     });
 
     test('concurrent sendMessage cancels the previous turn', () async {
-      var firstStarted = false;
       final firstBody = StreamController<List<int>>();
-      final secondBody = StreamController<List<int>>();
-      _FakeClient? firstClient;
-      _FakeClient? secondClient;
+      addTearDown(() async => firstBody.close());
+      var firstStarted = false;
       var ix = 0;
       final clients = <_FakeClient>[
         _FakeClient((_) async {
           firstStarted = true;
-          return _streamedResponse(firstBody);
+          return _liveResponse(firstBody.stream);
         }),
         _FakeClient((_) async {
-          secondBody.add(utf8.encode('data: SECOND\n\n'));
-          await secondBody.close();
-          return _streamedResponse(secondBody);
+          return _response(utf8.encode('data: SECOND\n\n'));
         }),
       ];
-      firstClient = clients[0];
-      secondClient = clients[1];
 
       final controller = OpenUiChatController(
         requestBuilder: _stubBuilder(),
@@ -134,12 +126,9 @@ void main() {
       expect(firstStarted, isTrue);
 
       await controller.sendMessage('second');
-      await Future<void>.delayed(Duration.zero);
 
-      expect(firstClient.closed, isTrue, reason: 'first client cancelled');
-      expect(secondClient.closed, isTrue);
-      // Three user-or-assistant messages: first user, first (orphan)
-      // assistant, second user, second assistant.
+      expect(clients[0].closed, isTrue, reason: 'first client cancelled');
+      expect(clients[1].closed, isTrue);
       expect(
         controller.messages.whereType<AssistantMessage>().last.response,
         contains('SECOND'),
@@ -158,7 +147,6 @@ void main() {
       addTearDown(controller.dispose);
 
       await controller.sendMessage('hi');
-      await Future<void>.delayed(Duration.zero);
 
       expect(controller.currentState.error, isA<StateError>());
       expect(controller.isRunning, isFalse);
@@ -168,12 +156,9 @@ void main() {
       'handleAction forwards ContinueConversationStep through sendMessage',
       () async {
         var sentBody = '';
-        final body = StreamController<List<int>>();
         final client = _FakeClient((request) async {
           sentBody = (request as http.Request).body;
-          body.add(utf8.encode('data: ack\n\n'));
-          await body.close();
-          return _streamedResponse(body);
+          return _response(utf8.encode('data: ack\n\n'));
         });
         final controller = OpenUiChatController(
           requestBuilder: _stubBuilder(),
@@ -194,7 +179,6 @@ void main() {
             statementId: 's',
           ),
         );
-        await Future<void>.delayed(Duration.zero);
 
         expect(sentBody, contains('please retry'));
         expect(controller.messages.first, isA<UserMessage>());

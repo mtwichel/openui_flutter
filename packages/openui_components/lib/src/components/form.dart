@@ -16,8 +16,8 @@ class FormScope extends InheritedWidget {
   /// Form name — keys the controller cache.
   final String name;
 
-  /// Looks up the nearest enclosing [FormScope], or `null` when the
-  /// widget is unparented.
+  /// Looks up the nearest enclosing [FormScope], or `null` when no
+  /// [FormScope] ancestor is mounted.
   static FormScope? maybeFind(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<FormScope>();
   }

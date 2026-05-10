@@ -42,6 +42,14 @@ export 'src/library/library.dart'
         isReactiveAssign,
         reactive;
 export 'src/merge/merge.dart' show mergeStatements;
+export 'src/parse/parse.dart'
+    show
+        CompiledMeta,
+        CompiledProgram,
+        ParamMap,
+        ParamSpec,
+        ResolvedElement,
+        parse;
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
 export 'src/parser/materialize.dart'
     show ElementNode, MaterializedResult, materialize;

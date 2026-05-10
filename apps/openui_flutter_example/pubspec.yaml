@@ -12,9 +12,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.6.0
   openui: ^0.1.0
   openui_chat: ^0.1.0
   openui_components: ^0.1.0
+  openui_core: ^0.1.0
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +25,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/scripts/

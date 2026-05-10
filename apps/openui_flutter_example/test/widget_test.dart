@@ -1,9 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openui_flutter_example/main.dart';
 
 void main() {
-  testWidgets('placeholder home renders Phase 0 message', (tester) async {
+  testWidgets('boots with the hello script picker visible', (tester) async {
     await tester.pumpWidget(const OpenUIExampleApp());
-    expect(find.textContaining('Phase 0 scaffold'), findsOneWidget);
+    // First frame: no messages yet.
+    expect(find.text('1. Hello'), findsOneWidget);
+    expect(find.text('2. Counter'), findsOneWidget);
+    expect(find.text('5. Charts'), findsOneWidget);
+    expect(find.byType(ChoiceChip), findsNWidgets(5));
   });
 }

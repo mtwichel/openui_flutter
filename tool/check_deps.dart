@@ -38,7 +38,7 @@ const _rules = <String, _PackageRule>{
   ),
   'openui_mcp': _PackageRule(
     type: _PackageType.dart,
-    allowed: {'openui_core'},
+    allowed: {'mcp_dart', 'meta', 'openui_core'},
   ),
   'openui_test_helpers': _PackageRule(
     type: _PackageType.dart,

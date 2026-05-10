@@ -13,6 +13,8 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
+  mcp_dart: ^2.1.1
+  meta: ^1.16.0
   openui_core: ^0.1.0
 
 dev_dependencies:

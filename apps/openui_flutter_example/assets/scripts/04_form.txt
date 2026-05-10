@@ -1,0 +1,13 @@
+$name = ""
+$role = "engineer"
+root = Card(children: [
+  CardHeader(title: "Sign-up form"),
+  Form(name: "signup", children: [
+    FormControl(label: "Display name", children: [Input(name: "displayName", value: $name)]),
+    FormControl(label: "Role", children: [Select(options: ["engineer", "designer", "pm"], value: $role)])
+  ]),
+  TextContent(text: "Hello, " + $name + " (" + $role + ")"),
+  Buttons(children: [
+    Button(label: "Reset", variant: "secondary", onClick: @Reset($name, $role))
+  ])
+])

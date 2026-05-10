@@ -1,0 +1,5 @@
+root = Card(children: [
+  CardHeader(title: "Hello, OpenUI!", subtitle: "Phase 4 stub-LLM demo"),
+  TextContent(text: "This is a streaming OpenUI Lang program rendered live in Flutter.", size: "medium"),
+  Callout(text: "Hit the buttons above to try the other scripts.", variant: "info")
+])

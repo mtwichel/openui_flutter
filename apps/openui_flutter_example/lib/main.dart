@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:openui_flutter_example/src/chat_screen.dart';
+
 void main() => runApp(const OpenUIExampleApp());
 
-/// Phase 0 scaffold for the example app.
-///
-/// The full streaming-chat demo (stubbed LLM, five reference scripts,
-/// integration test) lands in Phase 4 of the port.
+/// Boots the streaming-chat demo.
 class OpenUIExampleApp extends StatelessWidget {
   /// Creates the example app.
   const OpenUIExampleApp({super.key});
@@ -13,29 +12,9 @@ class OpenUIExampleApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OpenUI Flutter Example',
+      title: 'OpenUI Flutter',
       theme: ThemeData(useMaterial3: true),
-      home: const _PlaceholderHome(),
-    );
-  }
-}
-
-class _PlaceholderHome extends StatelessWidget {
-  const _PlaceholderHome();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('OpenUI Flutter')),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Phase 0 scaffold. Streaming chat demo lands in a later PR.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
+      home: const ChatScreen(),
     );
   }
 }

@@ -27,7 +27,7 @@ shared-test-helpers package under `packages/openui_test_helpers/`.
 
 ## Status
 
-v0.1 is in active development.
+v0.1 feature-complete.
 
 - **Phase 0** — architectural decisions, spikes, scaffold. Complete.
 - **Phase 1** — `openui_core` language and runtime. Complete. 461 tests at
@@ -37,10 +37,14 @@ v0.1 is in active development.
   `ToolProvider` + `extractToolResult`, `Library` + `defineComponent` +
   `reactive(schema)`, and a JS-compatible `parse(source, paramMap)`
   integration entry with a contract suite ported from the JS reference.
-- **Phase 2** — `openui` Flutter package (`Renderer` widget, form-state
-  cache, error boundary). Not started.
-- **Phase 3** — `openui_components` and `openui_chat`. Not started.
-- **Phase 4** — `openui_mcp` + example app + polish for v0.1.0. Not started.
+- **Phase 2** — `openui` Flutter package: `Renderer` widget, error
+  boundary, form-state cache, query manager, `RendererScope`. Complete.
+- **Phase 3** — `openui_components` (21 built-in widgets across layout,
+  content, forms, data, charts) and `openui_chat`
+  (`OpenUiChatController` + 4 SSE adapters + `MessageFormat`). Complete.
+- **Phase 4** — `openui_mcp` (`McpToolProvider` over `mcp_dart`) and the
+  example app: 5 stubbed-LLM scripts that drive the full streaming
+  chat surface end-to-end. Complete.
 - **Phase 5** — Post-v0.1 polish backlog (multi-thread chat, persistence,
   reconnect, extra adapters, more components, CLI brick). Deferred;
   documented in the plan for visibility, not part of v0.1.

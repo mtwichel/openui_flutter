@@ -38,6 +38,7 @@ export 'src/library/library.dart'
         Library,
         ReactiveAssign,
         defineComponent,
+        evaluateElementProps,
         isReactiveAssign,
         reactive;
 export 'src/merge/merge.dart' show mergeStatements;

@@ -199,4 +199,152 @@ void main() {
       expect(isReactiveAssign({'x': 1}), isFalse);
     });
   });
+
+  group('evaluateElementProps', () {
+    CompCall callFor(String source) {
+      final program = parseProgram(source);
+      return program.statements.single.expression as CompCall;
+    }
+
+    test('evaluates every named arg through the evaluator', () {
+      final schema = Schema.object(
+        properties: {'label': Schema.string(), 'count': Schema.integer()},
+      );
+      final ctx = EvalContext(statements: const [], store: Store());
+      final props = evaluateElementProps(
+        call: callFor('a = Button(label: "Click", count: 1 + 2)'),
+        schema: schema,
+        context: ctx,
+      );
+      expect(props, {'label': 'Click', 'count': 3});
+    });
+
+    test('a reactive prop bound to a StateRef emits a ReactiveAssign', () {
+      final schema = Schema.object(
+        properties: {'value': reactive(Schema.string())},
+      );
+      final store = Store()..set(r'$name', 'alice');
+      final ctx = EvalContext(statements: const [], store: store);
+      final props = evaluateElementProps(
+        call: callFor(r'a = Input(value: $name)'),
+        schema: schema,
+        context: ctx,
+      );
+      final v = props['value'];
+      expect(isReactiveAssign(v), isTrue);
+      expect(v, isA<ReactiveAssign>());
+      expect((v! as ReactiveAssign).target, r'$name');
+      expect((v as ReactiveAssign).value, 'alice');
+    });
+
+    test(
+      'a reactive prop bound to a non-StateRef expression evaluates normally',
+      () {
+        // The lang says reactive(...) is only "live" when the bound
+        // expression is a bare $state ref. A literal or computed
+        // expression resolves to a value (one-way).
+        final schema = Schema.object(
+          properties: {'value': reactive(Schema.string())},
+        );
+        final ctx = EvalContext(statements: const [], store: Store());
+        final props = evaluateElementProps(
+          call: callFor('a = Input(value: "static")'),
+          schema: schema,
+          context: ctx,
+        );
+        expect(props['value'], 'static');
+        expect(isReactiveAssign(props['value']), isFalse);
+      },
+    );
+
+    test(
+      'a non-reactive prop bound to a StateRef just resolves the value',
+      () {
+        final schema = Schema.object(properties: {'value': Schema.string()});
+        final store = Store()..set(r'$msg', 'hi');
+        final ctx = EvalContext(statements: const [], store: store);
+        final props = evaluateElementProps(
+          call: callFor(r'a = Display(value: $msg)'),
+          schema: schema,
+          context: ctx,
+        );
+        expect(props['value'], 'hi');
+        expect(isReactiveAssign(props['value']), isFalse);
+      },
+    );
+
+    test('positional args are dropped', () {
+      final schema = Schema.object();
+      final ctx = EvalContext(statements: const [], store: Store());
+      final props = evaluateElementProps(
+        call: callFor('a = Stack("positional", named: 1)'),
+        schema: schema,
+        context: ctx,
+      );
+      expect(props.keys, ['named']);
+    });
+
+    test('args matching no schema prop are still included', () {
+      final schema = Schema.object(properties: {'a': Schema.string()});
+      final ctx = EvalContext(statements: const [], store: Store());
+      final props = evaluateElementProps(
+        call: callFor('x = Comp(a: "hi", extra: 42)'),
+        schema: schema,
+        context: ctx,
+      );
+      expect(props, {'a': 'hi', 'extra': 42});
+    });
+
+    test('a schema with no properties key evaluates every arg normally', () {
+      // Construct directly so we have a Schema without `properties`.
+      final schema = Schema.fromMap(const {'type': 'object'});
+      final ctx = EvalContext(statements: const [], store: Store());
+      final props = evaluateElementProps(
+        call: callFor('a = X(label: "hi")'),
+        schema: schema,
+        context: ctx,
+      );
+      expect(props, {'label': 'hi'});
+    });
+
+    test('a properties entry that is not a map is treated as non-reactive', () {
+      // Hand-build a deliberately malformed schema so the entry isn't a
+      // Map. The helper should fall back to the regular evaluation
+      // path without throwing.
+      final schema = Schema.fromMap(const {
+        'type': 'object',
+        'properties': {'value': 'malformed'},
+      });
+      final store = Store()..set(r'$x', 'live');
+      final ctx = EvalContext(statements: const [], store: store);
+      final props = evaluateElementProps(
+        call: callFor(r'a = X(value: $x)'),
+        schema: schema,
+        context: ctx,
+      );
+      expect(props['value'], 'live');
+      expect(isReactiveAssign(props['value']), isFalse);
+    });
+
+    test('ReactiveAssign carries the live store value at call time', () {
+      final schema = Schema.object(
+        properties: {'value': reactive(Schema.string())},
+      );
+      final store = Store()..set(r'$name', 'before');
+      final ctx = EvalContext(statements: const [], store: store);
+      final first = evaluateElementProps(
+        call: callFor(r'a = Input(value: $name)'),
+        schema: schema,
+        context: ctx,
+      );
+      expect((first['value']! as ReactiveAssign).value, 'before');
+      store.set(r'$name', 'after');
+      final second = evaluateElementProps(
+        call: callFor(r'a = Input(value: $name)'),
+        schema: schema,
+        context: ctx,
+      );
+      expect((second['value']! as ReactiveAssign).value, 'after');
+    });
+  });
 }

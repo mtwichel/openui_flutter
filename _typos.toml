@@ -1,0 +1,24 @@
+[default.extend-words]
+# Project-specific spellings
+openui = "openui"
+genui = "genui"
+thesys = "thesys"
+thesysdev = "thesysdev"
+mcp = "mcp"
+sse = "sse"
+ag = "ag"
+cancelled = "cancelled"
+
+[default.extend-identifiers]
+# Identifiers that look like typos
+agUI = "agUI"
+langgraph = "langgraph"
+
+[files]
+extend-exclude = [
+  "*.lock",
+  "**/.dart_tool/**",
+  "**/build/**",
+  "**/coverage/**",
+  "tools/spikes/**",
+]

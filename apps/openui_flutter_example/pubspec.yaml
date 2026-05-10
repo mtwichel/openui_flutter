@@ -1,0 +1,25 @@
+name: openui_flutter_example
+description: Stubbed-LLM streaming chat demo for OpenUI Flutter.
+version: 0.0.1+1
+publish_to: none
+
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ^3.35.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  openui: ^0.1.0
+  openui_chat: ^0.1.0
+  openui_components: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^10.2.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,6 @@
+name: spike_s01
+publish_to: none
+environment:
+  sdk: ^3.9.0
+dependencies:
+  json_schema_builder: ^0.1.3

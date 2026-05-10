@@ -1,0 +1,27 @@
+name: openui_flutter_example
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/openui_flutter_example.yml
+      - apps/openui_flutter_example/**
+      - packages/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/openui_flutter_example.yml
+      - apps/openui_flutter_example/**
+      - packages/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    with:
+      working_directory: apps/openui_flutter_example
+      min_coverage: 0
+      flutter_channel: stable
+      flutter_version: 3.41.9

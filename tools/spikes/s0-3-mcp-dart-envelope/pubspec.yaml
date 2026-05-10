@@ -1,0 +1,6 @@
+name: mcp_inspect
+publish_to: none
+environment:
+  sdk: ^3.9.0
+dependencies:
+  mcp_dart: ^2.1.1

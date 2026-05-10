@@ -1,0 +1,29 @@
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+pubspec.lock
+
+# Generated
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+coverage/
+doc/api/
+
+# Editor / OS
+.idea/
+.vscode/
+.claude/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Spike workspaces
+tools/spikes/*/.dart_tool/
+tools/spikes/*/build/
+tools/spikes/*/pubspec.lock

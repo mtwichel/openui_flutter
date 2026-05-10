@@ -1,0 +1,27 @@
+name: openui
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/openui.yml
+      - packages/openui/**
+      - packages/openui_core/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/openui.yml
+      - packages/openui/**
+      - packages/openui_core/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    with:
+      working_directory: packages/openui
+      min_coverage: 100
+      flutter_channel: stable
+      flutter_version: 3.41.9

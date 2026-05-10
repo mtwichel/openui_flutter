@@ -1,0 +1,28 @@
+name: check_deps
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/check_deps.yml
+      - tool/check_deps.dart
+      - packages/**/pubspec.yaml
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/check_deps.yml
+      - tool/check_deps.dart
+      - packages/**/pubspec.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.11.5
+      - run: dart run tool/check_deps.dart

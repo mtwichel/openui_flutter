@@ -1,0 +1,20 @@
+name: openui_chat
+description: >
+  Headless chat controller for OpenUI Flutter. SSE adapters, message format,
+  action-plan dispatch, and per-stream cancellation. Pure Dart, no Flutter.
+version: 0.1.0
+repository: https://github.com/VeryGoodOpenSource/openui_flutter
+homepage: https://github.com/VeryGoodOpenSource/openui_flutter/tree/main/packages/openui_chat
+issue_tracker: https://github.com/VeryGoodOpenSource/openui_flutter/issues
+
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  openui_core: ^0.1.0
+
+dev_dependencies:
+  test: ^1.25.0
+  very_good_analysis: ^10.2.0

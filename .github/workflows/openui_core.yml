@@ -1,0 +1,24 @@
+name: openui_core
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/openui_core.yml
+      - packages/openui_core/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/openui_core.yml
+      - packages/openui_core/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
+    with:
+      working_directory: packages/openui_core
+      min_coverage: 100
+      dart_sdk: 3.11.5

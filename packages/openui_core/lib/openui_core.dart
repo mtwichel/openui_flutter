@@ -6,6 +6,8 @@
 /// and v0.2.
 library;
 
+export 'package:json_schema_builder/json_schema_builder.dart' show Schema;
+
 export 'src/actions/actions.dart'
     show
         ActionPlan,
@@ -29,6 +31,15 @@ export 'src/errors/errors.dart'
         UnknownComponentError;
 export 'src/eval/builtins.dart' show functionalBuiltins;
 export 'src/eval/evaluator.dart' show BuiltinHandler, EvalContext, evaluate;
+export 'src/library/library.dart'
+    show
+        Component,
+        ComponentRender,
+        Library,
+        ReactiveAssign,
+        defineComponent,
+        isReactiveAssign,
+        reactive;
 export 'src/merge/merge.dart' show mergeStatements;
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
 export 'src/parser/materialize.dart'

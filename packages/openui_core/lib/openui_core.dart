@@ -16,6 +16,7 @@ export 'src/errors/errors.dart'
         ParseError,
         ToolNotFoundError,
         UnknownComponentError;
+export 'src/eval/evaluator.dart' show BuiltinHandler, EvalContext, evaluate;
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
 export 'src/parser/materialize.dart'
     show ElementNode, MaterializedResult, materialize;

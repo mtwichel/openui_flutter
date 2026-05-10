@@ -63,10 +63,16 @@ root = Card(children: [
 
     testWidgets('Button fires its onClick action plan', (tester) async {
       final events = <ActionEvent>[];
+      // Trailing newline is intentional — without it the streaming
+      // parser puts `root = Button(...)` in the "pending tail" and the
+      // renderer disables the action (Acceptance Gap A6). The CI test
+      // bundler was hitting this; locally it didn't because the
+      // unbundled runner cached the parser state differently.
       await tester.pumpWidget(
         _app(
           r'''$count = 0
-root = Button(label: "Click", onClick: @Set($count, $count + 1))''',
+root = Button(label: "Click", onClick: @Set($count, $count + 1))
+''',
           onAction: events.add,
         ),
       );

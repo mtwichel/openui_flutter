@@ -51,6 +51,27 @@ void main() {
       expect(tokens.map((t) => t.value), ['hello\nworld', 'quote"']);
     });
 
+    test('decodes the full string-escape table', () {
+      final tokens = tokenize(
+        r'"\t\r\\" "\@unknown"',
+      ).where((t) => t.kind != TokenKind.eof).toList();
+      expect(tokens, hasLength(2));
+      // \t -> tab, \r -> carriage return, \\ -> backslash.
+      expect(tokens[0].value, '\t\r\\');
+      // Unknown escapes survive verbatim minus the backslash.
+      expect(tokens[1].value, '@unknown');
+    });
+
+    test('parses single-character binary operators', () {
+      final tokens = tokenize(
+        '1 + 2 - 3 * 4 / 5 % 6',
+      ).where((t) => t.kind != TokenKind.eof).toList();
+      expect(
+        tokens.where((t) => t.kind == TokenKind.op).map((t) => t.value),
+        ['+', '-', '*', '/', '%'],
+      );
+    });
+
     test('parses integer and decimal numbers', () {
       final tokens = tokenize(
         '42 3.14',
@@ -135,6 +156,20 @@ void main() {
 
     test('throws on unexpected char', () {
       expect(() => tokenize('#').toList(), throwsA(isA<LexException>()));
+    });
+
+    test('throws on dangling backslash inside a string', () {
+      expect(
+        () => tokenize(r'"oops\').toList(),
+        throwsA(isA<LexException>()),
+      );
+    });
+  });
+
+  group('LexException', () {
+    test('toString includes offset and message', () {
+      final ex = LexException('boom', 42);
+      expect(ex.toString(), 'LexException at offset 42: boom');
     });
   });
 

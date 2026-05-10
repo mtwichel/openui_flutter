@@ -6,6 +6,16 @@
 /// and v0.2.
 library;
 
+export 'src/errors/errors.dart'
+    show
+        AdapterMismatchError,
+        CyclicStateError,
+        EvaluationError,
+        McpToolError,
+        OpenUIError,
+        ParseError,
+        ToolNotFoundError,
+        UnknownComponentError;
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
 export 'src/parser/materialize.dart'
     show ElementNode, MaterializedResult, materialize;

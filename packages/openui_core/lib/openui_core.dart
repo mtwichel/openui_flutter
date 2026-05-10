@@ -7,3 +7,32 @@
 library;
 
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
+export 'src/parser/parser.dart'
+    show
+        Argument,
+        ArrayLit,
+        AstNode,
+        BinaryOp,
+        BuiltinCall,
+        CompCall,
+        IndexAccess,
+        Literal,
+        MemberAccess,
+        MutationCall,
+        NullLiteral,
+        ObjectEntry,
+        ObjectLit,
+        ParseException,
+        Program,
+        QueryCall,
+        Reference,
+        StateAssign,
+        StateRef,
+        Statement,
+        StatementKind,
+        Ternary,
+        UnaryOp,
+        autoClose,
+        classifyStatement,
+        parseExpression,
+        parseProgram;

@@ -63,9 +63,17 @@ class Program {
 /// Use [parseExpression] when only an RHS is needed (tests, fixtures).
 /// Use the streaming parser (Phase 1, separate file) when feeding tokens
 /// chunk-by-chunk.
+///
+/// Set [recoverable] when feeding the parser an `autoClose`-patched
+/// tail: it switches the lexer into truncation-tolerant mode so a
+/// dangling `\` or other partial token escapes through as a best-effort
+/// token instead of throwing `LexException`. The grammar layer still
+/// records [ParseException]s for genuine syntax errors.
 @experimental
-Program parseProgram(String source) {
-  final tokens = tokenize(source).toList(growable: false);
+Program parseProgram(String source, {bool recoverable = false}) {
+  final tokens = tokenize(source, recoverable: recoverable).toList(
+    growable: false,
+  );
   final statements = <Statement>[];
   final errors = <ParseException>[];
   var pos = 0;

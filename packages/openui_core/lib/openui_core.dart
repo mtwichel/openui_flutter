@@ -36,3 +36,12 @@ export 'src/parser/parser.dart'
         classifyStatement,
         parseExpression,
         parseProgram;
+export 'src/parser/streaming.dart'
+    show
+        MutationDecl,
+        ParseMeta,
+        ParseResult,
+        QueryDecl,
+        StateDecl,
+        StreamParser,
+        createStreamingParser;

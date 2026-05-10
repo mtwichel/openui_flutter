@@ -72,3 +72,4 @@ export 'src/parser/streaming.dart'
         StreamParser,
         createStreamingParser;
 export 'src/state/store.dart' show Store;
+export 'src/tools/tools.dart' show ToolProvider, ToolResult, extractToolResult;

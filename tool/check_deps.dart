@@ -18,8 +18,7 @@ const _rules = <String, _PackageRule>{
   ),
   'openui': _PackageRule(
     type: _PackageType.flutter,
-    // `meta`, `http`, ... will be added in later phases as they get used.
-    allowed: {'flutter', 'openui_core'},
+    allowed: {'flutter', 'meta', 'openui_core'},
   ),
   'openui_chat': _PackageRule(
     type: _PackageType.dart,

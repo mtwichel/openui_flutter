@@ -472,8 +472,15 @@ class _RendererState extends State<Renderer> {
       return _renderAst(value, ctx, statementHint: statementId);
     }
     if (value is ArrayLit) {
+      // `Reference` counts as widget-like because the JS reference's
+      // canonical idiom is `root = Column(children: [a, b])` with
+      // `a = Card(...)`. The reference target is most often a CompCall
+      // and renderNode follows it to the right widget.
       final hasComp = value.elements.any(
-        (e) => e is CompCall || (e is BuiltinCall && _isIterating(e)),
+        (e) =>
+            e is CompCall ||
+            e is Reference ||
+            (e is BuiltinCall && _isIterating(e)),
       );
       if (hasComp) {
         return [

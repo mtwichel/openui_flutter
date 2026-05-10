@@ -112,33 +112,35 @@ void main() {
       expect(builds, 2);
     });
 
-    testWidgets('updateShouldNotify does not fire when nothing changes', (
-      tester,
-    ) async {
-      var builds = 0;
+    test('updateShouldNotify returns false when nothing changes', () {
       final store = Store();
       addTearDown(store.dispose);
       final cache = FormStateCache();
       addTearDown(cache.dispose);
 
-      Widget tree() => Directionality(
-        textDirection: TextDirection.ltr,
-        child: _scope(
+      RendererScope build({
+        bool isStreaming = false,
+        Set<String> incomplete = const <String>{},
+      }) {
+        return RendererScope(
           store: store,
-          cache: cache,
-          child: Builder(
-            builder: (context) {
-              RendererScope.of(context);
-              builds++;
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      );
+          formStateCache: cache,
+          isStreaming: isStreaming,
+          incomplete: incomplete,
+          onActionAst: (_, _, {payload}) async {},
+          child: const SizedBox.shrink(),
+        );
+      }
 
-      await tester.pumpWidget(tree());
-      await tester.pumpWidget(tree());
-      expect(builds, 1);
+      expect(build().updateShouldNotify(build()), isFalse);
+      expect(
+        build(isStreaming: true).updateShouldNotify(build()),
+        isTrue,
+      );
+      expect(
+        build(incomplete: {'a'}).updateShouldNotify(build()),
+        isTrue,
+      );
     });
   });
 }

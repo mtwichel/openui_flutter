@@ -6,6 +6,17 @@
 /// and v0.2.
 library;
 
+export 'src/actions/actions.dart'
+    show
+        ActionPlan,
+        ActionStep,
+        ContinueConversationStep,
+        OpenUrlStep,
+        ResetStep,
+        RunStep,
+        SetStep,
+        actionPlanFromAst,
+        dispatchAction;
 export 'src/errors/errors.dart'
     show
         AdapterMismatchError,

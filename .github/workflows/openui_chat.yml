@@ -19,8 +19,10 @@ concurrency:
 
 jobs:
   build:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/dart_package.yml@v1
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
     with:
       working_directory: packages/openui_chat
-      min_coverage: 100
-      dart_sdk: 3.11.5
+      # Phase 0 scaffold: barrel is empty pending Phase 3 implementation.
+      min_coverage: 0
+      flutter_channel: stable
+      flutter_version: 3.41.9

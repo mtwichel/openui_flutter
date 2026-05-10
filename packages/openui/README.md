@@ -7,113 +7,134 @@
 Flutter `Renderer` widget for OpenUI Lang.
 
 The renderer takes a streaming `response: String` from your LLM, parses it
-against a `Library` of components, and rebuilds the widget tree on every
-chunk. It owns the reactive store, the form-state cache (so
-`TextEditingController`s survive mid-stream rebuilds), and the
-streaming-tolerant error boundary.
+against a `Library<Widget>` of components, and rebuilds the widget tree on
+every chunk. It owns the reactive store, the form-state cache (so
+`TextEditingController`s survive mid-stream rebuilds), the query manager,
+and a streaming-tolerant error boundary.
 
 ## Status
 
-v0.1, Phase 2 — not started. The Phase 0 scaffold is in place; the
-`Renderer` widget lands here.
+v0.1, Phase 2 complete. The package now ships:
 
-## Phase 2 plan
+- `Renderer` — the streaming widget.
+- `ErrorBoundary` — per-element error capture with last-good fallback.
+- `FormStateCache` — `TextEditingController` cache keyed by
+  `(formName, fieldName)` with a 250 ms grace window.
+- `QueryManager` — `@Run`-invalidatable query cache backed by a
+  `ToolProvider` or a test `QueryLoader`.
+- `RendererScope` — `InheritedWidget` exposing the store and form-state
+  cache to component implementations.
 
-Full scope is in
-[`docs/plan/2026-05-10-feat-openui-flutter-port-plan.md`](../../docs/plan/2026-05-10-feat-openui-flutter-port-plan.md)
-(`#### Phase 2: openui renderer`). Deliverables:
-
-1. **`Renderer` widget** (`lib/src/renderer.dart`) — `StatefulWidget` with
-   the API table below. Owns parser, store, query manager, form-state
-   cache, error boundary.
-2. **`_FormStateCache`** (`lib/src/form_state_cache.dart`) — keyed by
-   `(formName, fieldName)`, 250 ms debounce before disposal (Decision D7).
-3. **`_ErrorBoundary` widget** (`lib/src/error_boundary.dart`) — wraps
-   every component render; caches last successful child; recovers on the
-   next non-throwing `build()`.
-4. **Component dispatch** (`lib/src/render_node.dart`) — looks up
-   `Component<Widget>` by `typeName` in the library, invokes
-   `ComponentRender<Widget>(context, props, renderNode, statementId)`.
-5. **`renderNode` callback** — recursive child rendering. Reactive props
-   arrive as `ReactiveAssign` markers (use `isReactiveAssign` from core).
-6. **Loading overlay** — 0.7 opacity + 0.2 s transition while a query is
-   loading; honors the optional `queryLoadingPlaceholder` slot.
-7. **Streaming UX** — interactive components disable tap targets when
-   their containing statement is `meta.incomplete` (Acceptance Gap A6).
-8. **MCP detection** — `Renderer` checks if `toolProvider` is an MCP
-   adapter and runs `extractToolResult` on its responses.
-9. **Error deduplication** — `onError` fires only when the error set
-   changes (`listEquals` over `OpenUIError`'s structural equality).
-   Errors clear during streaming for LLM correction loops.
-10. **Widget tests** — cold render, streaming append (focus preserved),
-    error boundary recovery, form controller persistence across rebuild,
-    reactive prop two-way binding, action dispatch (set, reset, run,
-    continue_conversation, open_url).
-
-Success criteria: 100% line coverage on logic, widget tests demonstrate
-focus preservation across mid-stream rebuilds, error boundary recovers
-cleanly, every public symbol has dartdoc.
-
-## What `openui_core` provides for Phase 2
-
-The renderer composes existing pieces from `openui_core`:
-
-| Use this | For |
-|---|---|
-| `createStreamingParser(rootName: ...)` | Per-chunk parse + materialization. Returns `ParseResult` with `root: ElementNode?`, `meta` (incomplete / unresolved / orphaned / errors / stateDecls / queries / mutations). |
-| `parse(source, paramMap, {rootName})` | Optional integration entry that mirrors the JS reference — returns `CompiledProgram` with a fully-resolved `ResolvedElement` tree (`typeName + props + statementId`). Useful for non-streaming render passes and the contract suite. |
-| `Library<Widget>` | Component registry. Each `Component<Widget>` carries a `Schema` and a `ComponentRender<Widget>` callback. `defineComponent<Widget>(...)` is the factory. |
-| `evaluateElementProps(call, schema, context)` | Walks a `CompCall`'s named args, evaluates them against the `EvalContext`, emits `ReactiveAssign` markers for reactive props bound to `$state`. |
-| `Store` | One per `Renderer` (Decision D4). `set` short-circuits on shallow equality. `subscribe(...)` returns the unsubscribe callback. |
-| `EvalContext` | Statements, store, query results, iteration scope, builtins, errors sink. `withIteration({...})` shares the cycle-detection set across children. |
-| `evaluate(ast, context)` | Runtime AST → value. Used by component renderers that need to resolve sub-expressions dynamically (e.g. dynamic styles). |
-| `functionalBuiltins` | Drop into `EvalContext.builtins` to get `@Count`, `@Filter`, `@Each`, `@Map`. |
-| `actionPlanFromAst(astNode)` → `dispatchAction(plan: ..., context: ..., onRun: ..., onContinueConversation: ..., onOpenUrl: ..., stateDefaults: ...)` | Bridge from action-shaped AST to plan execution. `SetStep.valueAst` re-evaluates against the live store at click time per Decision D3. |
-| `mergeStatements(existing, patch, {rootId})` | LLM "edit, don't rewrite" pathway. The renderer never invokes this automatically (Acceptance Gap A17). |
-| `ToolProvider` + `extractToolResult` | Query / mutation execution. `openui_mcp` will implement `ToolProvider` over `mcp_dart`; the renderer wraps the call site so any provider works. |
-| `OpenUIError` hierarchy | Sealed: `ParseError`, `EvaluationError`, `CyclicStateError`, `UnknownComponentError`, `McpToolError`, `ToolNotFoundError`, `AdapterMismatchError`. Each has structural equality so dedup is a `listEquals` over the error list. |
-
-Open question for Phase 2: should `Renderer` use `createStreamingParser` +
-runtime `evaluate` per render, or the static `parse(source, paramMap)` +
-treewalker? The plan says streaming parser. The `parse()` integration
-gives an easier mental model but doesn't yet have a streaming variant.
-
-## `Renderer` API (from the plan)
-
-```dart
-class Renderer extends StatefulWidget {
-  final String? response;
-  final Library<Widget> library;
-  final bool isStreaming;
-  final void Function(ActionEvent)? onAction;
-  final void Function(Map<String, Object?>)? onStateUpdate;
-  final Map<String, Object?>? initialState;
-  final void Function(ParseResult?)? onParseResult;
-  final ToolProvider? toolProvider;
-  final QueryLoader? queryLoader;
-  final void Function(List<OpenUIError>)? onError;
-  final Widget? queryLoadingPlaceholder;
-}
-```
-
-`ActionEvent` and `QueryLoader` are new types that land with the renderer.
-`Library` is `openui_core`'s generic `Library<W>` pinned to `Widget`.
-
-## Decisions to honor
-
-Read these before writing the renderer:
-
-- [`D3` Action `$var` resolution](../../docs/decisions/2026-05-10-phase0-decisions.md) — at dispatch (click) time, against current store. `dispatchAction` already implements this.
-- [`D4` Reactive store scope](../../docs/decisions/2026-05-10-phase0-decisions.md) — one `Store` per `Renderer`.
-- [`D7` Form controller cache](../../docs/decisions/2026-05-10-phase0-decisions.md) — per-`Renderer`, keyed by `(formName, fieldName)`, 250 ms grace before disposal.
-- [`D8` Concurrent renders / sends](../../docs/decisions/2026-05-10-phase0-decisions.md) — queue-and-replace.
+Phase 3 ships the built-in component library on top of these primitives.
 
 ## Install
 
 ```yaml
 dependencies:
   openui: ^0.1.0
+  openui_core: ^0.1.0
 ```
+
+## Quick start
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:openui/openui.dart';
+import 'package:openui_core/openui_core.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Renderer(
+          response: 'root = Text(text: "Hello, OpenUI!")',
+          library: Library<Widget>(<Component<Widget>>[
+            defineComponent<Widget>(
+              name: 'Text',
+              schema: Schema.fromMap(const <String, Object?>{
+                'type': 'object',
+                'properties': <String, Object?>{
+                  'text': <String, Object?>{'type': 'string'},
+                },
+              }),
+              render: (ctx, props, renderNode, id) =>
+                  Text(props['text'] as String? ?? ''),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+```
+
+`Renderer` is a `StatefulWidget`; each call with a new `response` runs the
+streaming parser, seeds the reactive store, and fires any queries the
+parsed program declares.
+
+## `Renderer` API
+
+| Field | Purpose |
+|---|---|
+| `response: String?` | Cumulative source from the LLM. `null` = no content yet. |
+| `library: Library<Widget>` | Component registry. Required. |
+| `isStreaming: bool` | Whether `response` is still appending. Propagated to components via `RendererScope.isStreaming`. |
+| `onAction: void Function(ActionEvent)?` | Notified when an action plan fires. |
+| `onStateUpdate: void Function(Map<String, Object?>)?` | Notified after every store write with the post-write snapshot. |
+| `initialState: Map<String, Object?>?` | Persisted state seed. Keys include the leading `$`. Wins over parsed defaults. |
+| `onParseResult: void Function(ParseResult)?` | Fired once per parse pass. |
+| `toolProvider: ToolProvider?` | Production transport for `Query` / `Mutation`. |
+| `queryLoader: QueryLoader?` | Test seam — bypasses `toolProvider`. |
+| `onError: void Function(List<OpenUIError>)?` | Notified when the active error set changes. |
+| `rootName: String` | Entry-point statement (default `'root'`). |
+
+## How components consume the renderer
+
+Each component defines a `ComponentRender<Widget>` callback:
+
+```dart
+typedef ComponentRender<W> = W Function(
+  EvalContext context,
+  Map<String, Object?> props,
+  W Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+);
+```
+
+The renderer pre-resolves prop values for you:
+
+- **Primitive props** — already evaluated (e.g. `text: "hi"` arrives as
+  `"hi"`).
+- **Reactive props** (`x-reactive: true` in the schema, bound to a
+  `$state` ref) — arrive as a `ReactiveAssign` marker. Read
+  `marker.value` and write user edits back to `marker.target` via
+  `context.store.set(target, ...)`.
+- **Child components / arrays of components** — pre-rendered to `Widget`
+  / `List<Widget>` so you can drop them straight into your tree.
+- **Action props** (`@Set`, `@Reset`, `@Run`, `@ToAssistant`,
+  `@OpenUrl`) — arrive as `void Function()` callbacks that the renderer
+  ties to its action dispatcher.
+
+Need access to the form-state cache or the store from a component?
+`RendererScope.maybeFind(context)` exposes both.
+
+## Decisions honored
+
+- **D3 — Action `$var` resolution** at dispatch time, against the live
+  store. `dispatchAction` already implements this; the renderer carries
+  the unevaluated AST through.
+- **D4 — One `Store` per `Renderer`**. Created in `initState`, disposed
+  in `dispose`.
+- **D7 — Form controller cache** keyed by `(formName, fieldName)` with a
+  250 ms grace before disposal so focus survives streamed rebuilds.
+- **A14 — Error boundary auto-recovery**: a single successful build
+  clears the cached child. Flutter's synchronous build doesn't need
+  React's 3-frame counter.
 
 ## License
 

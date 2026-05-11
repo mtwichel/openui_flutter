@@ -498,5 +498,69 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
       expect(events, isNotEmpty);
       expect(events.first.plan.steps.first, isA<OpenUrlStep>());
     });
+
+    testWidgets(
+      'streaming keeps the last good root mounted during a parser hiccup',
+      (tester) async {
+        Widget tree(String response) => _TestRoot(
+          child: Renderer(
+            response: response,
+            library: _testLibrary(),
+            isStreaming: true,
+          ),
+        );
+
+        // 1. Full, valid program — the cache should retain this root.
+        await tester.pumpWidget(tree('root = Text(text: "first")\n'));
+        await tester.pumpAndSettle();
+        expect(find.text('first'), findsOneWidget);
+
+        // 2. Mid-stream extension that the parser can't yet resolve to a
+        //    materialized root (the new statement is in the pending
+        //    tail; the parser hasn't seen a complete `root = ...` for
+        //    the next snapshot). Without the cache, the body would
+        //    collapse to a SizedBox.shrink and "first" would unmount.
+        await tester.pumpWidget(
+          tree('root = Text(text: "first")\nroot = Text(text: "se'),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('first'),
+          findsOneWidget,
+          reason: 'cached root keeps the previous render visible',
+        );
+
+        // 3. The stream resolves — the new root replaces the cache.
+        await tester.pumpWidget(
+          tree('root = Text(text: "first")\nroot = Text(text: "second")\n'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('second'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'cache resets when a new response is unrelated to the previous',
+      (tester) async {
+        Widget tree(String response, {bool streaming = true}) => _TestRoot(
+          child: Renderer(
+            response: response,
+            library: _testLibrary(),
+            isStreaming: streaming,
+          ),
+        );
+
+        await tester.pumpWidget(tree('root = Text(text: "alpha")\n'));
+        await tester.pumpAndSettle();
+        expect(find.text('alpha'), findsOneWidget);
+
+        // A shorter, non-prefix response — this is a fresh stream.
+        // The cache from the alpha response must be discarded so a
+        // null root produces an empty body, not the stale alpha tree.
+        await tester.pumpWidget(tree(''));
+        await tester.pumpAndSettle();
+        expect(find.text('alpha'), findsNothing);
+      },
+    );
   });
 }

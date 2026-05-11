@@ -100,6 +100,16 @@ class _RendererState extends State<Renderer> {
   List<OpenUIError> _lastReportedErrors = const <OpenUIError>[];
   void Function()? _storeUnsubscribe;
 
+  // "Last good root" cache. Mid-stream, autoClose patches the pending
+  // tail differently on every chunk, so a single tick can produce a
+  // null or misshapen root while neighboring ticks parse cleanly. When
+  // `isStreaming` is true, prefer the cached root over a degraded new
+  // parse so the visible tree doesn't flicker between bad shapes.
+  // Mirrors the JS reference's completed-statement caching strategy
+  // (lang-core/src/parser/parser.ts, completedStmtMap).
+  ElementNode? _lastGoodRoot;
+  String _previousResponse = '';
+
   @override
   void initState() {
     super.initState();
@@ -163,8 +173,19 @@ class _RendererState extends State<Renderer> {
 
   void _runPipeline() {
     final response = widget.response ?? '';
+    // Reset the last-good cache when the new buffer can't be a
+    // continuation of the previous one (shorter, or starts differently).
+    // Matches the JS reference's StreamParser.set reset rule.
+    if (response.length < _previousResponse.length ||
+        !response.startsWith(_previousResponse)) {
+      _lastGoodRoot = null;
+    }
+    _previousResponse = response;
     final result = _parser.set(response);
     _lastResult = result;
+    if (result.root != null && result.meta.errors.isEmpty) {
+      _lastGoodRoot = result.root;
+    }
 
     // Eval state defaults against a throwaway store so the seed values
     // can reference plain (non-state) statements but cannot read from
@@ -262,7 +283,11 @@ class _RendererState extends State<Renderer> {
   Widget build(BuildContext context) {
     _formStateCache.beginPass();
     final result = _lastResult;
-    final root = result?.root;
+    // Mid-stream the parser can produce a null root for one tick and a
+    // non-null root the next; falling back to the cached good root
+    // keeps the rendered tree mounted across those gaps. After the
+    // stream finishes, the cache is irrelevant — the final parse wins.
+    final root = result?.root ?? (widget.isStreaming ? _lastGoodRoot : null);
     final incomplete = <String>{...?result?.meta.incomplete};
 
     Widget body;

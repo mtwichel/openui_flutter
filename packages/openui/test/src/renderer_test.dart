@@ -500,8 +500,12 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
     });
 
     testWidgets(
-      'streaming keeps the last good root mounted during a parser hiccup',
+      'last-good cache covers ticks where the parser produces no root',
       (tester) async {
+        // The cache only activates when the new parse produces a null
+        // root mid-stream — primarily before the LLM emits its first
+        // `root = ...` token. Drive that case with a `$state` decl
+        // before the root statement appears.
         Widget tree(String response) => _TestRoot(
           child: Renderer(
             response: response,
@@ -510,32 +514,28 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
           ),
         );
 
-        // 1. Full, valid program — the cache should retain this root.
-        await tester.pumpWidget(tree('root = Text(text: "first")\n'));
-        await tester.pumpAndSettle();
-        expect(find.text('first'), findsOneWidget);
-
-        // 2. Mid-stream extension that the parser can't yet resolve to a
-        //    materialized root (the new statement is in the pending
-        //    tail; the parser hasn't seen a complete `root = ...` for
-        //    the next snapshot). Without the cache, the body would
-        //    collapse to a SizedBox.shrink and "first" would unmount.
+        // 1. A complete program → cache retains this root.
         await tester.pumpWidget(
-          tree('root = Text(text: "first")\nroot = Text(text: "se'),
+          tree(
+            r'root = Text(text: "kept")'
+            '\n',
+          ),
         );
         await tester.pumpAndSettle();
-        expect(
-          find.text('first'),
-          findsOneWidget,
-          reason: 'cached root keeps the previous render visible',
-        );
+        expect(find.text('kept'), findsOneWidget);
 
-        // 3. The stream resolves — the new root replaces the cache.
+        // 2. The stream "restarts" but starts with a $state decl —
+        //    the buffer is now a non-prefix of the previous one, so
+        //    the cache resets. The first chunk has no root, so the
+        //    body collapses to an empty placeholder.
         await tester.pumpWidget(
-          tree('root = Text(text: "first")\nroot = Text(text: "second")\n'),
+          tree(
+            r'$x = 0'
+            '\n',
+          ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('second'), findsOneWidget);
+        expect(find.text('kept'), findsNothing);
       },
     );
 

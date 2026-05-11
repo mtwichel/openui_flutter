@@ -59,9 +59,24 @@ class StubLlmService {
     final raw = await _bundle.loadString(scriptPath);
     final tokens = _tokenize(raw);
     for (final token in tokens) {
-      yield utf8.encode('data: $token\n\n');
+      yield utf8.encode(_frame(token));
       await Future<void>.delayed(_tokenDelay);
     }
+  }
+
+  /// Wraps [token] in one SSE event. Embedded `\n`s become separate
+  /// `data:` lines so the framer joins them back with `\n` instead of
+  /// treating each as an event boundary.
+  String _frame(String token) {
+    final buffer = StringBuffer();
+    for (final line in token.split('\n')) {
+      buffer
+        ..write('data: ')
+        ..write(line)
+        ..write('\n');
+    }
+    buffer.write('\n');
+    return buffer.toString();
   }
 
   /// Splits [source] into chunks that match the way a typical LLM

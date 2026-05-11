@@ -516,10 +516,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
 
         // 1. A complete program → cache retains this root.
         await tester.pumpWidget(
-          tree(
-            r'root = Text(text: "kept")'
-            '\n',
-          ),
+          tree('root = Text(text: "kept")\n'),
         );
         await tester.pumpAndSettle();
         expect(find.text('kept'), findsOneWidget);

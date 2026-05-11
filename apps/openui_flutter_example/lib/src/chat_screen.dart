@@ -24,6 +24,8 @@ class _ChatScreenState extends State<ChatScreen> {
   late OpenUiChatController _controller;
   late StubScript _active;
   final Library<Widget> _library = openuiChatLibrary();
+  final List<OpenUIError> _renderErrors = <OpenUIError>[];
+  bool _showSource = false;
 
   @override
   void initState() {
@@ -43,8 +45,14 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _active = script;
       _service.scriptPath = script.assetPath;
+      _renderErrors.clear();
     });
-    await _controller.sendMessage('Run ${script.name}');
+    try {
+      await _controller.sendMessage('Run ${script.name}');
+    } on Object catch (error, stackTrace) {
+      debugPrint('sendMessage failed: $error\n$stackTrace');
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -52,6 +60,13 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('OpenUI Flutter'),
+        actions: [
+          IconButton(
+            tooltip: _showSource ? 'Hide source' : 'Show source',
+            icon: Icon(_showSource ? Icons.visibility_off : Icons.visibility),
+            onPressed: () => setState(() => _showSource = !_showSource),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -81,33 +96,113 @@ class _ChatScreenState extends State<ChatScreen> {
         initialData: _controller.currentState,
         builder: (context, snapshot) {
           final state = snapshot.data ?? _controller.currentState;
-          if (state.messages.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Pick a script above to start streaming.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-            );
-          }
           final assistant = state.messages
               .whereType<AssistantMessage>()
               .lastOrNull;
-          if (assistant == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: Renderer(
-              response: assistant.response,
-              isStreaming: assistant.isStreaming,
-              library: _library,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _DiagnosticPanel(
+                  state: state,
+                  assistant: assistant,
+                  errors: _renderErrors,
+                ),
+                const SizedBox(height: 12),
+                if (assistant == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: Text('Pick a script above to start streaming.'),
+                    ),
+                  )
+                else ...[
+                  if (_showSource) _SourcePanel(response: assistant.response),
+                  Renderer(
+                    response: assistant.response,
+                    isStreaming: assistant.isStreaming,
+                    library: _library,
+                    onError: (errors) {
+                      setState(() {
+                        _renderErrors
+                          ..clear()
+                          ..addAll(errors);
+                      });
+                    },
+                  ),
+                ],
+              ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _DiagnosticPanel extends StatelessWidget {
+  const _DiagnosticPanel({
+    required this.state,
+    required this.assistant,
+    required this.errors,
+  });
+
+  final ChatState state;
+  final AssistantMessage? assistant;
+  final List<OpenUIError> errors;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lines = <String>[
+      'isRunning: ${state.isRunning}',
+      'messages: ${state.messages.length}',
+      if (assistant != null) ...[
+        'assistant.streaming: ${assistant!.isStreaming}',
+        'assistant.responseLen: ${assistant!.response.length}',
+      ],
+      if (state.error != null) 'state.error: ${state.error}',
+      if (errors.isNotEmpty) 'renderErrors: ${errors.length}',
+      for (final e in errors) '  • $e',
+    ];
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.all(Radius.circular(8)),
+      ),
+      child: DefaultTextStyle(
+        style: theme.textTheme.bodySmall!.copyWith(fontFamily: 'monospace'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [for (final line in lines) Text(line)],
+        ),
+      ),
+    );
+  }
+}
+
+class _SourcePanel extends StatelessWidget {
+  const _SourcePanel({required this.response});
+
+  final String response;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
+        ),
+        child: SelectableText(
+          response.isEmpty ? '(no response yet)' : response,
+          style: theme.textTheme.bodySmall!.copyWith(fontFamily: 'monospace'),
+        ),
       ),
     );
   }

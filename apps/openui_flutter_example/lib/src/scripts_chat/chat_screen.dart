@@ -8,22 +8,31 @@ import 'package:openui_chat/openui_chat.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 
-import 'package:openui_flutter_example/src/stub_llm.dart';
+import 'package:openui_flutter_example/src/scripts_chat/stub_llm.dart';
 
 /// Enables the on-screen diagnostic panel and source viewer. Off by
 /// default; flip with `flutter run --dart-define=DEBUG_PANEL=true`.
 const bool kDebugPanel = bool.fromEnvironment('DEBUG_PANEL');
 
 /// Streaming chat surface backed by the stub LLM.
-class ChatScreen extends StatefulWidget {
-  /// Creates a [ChatScreen].
-  const ChatScreen({super.key});
+///
+/// Reached from the `Scripts` destination of the app shell. When the shell
+/// is in narrow mode it passes [onMenuTap] so the AppBar's leading slot can
+/// open the shell's drawer; in wide mode [onMenuTap] is null and no leading
+/// is shown.
+class ScriptsChatScreen extends StatefulWidget {
+  /// Creates a [ScriptsChatScreen].
+  const ScriptsChatScreen({super.key, this.onMenuTap});
+
+  /// Optional callback that opens the surrounding shell's drawer. Non-null
+  /// only in narrow-viewport mode.
+  final VoidCallback? onMenuTap;
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  State<ScriptsChatScreen> createState() => _ScriptsChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
   late StubLlmService _service;
   late OpenUiChatController _controller;
   late StubScript _active;
@@ -63,6 +72,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onMenuTap != null
+            ? IconButton(
+                tooltip: 'Open menu',
+                icon: const Icon(Icons.menu),
+                onPressed: widget.onMenuTap,
+              )
+            : null,
         title: const Text('OpenUI Flutter'),
         actions: [
           if (kDebugPanel)

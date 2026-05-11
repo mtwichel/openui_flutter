@@ -10,6 +10,10 @@ import 'package:openui_core/openui_core.dart';
 
 import 'package:openui_flutter_example/src/stub_llm.dart';
 
+/// Enables the on-screen diagnostic panel and source viewer. Off by
+/// default; flip with `flutter run --dart-define=DEBUG_PANEL=true`.
+const bool kDebugPanel = bool.fromEnvironment('DEBUG_PANEL');
+
 /// Streaming chat surface backed by the stub LLM.
 class ChatScreen extends StatefulWidget {
   /// Creates a [ChatScreen].
@@ -61,11 +65,12 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('OpenUI Flutter'),
         actions: [
-          IconButton(
-            tooltip: _showSource ? 'Hide source' : 'Show source',
-            icon: Icon(_showSource ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _showSource = !_showSource),
-          ),
+          if (kDebugPanel)
+            IconButton(
+              tooltip: _showSource ? 'Hide source' : 'Show source',
+              icon: Icon(_showSource ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => _showSource = !_showSource),
+            ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
@@ -104,12 +109,14 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _DiagnosticPanel(
-                  state: state,
-                  assistant: assistant,
-                  errors: _renderErrors,
-                ),
-                const SizedBox(height: 12),
+                if (kDebugPanel) ...[
+                  _DiagnosticPanel(
+                    state: state,
+                    assistant: assistant,
+                    errors: _renderErrors,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (assistant == null)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 32),
@@ -118,18 +125,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   )
                 else ...[
-                  if (_showSource) _SourcePanel(response: assistant.response),
+                  if (kDebugPanel && _showSource)
+                    _SourcePanel(response: assistant.response),
                   Renderer(
                     response: assistant.response,
                     isStreaming: assistant.isStreaming,
                     library: _library,
-                    onError: (errors) {
-                      setState(() {
-                        _renderErrors
-                          ..clear()
-                          ..addAll(errors);
-                      });
-                    },
+                    onError: kDebugPanel
+                        ? (errors) {
+                            setState(() {
+                              _renderErrors
+                                ..clear()
+                                ..addAll(errors);
+                            });
+                          }
+                        : null,
                   ),
                 ],
               ],

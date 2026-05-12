@@ -54,10 +54,22 @@ Library<Widget> _testLibrary() {
       }),
       render: (ctx, props, renderNode, id) {
         final value = props['value'] as int? ?? 0;
-        final onTap = props['onIncrement'] as void Function()?;
-        return GestureDetector(
-          onTap: onTap,
-          child: Text('count=$value'),
+        final hasAction = props.containsKey('onIncrement');
+        final action = props['onIncrement'] as ActionPlan?;
+        // Disabled when the prop was supplied but resolved to null
+        // (streaming-incomplete AST); inert when the prop is absent.
+        final disabled = hasAction && action == null;
+        return Builder(
+          builder: (context) {
+            final scope = RendererScope.maybeFind(context);
+            final onTap = (scope == null || disabled || action == null)
+                ? null
+                : () => scope.triggerAction('', action: action);
+            return GestureDetector(
+              onTap: onTap,
+              child: Text('count=$value'),
+            );
+          },
         );
       },
     ),

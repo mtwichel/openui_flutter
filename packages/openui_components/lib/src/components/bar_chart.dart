@@ -174,5 +174,7 @@ List<num> _coerceNumList(Object? value) {
 
 String _formatTooltipValue(double value) {
   final rounded = value.toStringAsFixed(2);
-  return rounded.contains('.') ? rounded.replaceFirst(RegExp(r'\.?0+$'), '') : rounded;
+  return rounded.contains('.')
+      ? rounded.replaceFirst(RegExp(r'\.?0+$'), '')
+      : rounded;
 }

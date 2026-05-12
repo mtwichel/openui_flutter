@@ -86,19 +86,21 @@ class LineChartWidget extends StatelessWidget {
               ),
               getTooltipColor: (_) => scheme.inverseSurface,
               getTooltipItems: (touchedSpots) {
-                return touchedSpots.map((spot) {
-                  final seriesName = series[spot.barIndex].name;
-                  final value = _formatTooltipValue(spot.y);
-                  return LineTooltipItem(
-                    '$seriesName\n$value',
-                    TextStyle(
-                      color: scheme.onInverseSurface,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      height: 1.3,
-                    ),
-                  );
-                }).toList(growable: false);
+                return touchedSpots
+                    .map((spot) {
+                      final seriesName = series[spot.barIndex].name;
+                      final value = _formatTooltipValue(spot.y);
+                      return LineTooltipItem(
+                        '$seriesName\n$value',
+                        TextStyle(
+                          color: scheme.onInverseSurface,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      );
+                    })
+                    .toList(growable: false);
               },
             ),
           ),
@@ -190,5 +192,7 @@ List<num> _coerceNumList(Object? value) {
 
 String _formatTooltipValue(double value) {
   final rounded = value.toStringAsFixed(2);
-  return rounded.contains('.') ? rounded.replaceFirst(RegExp(r'\.?0+$'), '') : rounded;
+  return rounded.contains('.')
+      ? rounded.replaceFirst(RegExp(r'\.?0+$'), '')
+      : rounded;
 }

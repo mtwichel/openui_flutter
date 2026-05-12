@@ -67,9 +67,9 @@ final class ResetStep extends ActionStep {
   int get hashCode => Object.hash(ResetStep, Object.hashAll(targets));
 }
 
-/// `@Run(refresh)`. The dispatcher invokes the registered `onRun`
-/// callback with [statementId]; a thrown exception halts the rest of
-/// the plan (mutations halt on failure).
+/// `@Run(refresh)`. Runtime-internal — the dispatcher routes the step
+/// to the renderer's `QueryManager`, never to the host. A thrown
+/// failure halts the rest of the plan (mutations halt on failure).
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -90,8 +90,8 @@ final class RunStep extends ActionStep {
 }
 
 /// `@ToAssistant(message, context?)`. The dispatcher evaluates the
-/// ASTs and forwards the resulting strings to the registered
-/// `onContinueConversation` callback.
+/// ASTs and emits an [ActionEvent] with
+/// [BuiltinActionType.continueConversation].
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -120,9 +120,9 @@ final class ContinueConversationStep extends ActionStep {
       Object.hash(ContinueConversationStep, messageAst, contextAst);
 }
 
-/// `@OpenUrl(url)`. The dispatcher evaluates [urlAst] and forwards
-/// the resulting string to `onOpenUrl` (typically wrapping
-/// `url_launcher`).
+/// `@OpenUrl(url)`. The dispatcher evaluates [urlAst] and emits an
+/// [ActionEvent] with [BuiltinActionType.openUrl] and the URL in
+/// `params['url']`.
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -139,6 +139,51 @@ final class OpenUrlStep extends ActionStep {
 
   @override
   int get hashCode => Object.hash(OpenUrlStep, urlAst);
+}
+
+/// Component-emitted action step with a host-visible custom [type].
+///
+/// Constructed by component Dart code (not the parser): [params] are
+/// plain Dart values that pass straight through to the emitted
+/// [ActionEvent.params].
+///
+/// Marked `@experimental` per D12.
+@experimental
+final class CustomActionStep extends ActionStep {
+  /// Creates a [CustomActionStep].
+  const CustomActionStep({
+    required this.type,
+    this.params = const <String, Object?>{},
+    this.humanFriendlyMessage,
+  });
+
+  /// The host-visible action type. Surfaces as [ActionEvent.type].
+  final String type;
+
+  /// Type-specific payload. Surfaces as [ActionEvent.params].
+  final Map<String, Object?> params;
+
+  /// Optional user-facing message. Surfaces as
+  /// [ActionEvent.humanFriendlyMessage].
+  final String? humanFriendlyMessage;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CustomActionStep &&
+          other.type == type &&
+          other.humanFriendlyMessage == humanFriendlyMessage &&
+          _mapEquals(other.params, params);
+
+  @override
+  int get hashCode => Object.hash(
+    CustomActionStep,
+    type,
+    humanFriendlyMessage,
+    Object.hashAllUnordered(
+      params.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
+  );
 }
 
 /// An ordered list of [ActionStep]s. Steps execute sequentially;
@@ -164,6 +209,69 @@ class ActionPlan {
   int get hashCode => Object.hash(ActionPlan, Object.hashAll(steps));
 }
 
+/// One host-visible action emission.
+///
+/// The renderer's `onAction` callback fires once per host-routed step:
+/// `@ToAssistant`, `@OpenUrl`, and any [CustomActionStep]. `@Set`,
+/// `@Reset`, and `@Run` are runtime-internal and never surface here.
+///
+/// Marked `@experimental` per D12.
+@experimental
+@immutable
+class ActionEvent {
+  /// Creates an [ActionEvent].
+  const ActionEvent({
+    required this.type,
+    this.humanFriendlyMessage,
+    this.params = const <String, Object?>{},
+    this.formState,
+    this.formName,
+  });
+
+  /// Open string. Built-in values live on [BuiltinActionType]. Custom
+  /// types come from component code constructing a [CustomActionStep].
+  final String type;
+
+  /// User-facing message. For `@ToAssistant`, the evaluated message.
+  /// For implicit Button activation, the Button's `label`. For
+  /// `@OpenUrl` and custom types, the component supplies whatever is
+  /// meaningful (may be `null` or empty).
+  final String? humanFriendlyMessage;
+
+  /// Type-specific payload. For `@OpenUrl`: `{'url': String}`. For
+  /// `@ToAssistant`: `{'context': String}` when the second arg is
+  /// present. For custom types: whatever the component passes.
+  final Map<String, Object?> params;
+
+  /// Form values at the moment the action fires, or `null` when not
+  /// inside a Form. The map is unmodifiable.
+  final Map<String, Object?>? formState;
+
+  /// Form name, or `null` when not inside a Form.
+  final String? formName;
+}
+
+/// Canonical [ActionEvent.type] strings for built-in action steps.
+///
+/// Hosts compare directly:
+///
+/// ```dart
+/// if (event.type == BuiltinActionType.continueConversation) { ... }
+/// ```
+///
+/// `abstract final` blocks instantiation and extension — this is a
+/// namespace for the canonical strings.
+///
+/// Marked `@experimental` per D12.
+@experimental
+abstract final class BuiltinActionType {
+  /// `@ToAssistant` and implicit-Button activations.
+  static const String continueConversation = 'continueConversation';
+
+  /// `@OpenUrl`.
+  static const String openUrl = 'openUrl';
+}
+
 /// Converts an [AstNode] into an [ActionPlan].
 ///
 /// Recognised shapes:
@@ -175,6 +283,10 @@ class ActionPlan {
 ///
 /// Returns `null` when [node] is neither shape — the renderer treats
 /// that as "this prop isn't an action handler".
+///
+/// The parser is closed to the five JS-defined builtins. Custom
+/// action types reach the host through component code constructing a
+/// [CustomActionStep] directly.
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -232,23 +344,33 @@ ActionStep? _stepFromAst(AstNode node) {
 ///
 /// `SetStep` writes to `context.store`. `ResetStep` looks up the
 /// declared default in [stateDefaults] (typically built from
-/// `meta.stateDecls`) and writes that. The three integration steps —
-/// `RunStep`, `ContinueConversationStep`, `OpenUrlStep` — fire their
-/// respective callbacks; absent callbacks make those step kinds
-/// silent no-ops.
+/// `meta.stateDecls`) and writes that. `RunStep` is dispatched
+/// through [onRun] (the renderer routes it to its `QueryManager`).
+/// `ContinueConversationStep`, `OpenUrlStep`, and any
+/// [CustomActionStep] are emitted as [ActionEvent]s through
+/// [onHostStep].
 ///
-/// Per the lang-reference, a [RunStep] failure (the callback throws)
-/// halts the rest of the plan. Other step kinds always continue.
+/// **Rethrow contract**: [dispatchAction] never throws to callers.
+/// `onRun` failures are caught internally and halt the rest of the
+/// plan. Eval failures on `@ToAssistant` / `@OpenUrl` for non-string
+/// results cause skip-emission and the plan continues. Other step
+/// kinds do not throw.
+///
+/// [formState] arrives already wrapped in `Map.unmodifiable` by the
+/// caller (the renderer wraps once at snapshot time). The dispatcher
+/// passes it through verbatim to every emitted [ActionEvent].
 ///
 /// Marked `@experimental` per D12.
 @experimental
 Future<void> dispatchAction({
   required ActionPlan plan,
   required EvalContext context,
+  required Future<void> Function(RunStep step) onRun,
+  required void Function(ActionEvent event) onHostStep,
   Map<String, AstNode> stateDefaults = const <String, AstNode>{},
-  Future<void> Function(String statementId)? onRun,
-  void Function(String message, String? extraContext)? onContinueConversation,
-  void Function(String url)? onOpenUrl,
+  Map<String, Object?>? formState,
+  String? formName,
+  String? humanFriendlyMessage,
 }) async {
   for (final step in plan.steps) {
     switch (step) {
@@ -270,31 +392,51 @@ Future<void> dispatchAction({
           }
         }
       case RunStep():
-        if (onRun != null) {
-          try {
-            await onRun(step.statementId);
-          } on Object {
-            return;
-          }
+        try {
+          await onRun(step);
+        } on Object {
+          return;
         }
       case ContinueConversationStep():
-        if (onContinueConversation != null) {
-          final msg = evaluate(step.messageAst, context);
-          if (msg is String) {
-            String? extra;
-            final cAst = step.contextAst;
-            if (cAst != null) {
-              final c = evaluate(cAst, context);
-              if (c is String) extra = c;
-            }
-            onContinueConversation(msg, extra);
-          }
+        final msg = evaluate(step.messageAst, context);
+        if (msg is! String) continue;
+        final params = <String, Object?>{};
+        final cAst = step.contextAst;
+        if (cAst != null) {
+          final c = evaluate(cAst, context);
+          if (c is String) params['context'] = c;
         }
+        onHostStep(
+          ActionEvent(
+            type: BuiltinActionType.continueConversation,
+            humanFriendlyMessage: msg,
+            params: params,
+            formState: formState,
+            formName: formName,
+          ),
+        );
       case OpenUrlStep():
-        if (onOpenUrl != null) {
-          final u = evaluate(step.urlAst, context);
-          if (u is String) onOpenUrl(u);
-        }
+        final u = evaluate(step.urlAst, context);
+        if (u is! String) continue;
+        onHostStep(
+          ActionEvent(
+            type: BuiltinActionType.openUrl,
+            humanFriendlyMessage: humanFriendlyMessage,
+            params: <String, Object?>{'url': u},
+            formState: formState,
+            formName: formName,
+          ),
+        );
+      case CustomActionStep():
+        onHostStep(
+          ActionEvent(
+            type: step.type,
+            humanFriendlyMessage: step.humanFriendlyMessage,
+            params: step.params,
+            formState: formState,
+            formName: formName,
+          ),
+        );
     }
   }
 }
@@ -304,6 +446,16 @@ bool _listEquals<T>(List<T> a, List<T> b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
     if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+bool _mapEquals<K, V>(Map<K, V> a, Map<K, V> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (final entry in a.entries) {
+    if (!b.containsKey(entry.key)) return false;
+    if (b[entry.key] != entry.value) return false;
   }
   return true;
 }

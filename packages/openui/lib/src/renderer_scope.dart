@@ -18,7 +18,7 @@ class RendererScope extends InheritedWidget {
     required this.formStateCache,
     required this.isStreaming,
     required this.incomplete,
-    required this.onActionAst,
+    required this.triggerAction,
     required super.child,
     super.key,
   });
@@ -38,14 +38,19 @@ class RendererScope extends InheritedWidget {
   /// (Acceptance Gap A6).
   final Set<String> incomplete;
 
-  /// Dispatch hook the renderer wires in to convert a raw action AST
-  /// (the value of an `onClick` prop, for example) into a callable.
+  /// Single public seam for components to dispatch an action.
+  ///
+  /// When `action` is `null`, the renderer short-circuits to emitting
+  /// a `continueConversation` `ActionEvent` carrying `userMessage`
+  /// (the implicit-Button path). When non-null, the renderer
+  /// dispatches the supplied plan and passes `userMessage` as the
+  /// `humanFriendlyMessage` for any host-routed step.
   final Future<void> Function(
-    AstNode actionAst,
-    String statementId, {
-    Object? payload,
+    String userMessage, {
+    String? formName,
+    ActionPlan? action,
   })
-  onActionAst;
+  triggerAction;
 
   /// Looks up the nearest enclosing [RendererScope].
   static RendererScope of(BuildContext context) {

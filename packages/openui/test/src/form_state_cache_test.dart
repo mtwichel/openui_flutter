@@ -75,6 +75,72 @@ void main() {
       });
     });
 
+    group('snapshot', () {
+      test('returns null when formName is null', () {
+        final cache = FormStateCache();
+        addTearDown(cache.dispose);
+        expect(cache.snapshot(null), isNull);
+      });
+
+      test('returns an empty unmodifiable map when the form has no '
+          'matching fields', () {
+        final cache = FormStateCache();
+        addTearDown(cache.dispose);
+        final snap = cache.snapshot('missing');
+        expect(snap, isNotNull);
+        expect(snap, isEmpty);
+        expect(() => snap!['x'] = 'v', throwsUnsupportedError);
+      });
+
+      test("returns each field's text value keyed by field name", () {
+        final cache = FormStateCache()
+          ..controllerFor(
+            formName: 'f',
+            fieldName: 'a',
+            initialValue: 'x',
+          );
+        addTearDown(cache.dispose);
+        expect(cache.snapshot('f'), <String, Object?>{'a': 'x'});
+      });
+
+      test('reflects post-edit controller text', () {
+        final cache = FormStateCache();
+        addTearDown(cache.dispose);
+        final controller = cache.controllerFor(
+          formName: 'f',
+          fieldName: 'a',
+          initialValue: 'x',
+        )..text = 'y';
+        expect(cache.snapshot('f'), <String, Object?>{'a': 'y'});
+        expect(controller.text, 'y');
+      });
+
+      test('forms with the same field name do not bleed', () {
+        final cache = FormStateCache()
+          ..controllerFor(
+            formName: 'a',
+            fieldName: 'shared',
+            initialValue: '1',
+          )
+          ..controllerFor(
+            formName: 'b',
+            fieldName: 'shared',
+            initialValue: '2',
+          );
+        addTearDown(cache.dispose);
+        expect(cache.snapshot('a'), <String, Object?>{'shared': '1'});
+        expect(cache.snapshot('b'), <String, Object?>{'shared': '2'});
+      });
+
+      test('returned map is unmodifiable', () {
+        final cache = FormStateCache()
+          ..controllerFor(formName: 'f', fieldName: 'a');
+        addTearDown(cache.dispose);
+        final snap = cache.snapshot('f');
+        expect(() => snap!['x'] = 'v', throwsUnsupportedError);
+      });
+    });
+
     test('dispose tears everything down', () {
       final cache = FormStateCache()
         ..controllerFor(formName: 'f', fieldName: 'a')

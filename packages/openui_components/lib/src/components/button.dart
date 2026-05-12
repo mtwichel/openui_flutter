@@ -4,6 +4,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:openui/openui.dart';
+import 'package:openui_components/src/components/form.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
@@ -47,7 +49,9 @@ class ButtonWidget extends StatelessWidget {
 Component<Widget> buttonComponent() {
   return defineComponent<Widget>(
     name: 'Button',
-    description: 'tappable button with action',
+    description:
+        'tappable button; omit onClick to send the label '
+        'to the assistant',
     schema: objectSchema(
       const <String, Object?>{
         'label': <String, Object?>{'type': 'string'},
@@ -57,10 +61,32 @@ Component<Widget> buttonComponent() {
       required: const ['label'],
     ),
     render: (ctx, props, renderNode, id) {
-      return ButtonWidget(
-        label: props['label']?.toString() ?? '',
-        variant: props['variant'] as String? ?? 'primary',
-        onPressed: props['onClick'] as VoidCallback?,
+      final label = props['label']?.toString() ?? '';
+      final variant = props['variant'] as String? ?? 'primary';
+      // The renderer sets `props['onClick']` to `null` when the AST is
+      // action-shaped but disabled mid-stream. Distinguish that case
+      // from "user omitted onClick" by checking the key — the latter
+      // is the implicit-@ToAssistant path.
+      final hasOnClickProp = props.containsKey('onClick');
+      final action = props['onClick'] as ActionPlan?;
+      final disabled = hasOnClickProp && action == null;
+      return Builder(
+        builder: (context) {
+          final scope = RendererScope.maybeFind(context);
+          final formName = FormScope.maybeFind(context)?.name;
+          final onPressed = (scope == null || disabled)
+              ? null
+              : () => scope.triggerAction(
+                  label,
+                  formName: formName,
+                  action: action,
+                );
+          return ButtonWidget(
+            label: label,
+            variant: variant,
+            onPressed: onPressed,
+          );
+        },
       );
     },
   );

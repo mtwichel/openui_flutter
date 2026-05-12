@@ -4,7 +4,6 @@
 
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
-import 'package:openui/src/action_event.dart';
 import 'package:openui/src/error_boundary.dart';
 import 'package:openui/src/form_state_cache.dart';
 import 'package:openui/src/query_manager.dart';
@@ -226,46 +225,81 @@ class _RendererState extends State<Renderer> {
     ];
     final queryErrors = _queryManager?.errors() ?? const <OpenUIError>[];
     errors.addAll(queryErrors);
+    // Preserve other error categories (eval, cycle, unknown-component,
+    // boundary throws) added via _reportError so they survive a
+    // post-dispatch rebuild of the parse / query slice.
+    for (final e in _lastReportedErrors) {
+      if (e is ParseError) continue;
+      if (queryErrors.contains(e)) continue;
+      errors.add(e);
+    }
     if (!_errorListsEqual(errors, _lastReportedErrors)) {
       _lastReportedErrors = List.unmodifiable(errors);
       onError(errors);
     }
   }
 
-  Future<void> _dispatch(
-    AstNode actionAst,
-    String statementId, {
-    Object? payload,
+  Future<void> _triggerAction(
+    String userMessage, {
+    String? formName,
+    ActionPlan? action,
   }) async {
-    final plan = actionPlanFromAst(actionAst);
-    if (plan == null || plan.steps.isEmpty) return;
+    final formState = _formStateCache.snapshot(formName);
+    if (action == null) {
+      widget.onAction?.call(
+        ActionEvent(
+          type: BuiltinActionType.continueConversation,
+          humanFriendlyMessage: userMessage,
+          formState: formState,
+          formName: formName,
+        ),
+      );
+      return;
+    }
     final result = _lastResult;
     final ctx = _buildEvalContext(result);
     final stateDefaults = <String, AstNode>{
       if (result != null)
         for (final decl in result.meta.stateDecls) decl.name: decl.defaultValue,
     };
-    final manager = _queryManager;
+    final onAction = widget.onAction;
     await dispatchAction(
-      plan: plan,
+      plan: action,
       context: ctx,
       stateDefaults: stateDefaults,
-      onRun: manager == null
-          ? null
-          : (id) async {
-              final args = _argsForRunnable(result, id);
-              if (args == null) return;
-              manager.invalidate(id, args);
-            },
+      onRun: (step) => _onRun(result, step),
+      onHostStep: onAction ?? (_) {},
+      formState: formState,
+      formName: formName,
+      humanFriendlyMessage: userMessage,
     );
     // dispatchAction collects @Reset-target-not-declared and similar
     // category errors in `ctx.errors`; surface them so they're not
     // silently swallowed.
     ctx.errors.forEach(_reportError);
-    widget.onAction?.call(
-      ActionEvent(plan: plan, statementId: statementId, payload: payload),
+    if (result != null) _maybeReportErrors(result);
+  }
+
+  Future<void> _onRun(ParseResult? result, RunStep step) async {
+    final manager = _queryManager;
+    if (manager == null) return;
+    final id = step.statementId;
+    if (result != null) {
+      for (final m in result.meta.mutations) {
+        if (m.statementId != id) continue;
+        await manager.fireMutation(id, m.args);
+        return;
+      }
+      for (final q in result.meta.queries) {
+        if (q.statementId != id) continue;
+        manager.invalidate(id, q.args);
+        return;
+      }
+    }
+    throw EvaluationError(
+      message: '@Run target "$id" is not a declared query or mutation',
+      statementId: id,
     );
-    _maybeReportErrors(result ?? _lastResult!);
   }
 
   EvalContext _buildEvalContext(ParseResult? result) {
@@ -314,7 +348,7 @@ class _RendererState extends State<Renderer> {
       formStateCache: _formStateCache,
       isStreaming: widget.isStreaming,
       incomplete: incomplete,
-      onActionAst: _dispatch,
+      triggerAction: _triggerAction,
       child: body,
     );
   }
@@ -371,17 +405,6 @@ class _RendererState extends State<Renderer> {
         final value = evaluate(node, ctx);
         return _wrapPrimitive(value);
     }
-  }
-
-  List<Argument>? _argsForRunnable(ParseResult? result, String id) {
-    if (result == null) return null;
-    for (final q in result.meta.queries) {
-      if (q.statementId == id) return q.args;
-    }
-    for (final m in result.meta.mutations) {
-      if (m.statementId == id) return m.args;
-    }
-    return null;
   }
 
   Widget _renderComp(
@@ -493,7 +516,7 @@ class _RendererState extends State<Renderer> {
           widget.isStreaming &&
           (result?.meta.incomplete.contains(statementId) ?? false);
       if (disabled) return null;
-      return () => _dispatch(value, statementId);
+      return asAction;
     }
     if (value is CompCall) {
       return _renderAst(value, ctx, statementHint: statementId);

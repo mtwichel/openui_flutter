@@ -31,7 +31,12 @@ class LlmChatScreen extends StatefulWidget {
 
   // Computed once at class load time so build() never regenerates it.
   static final String _systemPrompt = openuiLibrary().prompt(
-    const PromptOptions(),
+    const PromptOptions(
+      examples: [
+        // Send the user's choice back to the assistant when tapped.
+        'root = Buttons(children: [Button(label: "Yes"), Button(label: "No")])',
+      ],
+    ),
   );
 
   /// Optional callback that opens the surrounding shell's drawer. Non-null

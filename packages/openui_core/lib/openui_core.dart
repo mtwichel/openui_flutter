@@ -10,9 +10,12 @@ export 'package:json_schema_builder/json_schema_builder.dart' show Schema;
 
 export 'src/actions/actions.dart'
     show
+        ActionEvent,
         ActionPlan,
         ActionStep,
+        BuiltinActionType,
         ContinueConversationStep,
+        CustomActionStep,
         OpenUrlStep,
         ResetStep,
         RunStep,

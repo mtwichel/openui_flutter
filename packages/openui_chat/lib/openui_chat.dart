@@ -19,11 +19,7 @@ export 'src/adapters/openai_responses.dart' show openAIResponsesAdapter;
 export 'src/adapters/plain_sse.dart' show plainSseAdapter;
 export 'src/chat_state.dart' show ChatState;
 export 'src/controller.dart'
-    show
-        ActionEvent,
-        OpenUiChatController,
-        RequestBuilder,
-        defaultRequestBuilder;
+    show OpenUiChatController, RequestBuilder, defaultRequestBuilder;
 export 'src/formats/message_format.dart'
     show MessageFormat, identityFormat, openAiFormat, openAiResponsesFormat;
 export 'src/message.dart'

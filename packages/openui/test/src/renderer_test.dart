@@ -54,10 +54,22 @@ Library<Widget> _testLibrary() {
       }),
       render: (ctx, props, renderNode, id) {
         final value = props['value'] as int? ?? 0;
-        final onTap = props['onIncrement'] as void Function()?;
-        return GestureDetector(
-          onTap: onTap,
-          child: Text('count=$value'),
+        final hasAction = props.containsKey('onIncrement');
+        final action = props['onIncrement'] as ActionPlan?;
+        // Disabled when the prop was supplied but resolved to null
+        // (streaming-incomplete AST); inert when the prop is absent.
+        final disabled = hasAction && action == null;
+        return Builder(
+          builder: (context) {
+            final scope = RendererScope.maybeFind(context);
+            final onTap = (scope == null || disabled || action == null)
+                ? null
+                : () => scope.triggerAction('', action: action);
+            return GestureDetector(
+              onTap: onTap,
+              child: Text('count=$value'),
+            );
+          },
         );
       },
     ),
@@ -250,30 +262,31 @@ root = Column(children: [Input(name: "field", value: \$name), Input(name: "secon
       },
     );
 
-    testWidgets('action prop dispatches Set step against the store', (
-      tester,
-    ) async {
-      final events = <ActionEvent>[];
-      const program = '''\$count = 0
+    testWidgets(
+      'action prop dispatches Set step against the store and emits zero '
+      'ActionEvents (host-internal step)',
+      (tester) async {
+        final events = <ActionEvent>[];
+        const program = '''\$count = 0
 root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
 ''';
-      await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: program,
-            library: _testLibrary(),
-            onAction: events.add,
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+              onAction: events.add,
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('count=0'), findsOneWidget);
-      await tester.tap(find.byType(GestureDetector));
-      await tester.pump();
-      expect(find.text('count=1'), findsOneWidget);
-      expect(events.length, 1);
-      expect(events.first.plan.steps.first, isA<SetStep>());
-    });
+        expect(find.text('count=0'), findsOneWidget);
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
+        expect(find.text('count=1'), findsOneWidget);
+        expect(events, isEmpty);
+      },
+    );
 
     testWidgets(
       'action prop remains interactive after stream finalizes without newline',
@@ -297,8 +310,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
         expect(find.text('count=1'), findsOneWidget);
-        expect(events.length, 1);
-        expect(events.first.plan.steps.first, isA<SetStep>());
+        expect(events, isEmpty);
       },
     );
 
@@ -478,7 +490,8 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
     );
 
     testWidgets(
-      '@ToAssistant emits an ActionEvent with ContinueConversationStep',
+      '@ToAssistant emits a continueConversation ActionEvent with the '
+      'evaluated message',
       (tester) async {
         final events = <ActionEvent>[];
         const program =
@@ -497,34 +510,108 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
 
-        expect(events, isNotEmpty);
-        expect(events.first.plan.steps.first, isA<ContinueConversationStep>());
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.continueConversation);
+        expect(events.single.humanFriendlyMessage, 'retry');
       },
     );
 
-    testWidgets('@OpenUrl emits an ActionEvent with OpenUrlStep', (
-      tester,
-    ) async {
-      final events = <ActionEvent>[];
-      const program =
-          '''root = Counter(value: 0, onIncrement: @OpenUrl("https://example.com"))
+    testWidgets(
+      '@OpenUrl emits an openUrl ActionEvent with url in params',
+      (tester) async {
+        final events = <ActionEvent>[];
+        const program =
+            '''root = Counter(value: 0, onIncrement: @OpenUrl("https://example.com"))
 ''';
-      await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: program,
-            library: _testLibrary(),
-            onAction: events.add,
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+              onAction: events.add,
+            ),
           ),
-        ),
-      );
+        );
 
-      await tester.tap(find.byType(GestureDetector));
-      await tester.pump();
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
 
-      expect(events, isNotEmpty);
-      expect(events.first.plan.steps.first, isA<OpenUrlStep>());
-    });
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.openUrl);
+        expect(events.single.params['url'], 'https://example.com');
+      },
+    );
+
+    testWidgets(
+      '@Run on a mutation fires the mutation and halts on failure',
+      (tester) async {
+        // $flag defaults to 0; @Set targets 999. A halted plan leaves
+        // $flag at 0; a passing-by-coincidence value cannot arise —
+        // @Set is the only writer.
+        const program = '''refresh = Mutation(name: "fail")
+\$flag = 0
+root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
+''';
+        final stateUpdates = <Map<String, Object?>>[];
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+              onStateUpdate: stateUpdates.add,
+              queryLoader: (id, args) async {
+                if (id == 'refresh') throw StateError('mut-fail');
+                return null;
+              },
+            ),
+          ),
+        );
+
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        // @Set after the failed @Run did not run — $flag is still 0.
+        final lastFlag = stateUpdates.isEmpty ? 0 : stateUpdates.last[r'$flag'];
+        expect(lastFlag, 0);
+      },
+    );
+
+    testWidgets(
+      '@Run on a failing mutation surfaces a single OpenUIError through '
+      'onError',
+      (tester) async {
+        const program = '''refresh = Mutation(name: "fail")
+root = Counter(value: 0, onIncrement: @Run(refresh))
+''';
+        var lastSnapshot = const <OpenUIError>[];
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+              onError: (errors) {
+                lastSnapshot = errors;
+              },
+              queryLoader: (id, args) async {
+                if (id == 'refresh') throw StateError('boom');
+                return null;
+              },
+            ),
+          ),
+        );
+
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        // The renderer's onError snapshot accumulates active errors,
+        // so a regression that double-reports the mutation failure
+        // would land two entries here, not one.
+        final mutationErrors = lastSnapshot.whereType<EvaluationError>();
+        expect(mutationErrors, hasLength(1));
+      },
+    );
 
     testWidgets(
       'last-good cache covers ticks where the parser produces no root',

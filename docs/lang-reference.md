@@ -132,13 +132,25 @@ for (final step in plan.steps) {
       for (final t in targets) store.set(t, store.defaultFor(t));
     case RunStep(:final statementId):
       await queryManager.fire(statementId);
-    case ContinueConversationStep(:final message, :final context):
-      controller.enqueueUserMessage(message, context: context);
-    case OpenUrlStep(:final url):
-      onOpenUrl(url);
+    case ContinueConversationStep(:final messageAst, :final contextAst):
+      onHostStep(ActionEvent(
+        type: BuiltinActionType.continueConversation,
+        humanFriendlyMessage: evaluate(messageAst),
+        params: contextAst == null ? {} : {'context': evaluate(contextAst)},
+      ));
+    case OpenUrlStep(:final urlAst):
+      onHostStep(ActionEvent(
+        type: BuiltinActionType.openUrl,
+        params: {'url': evaluate(urlAst)},
+      ));
   }
 }
 ```
+
+The host subscribes to `Renderer.onAction`, which fires once per
+host-routed step. `@Set`, `@Reset`, and `@Run` are runtime-internal
+and never surface there — the renderer mutates the store directly for
+the first two and routes the third through its `QueryManager`.
 
 ## Streaming semantics
 

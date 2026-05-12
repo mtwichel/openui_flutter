@@ -153,7 +153,7 @@ void main() {
     });
 
     test(
-      'handleAction forwards ContinueConversationStep through sendMessage',
+      'handleAction forwards continueConversation through sendMessage',
       () async {
         var sentBody = '';
         final client = _FakeClient((request) async {
@@ -169,14 +169,8 @@ void main() {
 
         await controller.handleAction(
           const ActionEvent(
-            plan: ActionPlan(
-              steps: [
-                ContinueConversationStep(
-                  messageAst: Literal('please retry', offset: 0),
-                ),
-              ],
-            ),
-            statementId: 's',
+            type: BuiltinActionType.continueConversation,
+            humanFriendlyMessage: 'please retry',
           ),
         );
 
@@ -189,9 +183,9 @@ void main() {
       },
     );
 
-    test('handleAction ignores non-ContinueConversation steps', () async {
+    test('handleAction ignores non-continueConversation events', () async {
       final client = _FakeClient((_) async {
-        fail('handleAction should not have fired a request for @Set');
+        fail('handleAction should not have fired a request for @OpenUrl');
       });
       final controller = OpenUiChatController(
         requestBuilder: _stubBuilder(),
@@ -202,16 +196,41 @@ void main() {
 
       await controller.handleAction(
         const ActionEvent(
-          plan: ActionPlan(
-            steps: [
-              SetStep(target: r'$x', valueAst: Literal(1, offset: 0)),
-            ],
-          ),
-          statementId: 's',
+          type: BuiltinActionType.openUrl,
+          params: <String, Object?>{'url': 'https://x'},
         ),
       );
       expect(controller.messages, isEmpty);
     });
+
+    test(
+      'handleAction skips continueConversation events with null or empty '
+      'humanFriendlyMessage',
+      () async {
+        final client = _FakeClient((_) async {
+          fail('handleAction should not send for empty messages');
+        });
+        final controller = OpenUiChatController(
+          requestBuilder: _stubBuilder(),
+          adapter: plainSseAdapter(),
+          clientFactory: () => client,
+        );
+        addTearDown(controller.dispose);
+
+        await controller.handleAction(
+          const ActionEvent(
+            type: BuiltinActionType.continueConversation,
+          ),
+        );
+        await controller.handleAction(
+          const ActionEvent(
+            type: BuiltinActionType.continueConversation,
+            humanFriendlyMessage: '',
+          ),
+        );
+        expect(controller.messages, isEmpty);
+      },
+    );
 
     test('dispose closes the controller and rejects further sends', () async {
       final controller = OpenUiChatController(

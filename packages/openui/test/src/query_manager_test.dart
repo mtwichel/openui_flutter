@@ -218,6 +218,66 @@ void main() {
       expect(secondCalls, greaterThanOrEqualTo(1));
     });
 
+    group('fireMutation', () {
+      test('returns the resolved value and does not cache it', () async {
+        final manager = QueryManager(
+          loader: (id, args) async => 'ok-$id',
+        );
+        addTearDown(manager.dispose);
+
+        final result = await manager.fireMutation('m', const []);
+        expect(result, 'ok-m');
+        // Mutations are not cached — the entry has no value.
+        expect(manager.entryFor('m').value, isNull);
+      });
+
+      test('populates the entry error and rethrows on failure', () async {
+        final manager = QueryManager(
+          loader: (id, args) async => throw StateError('mut-fail'),
+        );
+        addTearDown(manager.dispose);
+
+        await expectLater(
+          manager.fireMutation('m', const []),
+          throwsStateError,
+        );
+        expect(manager.entryFor('m').error, isA<EvaluationError>());
+      });
+
+      test(
+        'thrown OpenUIError preserves its subclass through errors()',
+        () async {
+          final manager = QueryManager(
+            loader: (id, args) async => throw const McpToolError(message: 'no'),
+          );
+          addTearDown(manager.dispose);
+
+          await expectLater(
+            manager.fireMutation('m', const []),
+            throwsA(isA<McpToolError>()),
+          );
+          expect(
+            manager.errors().whereType<McpToolError>(),
+            isNotEmpty,
+          );
+        },
+      );
+
+      test('notifies onChange exactly once on failure', () async {
+        var notifications = 0;
+        final manager = QueryManager(
+          loader: (id, args) async => throw StateError('boom'),
+        )..onChange = () => notifications++;
+        addTearDown(manager.dispose);
+
+        await expectLater(
+          manager.fireMutation('m', const []),
+          throwsStateError,
+        );
+        expect(notifications, 1);
+      });
+    });
+
     test('dispose suppresses post-completion notifications', () async {
       var notifications = 0;
       final completer = Completer<Object?>();

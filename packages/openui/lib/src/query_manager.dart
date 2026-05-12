@@ -123,6 +123,32 @@ class QueryManager {
     _fire(statementId, args);
   }
 
+  /// Fires a mutation by [statementId]. Returns the resolved value on
+  /// success (mutations are not cached). On failure, writes an
+  /// [OpenUIError] into the entry's error slot, notifies [onChange],
+  /// and rethrows so the dispatcher can halt the plan.
+  Future<Object?> fireMutation(
+    String statementId,
+    List<Argument> args,
+  ) async {
+    if (_disposed) return null;
+    try {
+      return await _invoke(statementId, args);
+    } on Object catch (error) {
+      if (_disposed) rethrow;
+      _entries[statementId] = QueryEntry(
+        error: error is OpenUIError
+            ? error
+            : EvaluationError(
+                message: error.toString(),
+                statementId: statementId,
+              ),
+      );
+      onChange?.call();
+      rethrow;
+    }
+  }
+
   /// Releases listener and marks the manager unusable. In-flight
   /// futures still complete; their results are discarded.
   void dispose() {

@@ -167,7 +167,9 @@ void main() {
       await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.text('Generated OpenUI code'), findsOneWidget);
-      expect(find.text('root = Card(children: [])'), findsOneWidget);
+      // The assistant text appears in both the transcript bubble and
+      // the code viewer below it.
+      expect(find.text('root = Card(children: [])'), findsNWidgets(2));
     });
 
     testWidgets('assistant transcript renders each assistant response text', (
@@ -178,7 +180,10 @@ void main() {
 
       await tester.pumpWidget(_viewHarness(bloc));
 
-      expect(find.text('r=1'), findsNWidgets(2));
+      // r=1 appears once (transcript bubble); r=2 appears twice
+      // (transcript bubble + code viewer, which mirrors the latest
+      // assistant response).
+      expect(find.text('r=1'), findsOneWidget);
       expect(find.text('r=2'), findsNWidgets(2));
     });
 

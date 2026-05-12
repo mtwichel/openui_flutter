@@ -5,7 +5,6 @@
 /// `@experimental` — the shape may change between v0.1 and v0.2.
 library;
 
-export 'src/action_event.dart' show ActionEvent;
 export 'src/error_boundary.dart' show ErrorBoundary;
 export 'src/form_state_cache.dart' show FormStateCache;
 export 'src/query_manager.dart' show QueryEntry, QueryLoader, QueryManager;

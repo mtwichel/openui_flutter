@@ -2,6 +2,8 @@
 // surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openui/openui.dart';
@@ -13,13 +15,19 @@ RendererScope _scope({
   FormStateCache? cache,
   bool isStreaming = false,
   Set<String> incomplete = const <String>{},
+  Future<void> Function(
+    String userMessage, {
+    String? formName,
+    ActionPlan? action,
+  })?
+  triggerAction,
 }) {
   return RendererScope(
     store: store ?? Store(),
     formStateCache: cache ?? FormStateCache(),
     isStreaming: isStreaming,
     incomplete: incomplete,
-    onActionAst: (_, _, {payload}) async {},
+    triggerAction: triggerAction ?? (_, {formName, action}) async {},
     child: child,
   );
 }
@@ -61,6 +69,61 @@ void main() {
       );
       expect(captured, isNull);
     });
+
+    testWidgets(
+      'triggerAction without an action plan runs without error',
+      (tester) async {
+        var fired = false;
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: _scope(
+              triggerAction: (msg, {formName, action}) async {
+                fired = true;
+              },
+              child: Builder(
+                builder: (context) {
+                  unawaited(
+                    RendererScope.of(context).triggerAction('hi'),
+                  );
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(fired, isTrue);
+      },
+    );
+
+    testWidgets(
+      "triggerAction('') still calls through — empty-message filtering "
+      "is the host controller's job",
+      (tester) async {
+        String? seen;
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: _scope(
+              triggerAction: (msg, {formName, action}) async {
+                seen = msg;
+              },
+              child: Builder(
+                builder: (context) {
+                  unawaited(
+                    RendererScope.of(context).triggerAction(''),
+                  );
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(seen, '');
+      },
+    );
 
     testWidgets('updateShouldNotify fires on isStreaming change', (
       tester,
@@ -127,7 +190,7 @@ void main() {
           formStateCache: cache,
           isStreaming: isStreaming,
           incomplete: incomplete,
-          onActionAst: (_, _, {payload}) async {},
+          triggerAction: (_, {formName, action}) async {},
           child: const SizedBox.shrink(),
         );
       }

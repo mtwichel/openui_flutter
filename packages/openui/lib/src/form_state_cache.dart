@@ -79,6 +79,22 @@ class FormStateCache {
     }
   }
 
+  /// Returns the live field values for [formName], or `null` when
+  /// [formName] is `null`. When the form has no fields, returns an
+  /// empty unmodifiable map.
+  ///
+  /// The returned map is wrapped in `Map.unmodifiable` so callers can
+  /// pass it through to action events without re-wrapping.
+  Map<String, Object?>? snapshot(String? formName) {
+    if (formName == null) return null;
+    final values = <String, Object?>{};
+    for (final entry in _controllers.entries) {
+      if (entry.key.form != formName) continue;
+      values[entry.key.field] = entry.value.text;
+    }
+    return Map<String, Object?>.unmodifiable(values);
+  }
+
   /// Test seam — schedule disposal for every key not in [activeKeys],
   /// bypassing [beginPass] / [controllerFor]'s implicit tracking.
   @visibleForTesting

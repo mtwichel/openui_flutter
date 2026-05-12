@@ -130,20 +130,14 @@ class OpenUiChatController {
   }
 
   /// Hook the renderer's action emission back through the chat
-  /// controller. v0.1 handles only `ContinueConversationStep` —
-  /// the other step types are dispatched locally by the renderer.
-  ///
-  /// Other step kinds are no-ops here.
+  /// controller. v0.1 handles only
+  /// [BuiltinActionType.continueConversation] events — other action
+  /// types are no-ops here.
   Future<void> handleAction(ActionEvent event) async {
-    for (final step in event.plan.steps) {
-      if (step is ContinueConversationStep) {
-        final ast = step.messageAst;
-        final message = ast is Literal && ast.value is String
-            ? ast.value! as String
-            : null;
-        if (message != null) await sendMessage(message);
-      }
-    }
+    if (event.type != BuiltinActionType.continueConversation) return;
+    final message = event.humanFriendlyMessage;
+    if (message == null || message.isEmpty) return;
+    await sendMessage(message);
   }
 
   /// Closes the broadcast stream, cancels any in-flight turn, and
@@ -228,29 +222,4 @@ class OpenUiChatController {
       throw StateError('OpenUiChatController has been disposed');
     }
   }
-}
-
-/// Lightweight action-event payload from the renderer side, mirroring
-/// the renderer's `ActionEvent` shape. Defined here so `openui_chat`
-/// doesn't depend on the Flutter `openui` package.
-///
-/// Marked `@experimental` per D12.
-@experimental
-@immutable
-class ActionEvent {
-  /// Creates an [ActionEvent].
-  const ActionEvent({
-    required this.plan,
-    required this.statementId,
-    this.payload,
-  });
-
-  /// The action plan that fired.
-  final ActionPlan plan;
-
-  /// Statement id of the component that produced the event.
-  final String statementId;
-
-  /// Optional payload (form submit values, etc.).
-  final Object? payload;
 }

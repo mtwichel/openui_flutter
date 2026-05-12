@@ -5,10 +5,10 @@
 // distinguishing fields). actionPlanFromAst is exercised through the
 // real parser to confirm the AST-to-step mapping for every
 // recognised builtin and the rejection paths. dispatchAction is
-// driven through every variant — including missing-callback no-ops,
-// `@Reset` with a missing default (records error, continues), and
-// `@Run` failure (halts the rest of the plan).
-
+// driven through every variant — including @Run failure (halts the
+// rest of the plan but never throws to the caller), @ToAssistant /
+// @OpenUrl skip-emission for non-string eval results, and
+// formState / formName / humanFriendlyMessage propagation.
 import 'package:openui_core/openui_core.dart';
 import 'package:test/test.dart';
 
@@ -20,6 +20,28 @@ ActionPlan _planFor(String source) {
 
 AstNode _rhs(String source) =>
     parseProgram(source).statements.single.expression;
+
+Future<void> _run(
+  ActionPlan plan,
+  EvalContext context, {
+  Map<String, AstNode> stateDefaults = const <String, AstNode>{},
+  Future<void> Function(RunStep step)? onRun,
+  void Function(ActionEvent event)? onHostStep,
+  Map<String, Object?>? formState,
+  String? formName,
+  String? humanFriendlyMessage,
+}) {
+  return dispatchAction(
+    plan: plan,
+    context: context,
+    stateDefaults: stateDefaults,
+    onRun: onRun ?? (_) async {},
+    onHostStep: onHostStep ?? (_) {},
+    formState: formState,
+    formName: formName,
+    humanFriendlyMessage: humanFriendlyMessage,
+  );
+}
 
 void main() {
   group('ActionStep equality', () {
@@ -59,9 +81,7 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
       expect(a == a, isTrue);
-      // Length differs.
       expect(a, isNot(equals(const ResetStep(targets: [r'$a']))));
-      // Element differs.
       expect(
         a,
         isNot(equals(const ResetStep(targets: [r'$a', r'$c']))),
@@ -89,7 +109,6 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
       expect(a == a, isTrue);
-      // contextAst missing in one.
       expect(
         a,
         isNot(
@@ -100,7 +119,6 @@ void main() {
           ),
         ),
       );
-      // messageAst differs.
       expect(
         a,
         isNot(
@@ -129,6 +147,66 @@ void main() {
         ),
       );
     });
+
+    group('CustomActionStep', () {
+      test('identical fields compare equal with matching hashCodes', () {
+        const a = CustomActionStep(
+          type: 'custom',
+          params: <String, Object?>{'k': 'v', 'n': 1},
+          humanFriendlyMessage: 'msg',
+        );
+        const b = CustomActionStep(
+          type: 'custom',
+          params: <String, Object?>{'k': 'v', 'n': 1},
+          humanFriendlyMessage: 'msg',
+        );
+        expect(a, equals(b));
+        expect(a.hashCode, b.hashCode);
+      });
+
+      test('different type ⇒ not equal', () {
+        const a = CustomActionStep(type: 'a');
+        const b = CustomActionStep(type: 'b');
+        expect(a, isNot(equals(b)));
+      });
+
+      test('different humanFriendlyMessage ⇒ not equal', () {
+        const a = CustomActionStep(type: 't', humanFriendlyMessage: 'x');
+        const b = CustomActionStep(type: 't', humanFriendlyMessage: 'y');
+        expect(a, isNot(equals(b)));
+      });
+
+      test('null vs empty humanFriendlyMessage ⇒ not equal', () {
+        const a = CustomActionStep(type: 't');
+        const b = CustomActionStep(type: 't', humanFriendlyMessage: '');
+        expect(a, isNot(equals(b)));
+      });
+
+      test('same params in different insertion order ⇒ still equal', () {
+        const a = CustomActionStep(
+          type: 't',
+          params: <String, Object?>{'a': 1, 'b': 2},
+        );
+        const b = CustomActionStep(
+          type: 't',
+          params: <String, Object?>{'b': 2, 'a': 1},
+        );
+        expect(a, equals(b));
+        expect(a.hashCode, b.hashCode);
+      });
+
+      test('different params keys ⇒ not equal', () {
+        const a = CustomActionStep(
+          type: 't',
+          params: <String, Object?>{'a': 1},
+        );
+        const b = CustomActionStep(
+          type: 't',
+          params: <String, Object?>{'b': 1},
+        );
+        expect(a, isNot(equals(b)));
+      });
+    });
   });
 
   group('ActionPlan', () {
@@ -142,10 +220,7 @@ void main() {
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
       expect(a == a, isTrue);
-      expect(
-        a,
-        isNot(equals(const ActionPlan(steps: <ActionStep>[]))),
-      );
+      expect(a, isNot(equals(const ActionPlan(steps: <ActionStep>[]))));
     });
   });
 
@@ -163,7 +238,6 @@ void main() {
     });
 
     test('@Set whose first arg is not a StateRef returns null', () {
-      // `@Set(plain, 1)` — first arg is a Reference, not a StateRef.
       expect(actionPlanFromAst(_rhs('a = @Set(plain, 1)')), isNull);
     });
 
@@ -174,8 +248,6 @@ void main() {
     });
 
     test('@Reset drops non-StateRef args', () {
-      // `plain` is a bare Reference, not a StateRef; the dispatcher
-      // would have no idea how to reset it. Drop silently.
       final plan = _planFor(r'a = @Reset($a, plain, $c)');
       final step = plan.steps.single as ResetStep;
       expect(step.targets, [r'$a', r'$c']);
@@ -192,7 +264,6 @@ void main() {
     });
 
     test('@Run with a non-Reference arg returns null', () {
-      // The literal "x" is not a statement id.
       expect(actionPlanFromAst(_rhs('a = @Run("x")')), isNull);
     });
 
@@ -256,17 +327,16 @@ void main() {
     test('SetStep evaluates valueAst and writes to the store', () async {
       final ctx = fresh();
       final plan = _planFor(r'a = @Set($count, 1 + 1)');
-      await dispatchAction(plan: plan, context: ctx);
+      await _run(plan, ctx);
       expect(ctx.store.get(r'$count'), 2);
     });
 
     test('SetStep sees fresh store state across sequential steps', () async {
-      // Two SetSteps: the second reads $count after the first wrote.
       final ctx = fresh(state: {r'$count': 0});
       final plan = _planFor(
         r'a = [@Set($count, $count + 1), @Set($count, $count + 1)]',
       );
-      await dispatchAction(plan: plan, context: ctx);
+      await _run(plan, ctx);
       expect(ctx.store.get(r'$count'), 2);
     });
 
@@ -276,11 +346,7 @@ void main() {
       final defaults = <String, AstNode>{
         r'$count': const Literal(0, offset: 0),
       };
-      await dispatchAction(
-        plan: plan,
-        context: ctx,
-        stateDefaults: defaults,
-      );
+      await _run(plan, ctx, stateDefaults: defaults);
       expect(ctx.store.get(r'$count'), 0);
     });
 
@@ -293,11 +359,7 @@ void main() {
           r'$a': const Literal(0, offset: 0),
           r'$b': const Literal(1, offset: 0),
         };
-        await dispatchAction(
-          plan: plan,
-          context: ctx,
-          stateDefaults: defaults,
-        );
+        await _run(plan, ctx, stateDefaults: defaults);
         expect(ctx.store.get(r'$a'), 0);
         expect(ctx.store.get(r'$b'), 1);
         expect(ctx.errors, hasLength(1));
@@ -308,105 +370,85 @@ void main() {
       },
     );
 
-    test('RunStep invokes onRun with the statement id', () async {
+    test('RunStep invokes onRun with the step', () async {
       final ctx = fresh();
       final plan = _planFor('a = @Run(refresh)');
-      String? seenId;
-      await dispatchAction(
-        plan: plan,
-        context: ctx,
-        onRun: (id) async {
-          seenId = id;
+      RunStep? seen;
+      await _run(
+        plan,
+        ctx,
+        onRun: (step) async {
+          seen = step;
         },
       );
-      expect(seenId, 'refresh');
-    });
-
-    test('RunStep callback throwing halts the rest of the plan', () async {
-      final ctx = fresh();
-      final plan = _planFor(
-        r'a = [@Run(load), @Set($count, 99)]',
-      );
-      await dispatchAction(
-        plan: plan,
-        context: ctx,
-        onRun: (_) async => throw Exception('boom'),
-      );
-      // The Set step after the failed Run did not run.
-      expect(ctx.store.get(r'$count'), isNull);
-    });
-
-    test('RunStep without an onRun callback is a no-op', () async {
-      final ctx = fresh();
-      final plan = _planFor(
-        r'a = [@Run(load), @Set($count, 1)]',
-      );
-      await dispatchAction(plan: plan, context: ctx);
-      // Set still runs because Run was a silent no-op.
-      expect(ctx.store.get(r'$count'), 1);
+      expect(seen?.statementId, 'refresh');
     });
 
     test(
-      'ContinueConversationStep evaluates messageAst (and contextAst)',
+      'RunStep callback throwing halts the rest of the plan but does '
+      'not propagate',
+      () async {
+        final ctx = fresh();
+        final plan = _planFor(
+          r'a = [@Run(load), @Set($count, 99)]',
+        );
+        // dispatchAction must not throw — the throw is contained.
+        await _run(
+          plan,
+          ctx,
+          onRun: (_) async => throw Exception('boom'),
+        );
+        expect(ctx.store.get(r'$count'), isNull);
+      },
+    );
+
+    test(
+      'ContinueConversationStep emits an ActionEvent with type and '
+      'params populated',
       () async {
         final ctx = fresh();
         final plan = _planFor('a = @ToAssistant("hello", "extra")');
-        String? seenMsg;
-        String? seenCtx;
-        await dispatchAction(
-          plan: plan,
-          context: ctx,
-          onContinueConversation: (m, c) {
-            seenMsg = m;
-            seenCtx = c;
-          },
-        );
-        expect(seenMsg, 'hello');
-        expect(seenCtx, 'extra');
+        final events = <ActionEvent>[];
+        await _run(plan, ctx, onHostStep: events.add);
+        expect(events, hasLength(1));
+        final event = events.single;
+        expect(event.type, BuiltinActionType.continueConversation);
+        expect(event.humanFriendlyMessage, 'hello');
+        expect(event.params['context'], 'extra');
       },
     );
 
     test(
-      'ContinueConversationStep without context arg leaves it null',
+      'ContinueConversationStep without context arg leaves params '
+      'empty of "context"',
       () async {
         final ctx = fresh();
         final plan = _planFor('a = @ToAssistant("hello")');
-        String? seenCtx = 'sentinel';
-        await dispatchAction(
-          plan: plan,
-          context: ctx,
-          onContinueConversation: (m, c) {
-            seenCtx = c;
-          },
-        );
-        expect(seenCtx, isNull);
+        final events = <ActionEvent>[];
+        await _run(plan, ctx, onHostStep: events.add);
+        expect(events.single.params.containsKey('context'), isFalse);
       },
     );
 
     test(
-      'ContinueConversationStep skips when message evaluates non-string',
+      'ContinueConversationStep skips emission when message evaluates '
+      'non-string',
       () async {
         final ctx = fresh();
-        // Build a step manually with a non-string message AST.
         const plan = ActionPlan(
           steps: [
             ContinueConversationStep(messageAst: Literal(123, offset: 0)),
           ],
         );
-        var fired = false;
-        await dispatchAction(
-          plan: plan,
-          context: ctx,
-          onContinueConversation: (_, _) {
-            fired = true;
-          },
-        );
-        expect(fired, isFalse);
+        final events = <ActionEvent>[];
+        await _run(plan, ctx, onHostStep: events.add);
+        expect(events, isEmpty);
       },
     );
 
     test(
-      'ContinueConversationStep skips when contextAst evaluates non-string',
+      'ContinueConversationStep emits even when contextAst is non-string '
+      '(drops context only)',
       () async {
         final ctx = fresh();
         const plan = ActionPlan(
@@ -417,56 +459,99 @@ void main() {
             ),
           ],
         );
-        String? seenCtx = 'sentinel';
-        await dispatchAction(
-          plan: plan,
-          context: ctx,
-          onContinueConversation: (m, c) {
-            seenCtx = c;
-          },
-        );
-        // Message fired; context dropped.
-        expect(seenCtx, isNull);
+        final events = <ActionEvent>[];
+        await _run(plan, ctx, onHostStep: events.add);
+        expect(events.single.humanFriendlyMessage, 'hello');
+        expect(events.single.params.containsKey('context'), isFalse);
       },
     );
 
-    test('ContinueConversationStep without callback is a no-op', () async {
-      final ctx = fresh();
-      final plan = _planFor('a = @ToAssistant("hello")');
-      // No assertion needed — if it threw, the test fails.
-      await dispatchAction(plan: plan, context: ctx);
-    });
-
-    test('OpenUrlStep evaluates urlAst and forwards', () async {
+    test('OpenUrlStep emits openUrl event with url in params', () async {
       final ctx = fresh();
       final plan = _planFor('a = @OpenUrl("https://example.com")');
-      String? seen;
-      await dispatchAction(
-        plan: plan,
-        context: ctx,
-        onOpenUrl: (u) => seen = u,
-      );
-      expect(seen, 'https://example.com');
+      final events = <ActionEvent>[];
+      await _run(plan, ctx, onHostStep: events.add);
+      expect(events.single.type, BuiltinActionType.openUrl);
+      expect(events.single.params['url'], 'https://example.com');
     });
 
-    test('OpenUrlStep silently skips when url evaluates non-string', () async {
+    test('OpenUrlStep skips emission when url evaluates non-string', () async {
       final ctx = fresh();
       const plan = ActionPlan(
         steps: [OpenUrlStep(urlAst: Literal(42, offset: 0))],
       );
-      var fired = false;
-      await dispatchAction(
-        plan: plan,
-        context: ctx,
-        onOpenUrl: (_) => fired = true,
-      );
-      expect(fired, isFalse);
+      final events = <ActionEvent>[];
+      await _run(plan, ctx, onHostStep: events.add);
+      expect(events, isEmpty);
     });
 
-    test('OpenUrlStep without callback is a no-op', () async {
+    test('CustomActionStep emits its type and params verbatim', () async {
       final ctx = fresh();
-      final plan = _planFor('a = @OpenUrl("https://x")');
-      await dispatchAction(plan: plan, context: ctx);
+      const plan = ActionPlan(
+        steps: [
+          CustomActionStep(
+            type: 'submit',
+            params: <String, Object?>{'a': 1, 'b': 'two'},
+            humanFriendlyMessage: 'doing it',
+          ),
+        ],
+      );
+      final events = <ActionEvent>[];
+      await _run(plan, ctx, onHostStep: events.add);
+      final event = events.single;
+      expect(event.type, 'submit');
+      expect(event.humanFriendlyMessage, 'doing it');
+      expect(event.params, <String, Object?>{'a': 1, 'b': 'two'});
+    });
+
+    test(
+      'formState, formName, and humanFriendlyMessage propagate to every '
+      'host-routed event',
+      () async {
+        final ctx = fresh();
+        final plan = _planFor(
+          'a = [@ToAssistant("hello"), @OpenUrl("https://x")]',
+        );
+        final events = <ActionEvent>[];
+        final formState = Map<String, Object?>.unmodifiable(
+          <String, Object?>{'name': 'Alice'},
+        );
+        await _run(
+          plan,
+          ctx,
+          onHostStep: events.add,
+          formState: formState,
+          formName: 'signup',
+          humanFriendlyMessage: 'passed-through',
+        );
+        expect(events, hasLength(2));
+        for (final e in events) {
+          expect(e.formName, 'signup');
+          expect(e.formState, same(formState));
+        }
+        // @ToAssistant prefers the evaluated message over the passed-in
+        // humanFriendlyMessage; @OpenUrl keeps the passed-in one.
+        expect(events[0].humanFriendlyMessage, 'hello');
+        expect(events[1].humanFriendlyMessage, 'passed-through');
+      },
+    );
+
+    test('formState arrives at onHostStep unmodifiable', () async {
+      final ctx = fresh();
+      final plan = _planFor('a = @ToAssistant("hi")');
+      final events = <ActionEvent>[];
+      await _run(
+        plan,
+        ctx,
+        onHostStep: events.add,
+        formState: Map<String, Object?>.unmodifiable(
+          <String, Object?>{'k': 'v'},
+        ),
+      );
+      expect(
+        () => events.single.formState!['k'] = 'mutated',
+        throwsUnsupportedError,
+      );
     });
   });
 }

@@ -62,28 +62,149 @@ root = Card(children: [
       expect(find.byType(Divider), findsOneWidget);
     });
 
-    testWidgets('Button fires its onClick action plan', (tester) async {
-      final events = <ActionEvent>[];
-      // Trailing newline is intentional — without it the streaming
-      // parser puts `root = Button(...)` in the "pending tail" and the
-      // renderer disables the action (Acceptance Gap A6). The CI test
-      // bundler was hitting this; locally it didn't because the
-      // unbundled runner cached the parser state differently.
-      await tester.pumpWidget(
-        _app(
-          r'''$count = 0
+    testWidgets(
+      'Button onClick @Set runs as a host-internal step and emits zero '
+      'ActionEvents',
+      (tester) async {
+        final events = <ActionEvent>[];
+        final updates = <Map<String, Object?>>[];
+        // Trailing newline is intentional — without it the streaming
+        // parser puts `root = Button(...)` in the "pending tail" and the
+        // renderer disables the action (Acceptance Gap A6).
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Renderer(
+                response: r'''$count = 0
 root = Button(label: "Click", onClick: @Set($count, $count + 1))
 ''',
-          onAction: events.add,
-        ),
-      );
-      await tester.tap(find.text('Click'));
-      // The renderer's dispatch is async (dispatchAction awaits each
-      // step). pumpAndSettle drains the microtask the closure chains.
-      await tester.pumpAndSettle();
-      expect(events.length, 1);
-      expect(events.first.plan.steps.first, isA<SetStep>());
-    });
+                library: openuiLibrary(),
+                onAction: events.add,
+                onStateUpdate: updates.add,
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Click'));
+        await tester.pumpAndSettle();
+        expect(events, isEmpty);
+        expect(updates.last[r'$count'], 1);
+      },
+    );
+
+    testWidgets(
+      'Button with onClick AST disabled mid-stream does NOT fire the '
+      'implicit @ToAssistant path',
+      (tester) async {
+        final events = <ActionEvent>[];
+        // No trailing newline + isStreaming: true puts the onClick AST in
+        // meta.incomplete, so the renderer disables the action. The Button
+        // must stay tap-inert — not silently send the label to the LLM.
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Renderer(
+                response:
+                    'root = Button(label: "Retry", onClick: @ToAssistant("retry"))',
+                library: openuiLibrary(),
+                isStreaming: true,
+                onAction: events.add,
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Retry'));
+        await tester.pumpAndSettle();
+        expect(
+          events,
+          isEmpty,
+          reason: 'streaming-disabled Button must not fire implicit path',
+        );
+      },
+    );
+
+    testWidgets(
+      'Button without onClick fires implicit @ToAssistant with its label',
+      (tester) async {
+        final events = <ActionEvent>[];
+        await tester.pumpWidget(
+          _app(
+            'root = Button(label: "Retry")\n',
+            onAction: events.add,
+          ),
+        );
+        await tester.tap(find.text('Retry'));
+        await tester.pumpAndSettle();
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.continueConversation);
+        expect(events.single.humanFriendlyMessage, 'Retry');
+        expect(events.single.formName, isNull);
+        expect(events.single.formState, isNull);
+      },
+    );
+
+    testWidgets(
+      'Button inside a Form populates formName and formState',
+      (tester) async {
+        final events = <ActionEvent>[];
+        await tester.pumpWidget(
+          _app(
+            '''
+\$x = ""
+root = Form(name: "f", children: [
+  Input(name: "x", value: \$x),
+  Button(label: "Send")
+])
+''',
+            onAction: events.add,
+          ),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('input-f-x')),
+          'typed',
+        );
+        await tester.pump();
+        await tester.tap(find.text('Send'));
+        await tester.pumpAndSettle();
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.continueConversation);
+        expect(events.single.humanFriendlyMessage, 'Send');
+        expect(events.single.formName, 'f');
+        expect(events.single.formState!['x'], 'typed');
+      },
+    );
+
+    testWidgets(
+      'Button inside a Form with AST onClick carries formName and '
+      'formState on the emitted event',
+      (tester) async {
+        final events = <ActionEvent>[];
+        await tester.pumpWidget(
+          _app(
+            '''
+\$x = ""
+root = Form(name: "f", children: [
+  Input(name: "x", value: \$x),
+  Button(label: "Go", onClick: @ToAssistant("submit"))
+])
+''',
+            onAction: events.add,
+          ),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('input-f-x')),
+          'typed',
+        );
+        await tester.pump();
+        await tester.tap(find.text('Go'));
+        await tester.pumpAndSettle();
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.continueConversation);
+        expect(events.single.humanFriendlyMessage, 'submit');
+        expect(events.single.formName, 'f');
+        expect(events.single.formState!['x'], 'typed');
+      },
+    );
 
     testWidgets('Buttons lays out children horizontally', (tester) async {
       await tester.pumpWidget(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,14 +8,41 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
 import 'package:openui_flutter_example/src/llm_chat/llm_chat_screen.dart';
+import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 
 class _MockChatBloc extends MockBloc<ChatEvent, ChatState>
     implements ChatBloc {}
 
-Widget _harness(ChatBloc bloc) => MaterialApp(
+class _NoopService implements LlmChatService {
+  @override
+  Stream<String> sendMessage(String text) => const Stream<String>.empty();
+  @override
+  void reset() {}
+  @override
+  Future<void> close() async {}
+}
+
+Widget _viewHarness(ChatBloc bloc) => MaterialApp(
   home: BlocProvider<ChatBloc>.value(value: bloc, child: const LlmChatView()),
 );
+
+void _setWideViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1400, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+}
+
+void _setNarrowViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(600, 1000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+}
+
+void _stub(_MockChatBloc bloc, ChatState state) {
+  when(() => bloc.state).thenReturn(state);
+  whenListen(bloc, const Stream<ChatState>.empty(), initialState: state);
+}
 
 const _idleEmpty = ChatState();
 
@@ -29,6 +58,15 @@ const _streamingTwoMessages = ChatState(
   ],
 );
 
+const _twoAssistantTurns = ChatState(
+  messages: [
+    UiMessage(id: 'u1', role: UiMessageRole.user, text: 'first'),
+    UiMessage(id: 'a1', role: UiMessageRole.assistant, text: 'r=1'),
+    UiMessage(id: 'u2', role: UiMessageRole.user, text: 'second'),
+    UiMessage(id: 'a2', role: UiMessageRole.assistant, text: 'r=2'),
+  ],
+);
+
 const _errorState = ChatState(
   status: ChatStatus.error,
   messages: [UiMessage(id: 'u1', role: UiMessageRole.user, text: 'hi')],
@@ -36,6 +74,10 @@ const _errorState = ChatState(
 );
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const MessageSubmitted(''));
+  });
+
   group('LlmChatView', () {
     late _MockChatBloc bloc;
 
@@ -45,18 +87,10 @@ void main() {
     });
 
     testWidgets('input enabled when idle', (tester) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _idleEmpty);
 
-      when(() => bloc.state).thenReturn(_idleEmpty);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _idleEmpty,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       final tf = tester.widget<TextField>(find.byType(TextField));
       expect(tf.enabled, isTrue);
@@ -65,18 +99,10 @@ void main() {
     });
 
     testWidgets('input disabled while streaming', (tester) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _streamingTwoMessages);
 
-      when(() => bloc.state).thenReturn(_streamingTwoMessages);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _streamingTwoMessages,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       final tf = tester.widget<TextField>(find.byType(TextField));
       expect(tf.enabled, isFalse);
@@ -85,18 +111,10 @@ void main() {
     });
 
     testWidgets('error banner visible on error state', (tester) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _errorState);
 
-      when(() => bloc.state).thenReturn(_errorState);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _errorState,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.text('Boom'), findsOneWidget);
     });
@@ -104,36 +122,32 @@ void main() {
     testWidgets('transcript renders user bubble + assistant placeholder', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _streamingTwoMessages);
 
-      when(() => bloc.state).thenReturn(_streamingTwoMessages);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _streamingTwoMessages,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.text('hi'), findsOneWidget);
       expect(find.text('Generated UI #1'), findsOneWidget);
     });
 
+    testWidgets('assistant placeholders number sequentially across turns', (
+      tester,
+    ) async {
+      _setWideViewport(tester);
+      _stub(bloc, _twoAssistantTurns);
+
+      await tester.pumpWidget(_viewHarness(bloc));
+
+      expect(find.text('Generated UI #1'), findsOneWidget);
+      expect(find.text('Generated UI #2'), findsOneWidget);
+    });
+
     testWidgets('Clear icon dispatches ChatCleared', (tester) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _idleEmpty);
 
-      when(() => bloc.state).thenReturn(_idleEmpty);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _idleEmpty,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       await tester.tap(find.byTooltip('Clear chat'));
       await tester.pump();
@@ -144,18 +158,10 @@ void main() {
     testWidgets('Send dispatches MessageSubmitted with trimmed text', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _idleEmpty);
 
-      when(() => bloc.state).thenReturn(_idleEmpty);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _idleEmpty,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       await tester.enterText(find.byType(TextField), '  hello world  ');
       await tester.tap(find.byType(FilledButton));
@@ -166,22 +172,28 @@ void main() {
       ).called(1);
     });
 
+    testWidgets('whitespace-only input does NOT dispatch MessageSubmitted', (
+      tester,
+    ) async {
+      _setWideViewport(tester);
+      _stub(bloc, _idleEmpty);
+
+      await tester.pumpWidget(_viewHarness(bloc));
+
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+
+      verifyNever(() => bloc.add(any(that: isA<MessageSubmitted>())));
+    });
+
     testWidgets('wide viewport: renderer left of transcript', (tester) async {
-      tester.view.physicalSize = const Size(1400, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setWideViewport(tester);
+      _stub(bloc, _idleEmpty);
 
-      when(() => bloc.state).thenReturn(_idleEmpty);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _idleEmpty,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.byType(VerticalDivider), findsOneWidget);
-      // A Row exists for the wide-mode split.
       final rendererBox = tester.getRect(
         find.text('Ask the model to build something.'),
       );
@@ -190,27 +202,43 @@ void main() {
     });
 
     testWidgets('narrow viewport: renderer above transcript', (tester) async {
-      tester.view.physicalSize = const Size(600, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
+      _setNarrowViewport(tester);
+      _stub(bloc, _idleEmpty);
 
-      when(() => bloc.state).thenReturn(_idleEmpty);
-      whenListen(
-        bloc,
-        const Stream<ChatState>.empty(),
-        initialState: _idleEmpty,
-      );
-
-      await tester.pumpWidget(_harness(bloc));
+      await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.byType(VerticalDivider), findsNothing);
-      final dividers = find.byType(Divider);
-      expect(dividers, findsWidgets);
+      expect(find.byType(Divider), findsWidgets);
       final rendererBox = tester.getRect(
         find.text('Ask the model to build something.'),
       );
       final inputBox = tester.getRect(find.byType(TextField));
       expect(rendererBox.bottom, lessThan(inputBox.top));
+    });
+  });
+
+  group('LlmChatScreen', () {
+    testWidgets('constructs its own bloc via the injected service factory', (
+      tester,
+    ) async {
+      _setWideViewport(tester);
+      var factoryCalls = 0;
+      LlmChatService factory() {
+        factoryCalls++;
+        return _NoopService();
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(home: LlmChatScreen(serviceFactory: factory)),
+      );
+
+      expect(factoryCalls, 1);
+      // The wrapper provides a ChatBloc to the subtree.
+      final view = tester.element(find.byType(LlmChatView));
+      expect(BlocProvider.of<ChatBloc>(view), isA<ChatBloc>());
+      // Default idle state — input enabled, no error banner.
+      final tf = tester.widget<TextField>(find.byType(TextField));
+      expect(tf.enabled, isTrue);
     });
   });
 }

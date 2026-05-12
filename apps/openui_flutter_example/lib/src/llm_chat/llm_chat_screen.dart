@@ -10,25 +10,37 @@ import 'package:openui_core/openui_core.dart';
 
 import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
 import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
+import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
+import 'package:openui_flutter_example/src/responsive.dart';
+
+/// Factory signature for constructing the [LlmChatService] consumed by
+/// [LlmChatScreen]. Defaults to `DartanticChatService.new`; tests inject
+/// a fake.
+typedef LlmChatServiceFactory = LlmChatService Function();
 
 /// Top-level entry point for the Live destination of `AppShell`.
 ///
 /// Owns the [ChatBloc] for the route. Tests pump [LlmChatView] directly
-/// with a mocked bloc; production constructs the bloc with a real
-/// [DartanticChatService].
+/// with a mocked bloc, or inject a fake [serviceFactory] to drive the
+/// real wrapper without touching dartantic.
 class LlmChatScreen extends StatelessWidget {
   /// Creates an [LlmChatScreen].
-  const LlmChatScreen({super.key, this.onMenuTap});
+  const LlmChatScreen({super.key, this.onMenuTap, this.serviceFactory});
 
   /// Optional callback that opens the surrounding shell's drawer. Non-null
   /// only in narrow-viewport mode.
   final VoidCallback? onMenuTap;
 
+  /// Optional factory for the underlying [LlmChatService]. Defaults to
+  /// `DartanticChatService.new`. Provided for tests to inject fakes.
+  final LlmChatServiceFactory? serviceFactory;
+
   @override
   Widget build(BuildContext context) {
+    final factory = serviceFactory ?? DartanticChatService.new;
     return BlocProvider<ChatBloc>(
-      create: (_) => ChatBloc(service: DartanticChatService()),
+      create: (_) => ChatBloc(service: factory()),
       child: LlmChatView(onMenuTap: onMenuTap),
     );
   }
@@ -50,8 +62,6 @@ class LlmChatView extends StatefulWidget {
 }
 
 class _LlmChatViewState extends State<LlmChatView> {
-  static const double _wideBreakpoint = 900;
-
   final Library<Widget> _library = openuiChatLibrary();
   final TextEditingController _inputController = TextEditingController();
 
@@ -90,7 +100,7 @@ class _LlmChatViewState extends State<LlmChatView> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= _wideBreakpoint;
+          final wide = constraints.maxWidth >= kWideBreakpoint;
           final renderer = _RendererPane(library: _library);
           final chat = _ChatPane(
             controller: _inputController,

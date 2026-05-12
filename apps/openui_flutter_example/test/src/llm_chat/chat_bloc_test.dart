@@ -170,6 +170,26 @@ void main() {
     );
 
     blocTest<ChatBloc, ChatState>(
+      'submitting after an error clears state.error',
+      build: () => ChatBloc(service: service),
+      seed: () => const ChatState(
+        status: ChatStatus.error,
+        messages: [
+          UiMessage(id: 'a', role: UiMessageRole.user, text: 'old'),
+        ],
+        error: 'previous failure',
+      ),
+      act: (bloc) async {
+        bloc.add(const MessageSubmitted('retry'));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.error, isNull);
+        expect(bloc.state.status, ChatStatus.streaming);
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
       'clear-while-idle empties the transcript and resets the service',
       build: () => ChatBloc(service: service),
       seed: () => const ChatState(

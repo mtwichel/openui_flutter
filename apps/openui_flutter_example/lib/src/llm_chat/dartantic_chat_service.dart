@@ -2,10 +2,14 @@ import 'package:dartantic_ai/dartantic_ai.dart';
 
 import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
 
-/// Default agent string used by the production service. The
-/// `firebase-vertex` factory must be registered before any instance is
-/// constructed (see `main.dart`).
-const String _kDefaultAgent = 'firebase-vertex:gemini-2.5-flash';
+/// dartantic provider name registered by `main.dart` and consumed by
+/// the default agent string below. Sharing the constant keeps the
+/// registration and consumption in lockstep — change one and you change
+/// both.
+const String kFirebaseVertexProvider = 'firebase-vertex';
+
+/// Default agent string used by the production service.
+const String _kDefaultAgent = '$kFirebaseVertexProvider:gemini-2.5-flash';
 
 /// Live-LLM implementation of [LlmChatService] backed by a dartantic
 /// [Chat] against Gemini via Firebase AI Logic (Vertex AI). The

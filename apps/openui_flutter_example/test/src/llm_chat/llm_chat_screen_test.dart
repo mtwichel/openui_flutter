@@ -131,6 +131,18 @@ void main() {
       expect(find.text('Generated UI #1'), findsOneWidget);
     });
 
+    testWidgets('shows generated OpenUI code viewer under renderer', (
+      tester,
+    ) async {
+      _setWideViewport(tester);
+      _stub(bloc, _streamingTwoMessages);
+
+      await tester.pumpWidget(_viewHarness(bloc));
+
+      expect(find.text('Generated OpenUI code'), findsOneWidget);
+      expect(find.text('root = Card(children: [])'), findsOneWidget);
+    });
+
     testWidgets('assistant placeholders number sequentially across turns', (
       tester,
     ) async {

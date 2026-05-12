@@ -276,6 +276,33 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
     });
 
     testWidgets(
+      'action prop remains interactive after stream finalizes without newline',
+      (tester) async {
+        final events = <ActionEvent>[];
+        const program =
+            r'$count = 0'
+            '\n'
+            r'root = Counter(value: $count, onIncrement: @Set($count, $count + 1))';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+              onAction: events.add,
+            ),
+          ),
+        );
+
+        expect(find.text('count=0'), findsOneWidget);
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
+        expect(find.text('count=1'), findsOneWidget);
+        expect(events.length, 1);
+        expect(events.first.plan.steps.first, isA<SetStep>());
+      },
+    );
+
+    testWidgets(
       'Reset step writes the declared default back to the store',
       (tester) async {
         const program = '''\$count = 7

@@ -489,7 +489,9 @@ class _RendererState extends State<Renderer> {
       // Disable interactivity while the containing statement is still
       // being streamed (Acceptance Gap A6).
       final result = _lastResult;
-      final disabled = result?.meta.incomplete.contains(statementId) ?? false;
+      final disabled =
+          widget.isStreaming &&
+          (result?.meta.incomplete.contains(statementId) ?? false);
       if (disabled) return null;
       return () => _dispatch(value, statementId);
     }

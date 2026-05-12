@@ -38,7 +38,6 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
   late StubScript _active;
   final Library<Widget> _library = openuiChatLibrary();
   final List<OpenUIError> _renderErrors = <OpenUIError>[];
-  bool _showSource = false;
 
   @override
   void initState() {
@@ -80,14 +79,6 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
               )
             : null,
         title: const Text('OpenUI Flutter'),
-        actions: [
-          if (kDebugPanel)
-            IconButton(
-              tooltip: _showSource ? 'Hide source' : 'Show source',
-              icon: Icon(_showSource ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _showSource = !_showSource),
-            ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -141,8 +132,6 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
                     ),
                   )
                 else ...[
-                  if (kDebugPanel && _showSource)
-                    _SourcePanel(response: assistant.response),
                   Renderer(
                     response: assistant.response,
                     isStreaming: assistant.isStreaming,
@@ -157,6 +146,8 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
                           }
                         : null,
                   ),
+                  const SizedBox(height: 12),
+                  _GeneratedCodeViewer(response: assistant.response),
                 ],
               ],
             ),
@@ -209,25 +200,44 @@ class _DiagnosticPanel extends StatelessWidget {
   }
 }
 
-class _SourcePanel extends StatelessWidget {
-  const _SourcePanel({required this.response});
+class _GeneratedCodeViewer extends StatelessWidget {
+  const _GeneratedCodeViewer({required this.response});
 
   final String response;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
+    return SizedBox(
+      height: 220,
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         ),
-        child: SelectableText(
-          response.isEmpty ? '(no response yet)' : response,
-          style: theme.textTheme.bodySmall!.copyWith(fontFamily: 'monospace'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Text(
+                'Generated OpenUI code',
+                style: theme.textTheme.labelLarge,
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: SelectableText(
+                  response.isEmpty
+                      ? '// Generated OpenUI code will appear here.'
+                      : response,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

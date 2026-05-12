@@ -140,26 +140,78 @@ class _RendererPane extends StatelessWidget {
             .where((m) => m.role == UiMessageRole.assistant)
             .lastOrNull;
         final response = lastAssistant?.text ?? '';
-        if (response.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'Ask the model to build something.',
-                style: TextStyle(color: Colors.grey),
-              ),
+        return Column(
+          children: [
+            Expanded(
+              child: response.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Ask the model to build something.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Renderer(
+                        response: response,
+                        isStreaming: state.status == ChatStatus.streaming,
+                        library: library,
+                      ),
+                    ),
             ),
-          );
-        }
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Renderer(
-            response: response,
-            isStreaming: state.status == ChatStatus.streaming,
-            library: library,
-          ),
+            const Divider(height: 1),
+            _GeneratedCodeViewer(response: response),
+          ],
         );
       },
+    );
+  }
+}
+
+class _GeneratedCodeViewer extends StatelessWidget {
+  const _GeneratedCodeViewer({required this.response});
+
+  final String response;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 200,
+      width: double.infinity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Text(
+                'Generated OpenUI code',
+                style: theme.textTheme.labelLarge,
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: SelectableText(
+                  response.isEmpty
+                      ? '// Generated OpenUI code will appear here.'
+                      : response,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

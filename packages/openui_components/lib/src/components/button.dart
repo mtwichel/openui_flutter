@@ -47,11 +47,15 @@ class ButtonWidget extends StatelessWidget {
 Component<Widget> buttonComponent() {
   return defineComponent<Widget>(
     name: 'Button',
-    schema: objectSchema(const <String, Object?>{
-      'label': <String, Object?>{'type': 'string'},
-      'variant': <String, Object?>{'type': 'string'},
-      'onClick': <String, Object?>{},
-    }),
+    description: 'tappable button with action',
+    schema: objectSchema(
+      const <String, Object?>{
+        'label': <String, Object?>{'type': 'string'},
+        'variant': <String, Object?>{'type': 'string'},
+        'onClick': <String, Object?>{},
+      },
+      required: const ['label'],
+    ),
     render: (ctx, props, renderNode, id) {
       return ButtonWidget(
         label: props['label'] as String? ?? '',
@@ -88,9 +92,13 @@ class ButtonsWidget extends StatelessWidget {
 Component<Widget> buttonsComponent() {
   return defineComponent<Widget>(
     name: 'Buttons',
-    schema: objectSchema(const <String, Object?>{
-      'children': <String, Object?>{'type': 'array'},
-    }),
+    description: 'horizontal row of buttons',
+    schema: objectSchema(
+      const <String, Object?>{
+        'children': <String, Object?>{'type': 'array'},
+      },
+      required: const ['children'],
+    ),
     render: (ctx, props, renderNode, id) {
       final children =
           (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??

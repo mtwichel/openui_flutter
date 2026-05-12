@@ -7,7 +7,6 @@ import 'package:openui/openui.dart';
 import 'package:openui_chat/openui_chat.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
-
 import 'package:openui_flutter_example/src/scripts_chat/stub_llm.dart';
 
 /// Enables the on-screen diagnostic panel and source viewer. Off by
@@ -136,6 +135,12 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
                     response: assistant.response,
                     isStreaming: assistant.isStreaming,
                     library: _library,
+                    onStateUpdate: (snapshot) {
+                      debugPrint('onStateUpdate: $snapshot');
+                    },
+                    onAction: (event) {
+                      debugPrint('onAction: $event');
+                    },
                     onError: kDebugPanel
                         ? (errors) {
                             setState(() {
@@ -212,7 +217,9 @@ class _GeneratedCodeViewer extends StatelessWidget {
       height: 220,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

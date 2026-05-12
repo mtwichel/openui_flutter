@@ -97,10 +97,14 @@ int _max(int a, int b) => a > b ? a : b;
 Component<Widget> barChartComponent() {
   return defineComponent<Widget>(
     name: 'BarChart',
-    schema: objectSchema(const <String, Object?>{
-      'series': <String, Object?>{'type': 'array'},
-      'labels': <String, Object?>{'type': 'array'},
-    }),
+    description: 'multi-series bar chart',
+    schema: objectSchema(
+      const <String, Object?>{
+        'series': <String, Object?>{'type': 'array'},
+        'labels': <String, Object?>{'type': 'array'},
+      },
+      required: const ['series'],
+    ),
     render: (ctx, props, renderNode, id) {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
       final series = <({String name, List<num> values})>[

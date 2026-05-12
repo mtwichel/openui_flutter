@@ -86,10 +86,14 @@ class CardHeaderWidget extends StatelessWidget {
 Component<Widget> cardComponent() {
   return defineComponent<Widget>(
     name: 'Card',
-    schema: objectSchema(const <String, Object?>{
-      'variant': <String, Object?>{'type': 'string'},
-      'children': <String, Object?>{'type': 'array'},
-    }),
+    description: 'elevated surface container',
+    schema: objectSchema(
+      const <String, Object?>{
+        'variant': <String, Object?>{'type': 'string'},
+        'children': <String, Object?>{'type': 'array'},
+      },
+      required: const ['children'],
+    ),
     render: (ctx, props, renderNode, id) {
       final children =
           (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??
@@ -106,10 +110,14 @@ Component<Widget> cardComponent() {
 Component<Widget> cardHeaderComponent() {
   return defineComponent<Widget>(
     name: 'CardHeader',
-    schema: objectSchema(const <String, Object?>{
-      'title': <String, Object?>{'type': 'string'},
-      'subtitle': <String, Object?>{'type': 'string'},
-    }),
+    description: 'title and optional subtitle block',
+    schema: objectSchema(
+      const <String, Object?>{
+        'title': <String, Object?>{'type': 'string'},
+        'subtitle': <String, Object?>{'type': 'string'},
+      },
+      required: const ['title'],
+    ),
     render: (ctx, props, renderNode, id) {
       return CardHeaderWidget(
         title: props['title'] as String? ?? '',

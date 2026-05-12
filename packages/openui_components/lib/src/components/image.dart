@@ -42,10 +42,14 @@ class ImageWidget extends StatelessWidget {
 Component<Widget> imageComponent() {
   return defineComponent<Widget>(
     name: 'Image',
-    schema: objectSchema(const <String, Object?>{
-      'src': <String, Object?>{'type': 'string'},
-      'alt': <String, Object?>{'type': 'string'},
-    }),
+    description: 'network image with fallback',
+    schema: objectSchema(
+      const <String, Object?>{
+        'src': <String, Object?>{'type': 'string'},
+        'alt': <String, Object?>{'type': 'string'},
+      },
+      required: const ['src'],
+    ),
     render: (ctx, props, renderNode, id) {
       return ImageWidget(
         src: props['src'] as String? ?? '',

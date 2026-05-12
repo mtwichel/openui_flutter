@@ -61,11 +61,15 @@ class InputWidget extends StatelessWidget {
 Component<Widget> inputComponent() {
   return defineComponent<Widget>(
     name: 'Input',
-    schema: objectSchema(<String, Object?>{
-      'name': const <String, Object?>{'type': 'string'},
-      'value': reactiveProp('string'),
-      'placeholder': const <String, Object?>{'type': 'string'},
-    }),
+    description: 'text field bound to state variable',
+    schema: objectSchema(
+      <String, Object?>{
+        'name': const <String, Object?>{'type': 'string'},
+        'value': reactiveProp('string'),
+        'placeholder': const <String, Object?>{'type': 'string'},
+      },
+      required: const ['name', 'value'],
+    ),
     render: (ctx, props, renderNode, id) {
       final value = props['value'];
       return InputWidget(

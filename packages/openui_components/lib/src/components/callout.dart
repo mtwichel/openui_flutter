@@ -58,10 +58,14 @@ class CalloutWidget extends StatelessWidget {
 Component<Widget> calloutComponent() {
   return defineComponent<Widget>(
     name: 'Callout',
-    schema: objectSchema(const <String, Object?>{
-      'text': <String, Object?>{'type': 'string'},
-      'variant': <String, Object?>{'type': 'string'},
-    }),
+    description: 'tinted banner for alerts and notices',
+    schema: objectSchema(
+      const <String, Object?>{
+        'text': <String, Object?>{'type': 'string'},
+        'variant': <String, Object?>{'type': 'string'},
+      },
+      required: const ['text'],
+    ),
     render: (ctx, props, renderNode, id) {
       return CalloutWidget(
         text: props['text'] as String? ?? '',

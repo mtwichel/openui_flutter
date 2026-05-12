@@ -47,10 +47,14 @@ class SelectWidget extends StatelessWidget {
 Component<Widget> selectComponent() {
   return defineComponent<Widget>(
     name: 'Select',
-    schema: objectSchema(<String, Object?>{
-      'options': const <String, Object?>{'type': 'array'},
-      'value': reactiveProp('string'),
-    }),
+    description: 'dropdown bound to state variable',
+    schema: objectSchema(
+      <String, Object?>{
+        'options': const <String, Object?>{'type': 'array'},
+        'value': reactiveProp('string'),
+      },
+      required: const ['options', 'value'],
+    ),
     render: (ctx, props, renderNode, id) {
       final raw = props['options'];
       final options = raw is List<Object?>

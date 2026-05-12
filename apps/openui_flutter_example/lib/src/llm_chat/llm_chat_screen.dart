@@ -2,6 +2,7 @@
 // the entire surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
+import 'package:dartantic_ai/dartantic_ai.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:openui/openui.dart';
@@ -23,9 +24,14 @@ typedef LlmChatServiceFactory = LlmChatService Function();
 /// Owns the [ChatBloc] for the route. Tests pump [LlmChatView] directly
 /// with a mocked bloc, or inject a fake [serviceFactory] to drive the
 /// real wrapper without touching dartantic.
-class LlmChatScreen extends StatelessWidget {
+class LlmChatScreen extends StatefulWidget {
   /// Creates an [LlmChatScreen].
   const LlmChatScreen({super.key, this.onMenuTap, this.serviceFactory});
+
+  // Computed once at class load time so build() never regenerates it.
+  static final String _systemPrompt = openuiLibrary().prompt(
+    const PromptOptions(),
+  );
 
   /// Optional callback that opens the surrounding shell's drawer. Non-null
   /// only in narrow-viewport mode.
@@ -35,12 +41,139 @@ class LlmChatScreen extends StatelessWidget {
   /// `DartanticChatService.new`. Provided for tests to inject fakes.
   final LlmChatServiceFactory? serviceFactory;
 
+  // In-memory session key only. It is intentionally not persisted.
+  static String _sessionGeminiApiKey = '';
+
+  @override
+  State<LlmChatScreen> createState() => _LlmChatScreenState();
+}
+
+class _LlmChatScreenState extends State<LlmChatScreen> {
+  late final TextEditingController _apiKeyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _apiKeyController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  void _submitApiKey() {
+    final apiKey = _apiKeyController.text.trim();
+    if (apiKey.isEmpty) return;
+    setState(() {
+      LlmChatScreen._sessionGeminiApiKey = apiKey;
+      _apiKeyController.clear();
+    });
+  }
+
+  void _clearApiKey() {
+    setState(() {
+      LlmChatScreen._sessionGeminiApiKey = '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final factory = serviceFactory ?? DartanticChatService.new;
+    final factory =
+        widget.serviceFactory ??
+        () => DartanticChatService(systemPrompt: LlmChatScreen._systemPrompt);
+
+    // Test-only override path: injected service can bypass API-key gating.
+    if (widget.serviceFactory == null) {
+      final apiKey = LlmChatScreen._sessionGeminiApiKey;
+      if (apiKey.isEmpty) {
+        return _ApiKeyGate(
+          onMenuTap: widget.onMenuTap,
+          controller: _apiKeyController,
+          onSubmit: _submitApiKey,
+        );
+      }
+      Agent.providerFactories[kGeminiProvider] = () =>
+          GoogleProvider(apiKey: apiKey);
+    }
+
     return BlocProvider<ChatBloc>(
+      key: ValueKey(LlmChatScreen._sessionGeminiApiKey),
       create: (_) => ChatBloc(service: factory()),
-      child: LlmChatView(onMenuTap: onMenuTap),
+      child: LlmChatView(
+        onMenuTap: widget.onMenuTap,
+        onChangeApiKey: widget.serviceFactory == null ? _clearApiKey : null,
+      ),
+    );
+  }
+}
+
+class _ApiKeyGate extends StatelessWidget {
+  const _ApiKeyGate({
+    required this.onMenuTap,
+    required this.controller,
+    required this.onSubmit,
+  });
+
+  final VoidCallback? onMenuTap;
+  final TextEditingController controller;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: onMenuTap != null
+            ? IconButton(
+                tooltip: 'Open menu',
+                icon: const Icon(Icons.menu),
+                onPressed: onMenuTap,
+              )
+            : null,
+        title: const Text('Live'),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Enter Gemini API key',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Needed to enable Live chat for this session only. '
+                  'The key is kept in memory and resets when the app restarts.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  obscureText: true,
+                  onSubmitted: (_) => onSubmit(),
+                  decoration: const InputDecoration(
+                    hintText: 'AIza...',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: onSubmit,
+                  child: const Text('Enable Live chat'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -51,10 +184,13 @@ class LlmChatScreen extends StatelessWidget {
 /// inside a `BlocProvider.value` with a mocked bloc.
 class LlmChatView extends StatefulWidget {
   /// Creates an [LlmChatView].
-  const LlmChatView({super.key, this.onMenuTap});
+  const LlmChatView({super.key, this.onMenuTap, this.onChangeApiKey});
 
   /// Optional callback that opens the surrounding shell's drawer.
   final VoidCallback? onMenuTap;
+
+  /// Optional callback invoked when the user wants to change the API key.
+  final VoidCallback? onChangeApiKey;
 
   @override
   State<LlmChatView> createState() => _LlmChatViewState();
@@ -90,6 +226,12 @@ class _LlmChatViewState extends State<LlmChatView> {
             : null,
         title: const Text('Live'),
         actions: [
+          if (widget.onChangeApiKey != null)
+            IconButton(
+              tooltip: 'Change API key',
+              icon: const Icon(Icons.key),
+              onPressed: widget.onChangeApiKey,
+            ),
           IconButton(
             tooltip: 'Clear chat',
             icon: const Icon(Icons.delete_outline),
@@ -184,7 +326,9 @@ class _GeneratedCodeViewer extends StatelessWidget {
       width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

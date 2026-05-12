@@ -126,14 +126,18 @@ WrapCrossAlignment _wrapAlign(String? value) {
 Component<Widget> stackComponent() {
   return defineComponent<Widget>(
     name: 'Stack',
-    schema: objectSchema(const <String, Object?>{
-      'direction': <String, Object?>{'type': 'string'},
-      'gap': <String, Object?>{},
-      'align': <String, Object?>{'type': 'string'},
-      'justify': <String, Object?>{'type': 'string'},
-      'wrap': <String, Object?>{'type': 'boolean'},
-      'children': <String, Object?>{'type': 'array'},
-    }),
+    description: 'vertical or horizontal layout container',
+    schema: objectSchema(
+      const <String, Object?>{
+        'direction': <String, Object?>{'type': 'string'},
+        'gap': <String, Object?>{},
+        'align': <String, Object?>{'type': 'string'},
+        'justify': <String, Object?>{'type': 'string'},
+        'wrap': <String, Object?>{'type': 'boolean'},
+        'children': <String, Object?>{'type': 'array'},
+      },
+      required: const ['children'],
+    ),
     render: (ctx, props, renderNode, id) {
       final children =
           (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??

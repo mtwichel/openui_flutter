@@ -2,10 +2,17 @@ import 'package:openui_core/openui_core.dart';
 
 /// Sugar for the `Schema.object(...)` shape that every component
 /// definition emits. Keeps the per-component file body short.
-Schema objectSchema(Map<String, Object?> properties) {
+///
+/// Pass [required] to mark mandatory props; they render without `?`
+/// in generated prompts.
+Schema objectSchema(
+  Map<String, Object?> properties, {
+  List<String>? required,
+}) {
   return Schema.fromMap(<String, Object?>{
     'type': 'object',
     'properties': properties,
+    if (required != null && required.isNotEmpty) 'required': required,
   });
 }
 

@@ -88,6 +88,17 @@ void main() {
       expect(result, contains('onClick?: any'));
     });
 
+    test('prop with type object renders as object', () {
+      final c = _comp(
+        'Form',
+        properties: {
+          'config': const {'type': 'object'},
+        },
+      );
+      final result = generatePrompt([c]);
+      expect(result, contains('config?: object'));
+    });
+
     test('reactive prop (x-reactive: true) renders its base type', () {
       final c = _comp(
         'Input',

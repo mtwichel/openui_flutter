@@ -2,12 +2,12 @@
 // the entire surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
+import 'package:dartantic_ai/dartantic_ai.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
-import 'package:dartantic_ai/dartantic_ai.dart';
 import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
 import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
 import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
@@ -142,7 +142,10 @@ class _ApiKeyGate extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Enter Gemini API key', style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  'Enter Gemini API key',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Needed to enable Live chat for this session only. '
@@ -185,6 +188,8 @@ class LlmChatView extends StatefulWidget {
 
   /// Optional callback that opens the surrounding shell's drawer.
   final VoidCallback? onMenuTap;
+
+  /// Optional callback invoked when the user wants to change the API key.
   final VoidCallback? onChangeApiKey;
 
   @override

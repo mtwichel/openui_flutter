@@ -21,4 +21,5 @@ extend-exclude = [
   "**/build/**",
   "**/coverage/**",
   "tools/spikes/**",
+  "**/firebase_options.dart",
 ]

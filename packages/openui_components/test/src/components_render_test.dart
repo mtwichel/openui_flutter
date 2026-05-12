@@ -4,6 +4,7 @@
 // the matching raw-string form is less readable than the escapes.
 // ignore_for_file: experimental_member_use, leading_newlines_in_multiline_strings, use_raw_strings, lines_longer_than_80_chars
 
+import 'package:fl_chart/fl_chart.dart' show LineChart;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openui/openui.dart';
@@ -167,6 +168,38 @@ root = Table(
       expect(find.text('1 / 2'), findsOneWidget);
     });
 
+    testWidgets('Table accepts string columns and positional rows', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app('''
+root = Table(
+  columns: ["State", "Abbr"],
+  rows: [["Alabama", "AL"], ["Alaska", "AK"]]
+)
+'''),
+      );
+      // String columns are used as their own label.
+      expect(find.text('State'), findsOneWidget);
+      expect(find.text('Abbr'), findsOneWidget);
+      // Positional row cells line up with the columns order.
+      expect(find.text('Alabama'), findsOneWidget);
+      expect(find.text('AK'), findsOneWidget);
+    });
+
+    testWidgets('Table renders an error Callout when columns are empty', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app('root = Table(columns: [], rows: [])'),
+      );
+      expect(find.byType(CalloutWidget), findsOneWidget);
+      expect(
+        find.textContaining('requires at least one column'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('Image shows fallback when URL is broken', (tester) async {
       await tester.pumpWidget(
         _app('root = Image(src: "http://invalid.test/x.png", alt: "x")'),
@@ -198,6 +231,24 @@ root = LineChart(
       expect(find.byType(LineChartWidget), findsOneWidget);
     });
 
+    testWidgets('LineChart accepts `data` as an alias for `values`', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app('''
+root = LineChart(
+  series: [{name: "y", data: [1, 2, 3]}],
+  labels: ["a", "b", "c"]
+)
+'''),
+      );
+      // Find the underlying fl_chart LineChart widget so we can assert
+      // the series actually produced spots (not just an empty SizedBox).
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      expect(chart.data.lineBarsData, hasLength(1));
+      expect(chart.data.lineBarsData.first.spots, hasLength(3));
+    });
+
     testWidgets('MarkDownRenderer renders the source as Markdown', (
       tester,
     ) async {
@@ -216,5 +267,17 @@ root = LineChart(
         expect(find.text('hero'), findsOneWidget);
       },
     );
+
+    testWidgets('TextContent stringifies a numeric state value', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app('''
+\$count = 7
+root = TextContent(text: \$count)
+'''),
+      );
+      expect(find.text('7'), findsOneWidget);
+    });
   });
 }

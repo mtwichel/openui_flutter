@@ -16,7 +16,8 @@ class _MockChatBloc extends MockBloc<ChatEvent, ChatState>
 
 class _NoopService implements LlmChatService {
   @override
-  Stream<String> sendMessage(String text) => const Stream<String>.empty();
+  Stream<LlmChatEvent> sendMessage(String text) =>
+      const Stream<LlmChatEvent>.empty();
   @override
   void reset() {}
   @override
@@ -24,7 +25,10 @@ class _NoopService implements LlmChatService {
 }
 
 Widget _viewHarness(ChatBloc bloc) => MaterialApp(
-  home: BlocProvider<ChatBloc>.value(value: bloc, child: const LlmChatView()),
+  home: BlocProvider<ChatBloc>.value(
+    value: bloc,
+    child: const LlmChatView(systemPrompt: 'system prompt'),
+  ),
 );
 
 void _setWideViewport(WidgetTester tester) {
@@ -119,7 +123,7 @@ void main() {
       expect(find.text('Boom'), findsOneWidget);
     });
 
-    testWidgets('transcript renders user bubble + assistant placeholder', (
+    testWidgets('transcript renders copyable user + assistant messages', (
       tester,
     ) async {
       _setWideViewport(tester);
@@ -128,7 +132,7 @@ void main() {
       await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.text('hi'), findsOneWidget);
-      expect(find.text('Generated UI #1'), findsOneWidget);
+      expect(find.text('root = Card(children: [])'), findsNWidgets(2));
     });
 
     testWidgets('shows generated OpenUI code viewer under renderer', (
@@ -143,7 +147,7 @@ void main() {
       expect(find.text('root = Card(children: [])'), findsOneWidget);
     });
 
-    testWidgets('assistant placeholders number sequentially across turns', (
+    testWidgets('assistant transcript renders each assistant response text', (
       tester,
     ) async {
       _setWideViewport(tester);
@@ -151,8 +155,8 @@ void main() {
 
       await tester.pumpWidget(_viewHarness(bloc));
 
-      expect(find.text('Generated UI #1'), findsOneWidget);
-      expect(find.text('Generated UI #2'), findsOneWidget);
+      expect(find.text('r=1'), findsNWidgets(2));
+      expect(find.text('r=2'), findsNWidgets(2));
     });
 
     testWidgets('Clear icon dispatches ChatCleared', (tester) async {

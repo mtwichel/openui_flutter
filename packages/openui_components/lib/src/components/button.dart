@@ -58,7 +58,7 @@ Component<Widget> buttonComponent() {
     ),
     render: (ctx, props, renderNode, id) {
       return ButtonWidget(
-        label: props['label'] as String? ?? '',
+        label: props['label']?.toString() ?? '',
         variant: props['variant'] as String? ?? 'primary',
         onPressed: props['onClick'] as VoidCallback?,
       );

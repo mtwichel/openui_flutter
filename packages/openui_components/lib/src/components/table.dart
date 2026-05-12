@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:openui_components/src/components/callout.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
@@ -30,6 +31,14 @@ class _TableWidgetState extends State<TableWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.columns.isEmpty) {
+      return const CalloutWidget(
+        text:
+            'Table requires at least one column. Pass '
+            'columns: [{name: "..."}] or columns: ["..."].',
+        variant: 'error',
+      );
+    }
     final start = _page * _pageSize;
     final end = (start + _pageSize).clamp(0, widget.rows.length);
     final pageRows = widget.rows.sublist(start, end);
@@ -84,34 +93,80 @@ class _TableWidgetState extends State<TableWidget> {
   }
 }
 
-/// Registration for `Table`. Column definitions come from inline
-/// `Col(name, label?)` calls in the source.
+/// Registration for `Table`. Accepts either `{name, label?}` column
+/// objects or bare strings, and either map-keyed or positional rows.
 Component<Widget> tableComponent() {
   return defineComponent<Widget>(
     name: 'Table',
     description: 'paginated data table',
     schema: objectSchema(
       const <String, Object?>{
-        'columns': <String, Object?>{'type': 'array'},
-        'rows': <String, Object?>{'type': 'array'},
+        'columns': <String, Object?>{
+          'type': 'array',
+          'description':
+              'array of {name: string, label?: string} objects. '
+              'A bare string entry is treated as both name and label.',
+        },
+        'rows': <String, Object?>{
+          'type': 'array',
+          'description':
+              'array of {<columnName>: value} maps, or positional '
+              'arrays aligned with the columns order',
+        },
       },
       required: const ['columns', 'rows'],
     ),
     render: (ctx, props, renderNode, id) {
-      final cols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
-      final rows = (props['rows'] as List<Object?>?) ?? const <Object?>[];
+      final rawCols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
+      final rawRows = (props['rows'] as List<Object?>?) ?? const <Object?>[];
+      final columns = _normalizeColumns(rawCols);
       return TableWidget(
-        columns: <Map<String, Object?>>[
-          for (final c in cols)
-            if (c is Map<String, Object?>) c,
-        ],
-        rows: <Map<String, Object?>>[
-          for (final r in rows)
-            if (r is Map<String, Object?>) r,
-        ],
+        columns: columns,
+        rows: _normalizeRows(rawRows, columns),
       );
     },
   );
+}
+
+List<Map<String, Object?>> _normalizeColumns(List<Object?> raw) {
+  final out = <Map<String, Object?>>[];
+  for (final c in raw) {
+    if (_coerceStringKeyMap(c) case final map?) {
+      if (map['name'] is String) out.add(map);
+    } else if (c is String) {
+      out.add(<String, Object?>{'name': c, 'label': c});
+    }
+  }
+  return out;
+}
+
+List<Map<String, Object?>> _normalizeRows(
+  List<Object?> raw,
+  List<Map<String, Object?>> columns,
+) {
+  final out = <Map<String, Object?>>[];
+  for (final r in raw) {
+    if (_coerceStringKeyMap(r) case final map?) {
+      out.add(map);
+    } else if (r is List<Object?>) {
+      final entry = <String, Object?>{};
+      final limit = r.length < columns.length ? r.length : columns.length;
+      for (var i = 0; i < limit; i++) {
+        final name = columns[i]['name'];
+        if (name is String) entry[name] = r[i];
+      }
+      out.add(entry);
+    }
+  }
+  return out;
+}
+
+Map<String, Object?>? _coerceStringKeyMap(Object? value) {
+  if (value is! Map<Object?, Object?>) return null;
+  return <String, Object?>{
+    for (final entry in value.entries)
+      if (entry.key is String) entry.key as String: entry.value,
+  };
 }
 
 /// `Col(name, label?)` resolves to a literal `Map<String, Object?>`.

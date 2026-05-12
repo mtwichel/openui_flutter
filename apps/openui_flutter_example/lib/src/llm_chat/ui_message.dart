@@ -7,6 +7,12 @@ enum UiMessageRole {
 
   /// Streamed back from the LLM. Carries OpenUI Lang source.
   assistant,
+
+  /// Incremental model reasoning text.
+  thinking,
+
+  /// Tool-usage activity from provider metadata.
+  tool,
 }
 
 /// A single entry in the live chat transcript.

@@ -4,6 +4,7 @@
 
 import 'package:dartantic_ai/dartantic_ai.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
@@ -97,13 +98,13 @@ class _LlmChatScreenState extends State<LlmChatScreen> {
       Agent.providerFactories[kGeminiProvider] = () =>
           GoogleProvider(apiKey: apiKey);
     }
-
     return BlocProvider<ChatBloc>(
       key: ValueKey(LlmChatScreen._sessionGeminiApiKey),
       create: (_) => ChatBloc(service: factory()),
       child: LlmChatView(
         onMenuTap: widget.onMenuTap,
         onChangeApiKey: widget.serviceFactory == null ? _clearApiKey : null,
+        systemPrompt: LlmChatScreen._systemPrompt,
       ),
     );
   }
@@ -184,7 +185,12 @@ class _ApiKeyGate extends StatelessWidget {
 /// inside a `BlocProvider.value` with a mocked bloc.
 class LlmChatView extends StatefulWidget {
   /// Creates an [LlmChatView].
-  const LlmChatView({super.key, this.onMenuTap, this.onChangeApiKey});
+  const LlmChatView({
+    super.key,
+    this.onMenuTap,
+    this.onChangeApiKey,
+    required this.systemPrompt,
+  });
 
   /// Optional callback that opens the surrounding shell's drawer.
   final VoidCallback? onMenuTap;
@@ -192,6 +198,8 @@ class LlmChatView extends StatefulWidget {
   /// Optional callback invoked when the user wants to change the API key.
   final VoidCallback? onChangeApiKey;
 
+  /// System prompt injected into the live chat service.
+  final String systemPrompt;
   @override
   State<LlmChatView> createState() => _LlmChatViewState();
 }
@@ -199,6 +207,7 @@ class LlmChatView extends StatefulWidget {
 class _LlmChatViewState extends State<LlmChatView> {
   final Library<Widget> _library = openuiChatLibrary();
   final TextEditingController _inputController = TextEditingController();
+  bool _showSystemMessage = false;
 
   @override
   void dispose() {
@@ -233,6 +242,19 @@ class _LlmChatViewState extends State<LlmChatView> {
               onPressed: widget.onChangeApiKey,
             ),
           IconButton(
+            tooltip: _showSystemMessage
+                ? 'Hide system prompt'
+                : 'Show system prompt',
+            icon: Icon(
+              _showSystemMessage ? Icons.visibility_off : Icons.visibility,
+            ),
+            onPressed: () {
+              setState(() {
+                _showSystemMessage = !_showSystemMessage;
+              });
+            },
+          ),
+          IconButton(
             tooltip: 'Clear chat',
             icon: const Icon(Icons.delete_outline),
             onPressed: () => context.read<ChatBloc>().add(const ChatCleared()),
@@ -246,6 +268,8 @@ class _LlmChatViewState extends State<LlmChatView> {
           final chat = _ChatPane(
             controller: _inputController,
             onSend: _send,
+            showSystemMessage: _showSystemMessage,
+            systemPrompt: widget.systemPrompt,
           );
           if (wide) {
             return Row(
@@ -269,10 +293,17 @@ class _LlmChatViewState extends State<LlmChatView> {
   }
 }
 
-class _RendererPane extends StatelessWidget {
+class _RendererPane extends StatefulWidget {
   const _RendererPane({required this.library});
 
   final Library<Widget> library;
+
+  @override
+  State<_RendererPane> createState() => _RendererPaneState();
+}
+
+class _RendererPaneState extends State<_RendererPane> {
+  String _lastParseableResponse = '';
 
   @override
   Widget build(BuildContext context) {
@@ -282,10 +313,14 @@ class _RendererPane extends StatelessWidget {
             .where((m) => m.role == UiMessageRole.assistant)
             .lastOrNull;
         final response = lastAssistant?.text ?? '';
+        final isStreaming = state.status == ChatStatus.streaming;
+        final rendererResponse = isStreaming
+            ? response
+            : (_lastParseableResponse.isNotEmpty ? _lastParseableResponse : response);
         return Column(
           children: [
             Expanded(
-              child: response.isEmpty
+              child: rendererResponse.isEmpty
                   ? const Center(
                       child: Padding(
                         padding: EdgeInsets.all(24),
@@ -298,9 +333,14 @@ class _RendererPane extends StatelessWidget {
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: Renderer(
-                        response: response,
-                        isStreaming: state.status == ChatStatus.streaming,
-                        library: library,
+                        response: rendererResponse,
+                        isStreaming: isStreaming,
+                        library: widget.library,
+                        onParseResult: (result) {
+                          if (result.root != null && result.meta.errors.isEmpty) {
+                            _lastParseableResponse = rendererResponse;
+                          }
+                        },
                       ),
                     ),
             ),
@@ -361,10 +401,17 @@ class _GeneratedCodeViewer extends StatelessWidget {
 }
 
 class _ChatPane extends StatelessWidget {
-  const _ChatPane({required this.controller, required this.onSend});
+  const _ChatPane({
+    required this.controller,
+    required this.onSend,
+    required this.showSystemMessage,
+    required this.systemPrompt,
+  });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  final bool showSystemMessage;
+  final String systemPrompt;
 
   @override
   Widget build(BuildContext context) {
@@ -373,7 +420,13 @@ class _ChatPane extends StatelessWidget {
         final isStreaming = state.status == ChatStatus.streaming;
         return Column(
           children: [
-            Expanded(child: _Transcript(messages: state.messages)),
+            Expanded(
+              child: _Transcript(
+                messages: state.messages,
+                showSystemMessage: showSystemMessage,
+                systemPrompt: systemPrompt,
+              ),
+            ),
             if (state.status == ChatStatus.error)
               _ErrorBanner(message: state.error ?? 'Unknown error'),
             _InputBar(
@@ -389,13 +442,19 @@ class _ChatPane extends StatelessWidget {
 }
 
 class _Transcript extends StatelessWidget {
-  const _Transcript({required this.messages});
+  const _Transcript({
+    required this.messages,
+    required this.showSystemMessage,
+    required this.systemPrompt,
+  });
 
   final List<UiMessage> messages;
+  final bool showSystemMessage;
+  final String systemPrompt;
 
   @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) {
+    if (messages.isEmpty && !showSystemMessage) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -406,17 +465,56 @@ class _Transcript extends StatelessWidget {
         ),
       );
     }
-    var assistantSeq = 0;
     final tiles = <Widget>[];
-    for (final m in messages) {
-      if (m.role == UiMessageRole.user) {
-        tiles.add(_UserBubble(key: ValueKey(m.id), text: m.text));
-      } else {
-        assistantSeq++;
-        tiles.add(
-          _AssistantPlaceholder(key: ValueKey(m.id), index: assistantSeq),
-        );
-      }
+    if (showSystemMessage) {
+      tiles.add(
+        _CopyableMessageBubble(
+          key: const ValueKey('system-prompt'),
+          roleLabel: 'System',
+          text: systemPrompt,
+          alignment: Alignment.center,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.tertiaryContainer.withValues(alpha: 0.6),
+        ),
+      );
+    }
+    for (final message in messages) {
+      final roleLabel = switch (message.role) {
+        UiMessageRole.user => 'User',
+        UiMessageRole.assistant => 'Assistant',
+        UiMessageRole.thinking => 'Thinking',
+        UiMessageRole.tool => 'Tool',
+      };
+      final alignment = switch (message.role) {
+        UiMessageRole.user => Alignment.centerRight,
+        UiMessageRole.assistant ||
+        UiMessageRole.thinking ||
+        UiMessageRole.tool => Alignment.centerLeft,
+      };
+      final background = switch (message.role) {
+        UiMessageRole.user => Theme.of(context).colorScheme.primaryContainer,
+        UiMessageRole.assistant => Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest,
+        UiMessageRole.thinking =>
+          Theme.of(context).colorScheme.secondaryContainer.withValues(
+            alpha: 0.65,
+          ),
+        UiMessageRole.tool =>
+          Theme.of(context).colorScheme.tertiaryContainer.withValues(
+            alpha: 0.65,
+          ),
+      };
+      tiles.add(
+        _CopyableMessageBubble(
+          key: ValueKey(message.id),
+          roleLabel: roleLabel,
+          text: message.text,
+          alignment: alignment,
+          backgroundColor: background,
+        ),
+      );
     }
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -425,52 +523,38 @@ class _Transcript extends StatelessWidget {
   }
 }
 
-class _UserBubble extends StatelessWidget {
-  const _UserBubble({required this.text, super.key});
+class _CopyableMessageBubble extends StatelessWidget {
+  const _CopyableMessageBubble({
+    required this.roleLabel,
+    required this.text,
+    required this.alignment,
+    required this.backgroundColor,
+    super.key,
+  });
 
+  final String roleLabel;
   final String text;
+  final Alignment alignment;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: alignment,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer,
+          color: backgroundColor,
           borderRadius: const BorderRadius.all(Radius.circular(12)),
         ),
-        child: Text(text),
-      ),
-    );
-  }
-}
-
-class _AssistantPlaceholder extends StatelessWidget {
-  const _AssistantPlaceholder({required this.index, super.key});
-
-  final int index;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: const BorderRadius.all(Radius.circular(12)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.widgets_outlined, size: 16),
-            const SizedBox(width: 8),
-            Text('Generated UI #$index'),
+            Text(roleLabel, style: theme.textTheme.labelSmall),
+            const SizedBox(height: 4),
+            SelectableText(text.isEmpty ? '(streaming...)' : text),
           ],
         ),
       ),
@@ -498,7 +582,7 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-class _InputBar extends StatelessWidget {
+class _InputBar extends StatefulWidget {
   const _InputBar({
     required this.controller,
     required this.onSend,
@@ -510,16 +594,49 @@ class _InputBar extends StatelessWidget {
   final bool enabled;
 
   @override
+  State<_InputBar> createState() => _InputBarState();
+}
+
+class _InputBarState extends State<_InputBar> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.enter &&
+            HardwareKeyboard.instance.isShiftPressed &&
+            widget.enabled) {
+          widget.onSend();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: TextField(
-              controller: controller,
-              enabled: enabled,
-              onSubmitted: enabled ? (_) => onSend() : null,
+              controller: widget.controller,
+              focusNode: _focusNode,
+              enabled: widget.enabled,
+              minLines: 1,
+              maxLines: 6,
               decoration: const InputDecoration(
                 hintText: 'Describe a UI…',
                 border: OutlineInputBorder(),
@@ -528,9 +645,12 @@ class _InputBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          FilledButton(
-            onPressed: enabled ? onSend : null,
-            child: const Text('Send'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: FilledButton(
+              onPressed: widget.enabled ? widget.onSend : null,
+              child: const Text('Send'),
+            ),
           ),
         ],
       ),

@@ -100,8 +100,16 @@ Component<Widget> barChartComponent() {
     description: 'multi-series bar chart',
     schema: objectSchema(
       const <String, Object?>{
-        'series': <String, Object?>{'type': 'array'},
-        'labels': <String, Object?>{'type': 'array'},
+        'series': <String, Object?>{
+          'type': 'array',
+          'description':
+              'array of {name: string, values: array of numbers} objects. '
+              '`data` is accepted as an alias for `values`.',
+        },
+        'labels': <String, Object?>{
+          'type': 'array',
+          'description': 'array of x-axis label strings, one per data point',
+        },
       },
       required: const ['series'],
     ),
@@ -109,12 +117,10 @@ Component<Widget> barChartComponent() {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
       final series = <({String name, List<num> values})>[
         for (final s in raw)
-          if (s is Map<String, Object?>)
+          if (_coerceSeriesMap(s) case final seriesMap?)
             (
-              name: s['name'] as String? ?? '',
-              values: (s['values'] as List<Object?>? ?? const <Object?>[])
-                  .whereType<num>()
-                  .toList(),
+              name: seriesMap['name']?.toString() ?? '',
+              values: _coerceNumList(seriesMap['values'] ?? seriesMap['data']),
             ),
       ];
       final labels = (props['labels'] as List<Object?>?)
@@ -123,4 +129,17 @@ Component<Widget> barChartComponent() {
       return BarChartWidget(series: series, labels: labels);
     },
   );
+}
+
+Map<String, Object?>? _coerceSeriesMap(Object? value) {
+  if (value is! Map<Object?, Object?>) return null;
+  return <String, Object?>{
+    for (final entry in value.entries)
+      if (entry.key is String) entry.key as String: entry.value,
+  };
+}
+
+List<num> _coerceNumList(Object? value) {
+  if (value is! List<Object?>) return const <num>[];
+  return value.whereType<num>().toList(growable: false);
 }

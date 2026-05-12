@@ -79,7 +79,7 @@ Component<Widget> textContentComponent() {
               scope?.isStreaming == true &&
               (scope?.incomplete.contains(id) ?? false);
           return TextContentWidget(
-            text: props['text'] as String? ?? '',
+            text: props['text']?.toString() ?? '',
             size: props['size'] as String? ?? 'medium',
             isStreaming: streaming,
           );

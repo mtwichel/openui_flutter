@@ -8,14 +8,14 @@ import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 
 class _FakeService implements LlmChatService {
-  final List<StreamController<String>> controllers =
-      <StreamController<String>>[];
+  final List<StreamController<LlmChatEvent>> controllers =
+      <StreamController<LlmChatEvent>>[];
   int resetCount = 0;
   int closeCount = 0;
 
   @override
-  Stream<String> sendMessage(String text) {
-    final controller = StreamController<String>();
+  Stream<LlmChatEvent> sendMessage(String text) {
+    final controller = StreamController<LlmChatEvent>();
     controllers.add(controller);
     return controller.stream;
   }
@@ -52,9 +52,9 @@ void main() {
       act: (bloc) async {
         bloc.add(const MessageSubmitted('hi'));
         await _tick();
-        service.controllers.last.add('Hello');
+        service.controllers.last.add(const LlmChatEvent.output('Hello'));
         await _tick();
-        service.controllers.last.add(' world');
+        service.controllers.last.add(const LlmChatEvent.output(' world'));
         await _tick();
         await service.controllers.last.close();
       },
@@ -97,14 +97,14 @@ void main() {
       act: (bloc) async {
         bloc.add(const MessageSubmitted('one'));
         await _tick();
-        service.controllers.last.add('A');
+        service.controllers.last.add(const LlmChatEvent.output('A'));
         await _tick();
         await service.controllers.last.close();
         await _tick();
 
         bloc.add(const MessageSubmitted('two'));
         await _tick();
-        service.controllers.last.add('B');
+        service.controllers.last.add(const LlmChatEvent.output('B'));
         await _tick();
         await service.controllers.last.close();
       },
@@ -120,19 +120,58 @@ void main() {
     );
 
     blocTest<ChatBloc, ChatState>(
+      'thinking and tool events appear in transcript during streaming',
+      build: () => ChatBloc(service: service),
+      act: (bloc) async {
+        bloc.add(const MessageSubmitted('search this'));
+        await _tick();
+        service.controllers.last.add(
+          const LlmChatEvent.thinking('planning...'),
+        );
+        await _tick();
+        service.controllers.last.add(
+          const LlmChatEvent.tool('web_search: started'),
+        );
+        await _tick();
+        service.controllers.last.add(const LlmChatEvent.output('Answer'));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.status, ChatStatus.streaming);
+        expect(bloc.state.messages[0].role, UiMessageRole.user);
+        expect(bloc.state.messages[1].role, UiMessageRole.assistant);
+        expect(bloc.state.messages[1].text, 'Answer');
+        expect(
+          bloc.state.messages.any(
+            (m) =>
+                m.role == UiMessageRole.thinking && m.text.contains('planning'),
+          ),
+          isTrue,
+        );
+        expect(
+          bloc.state.messages.any(
+            (m) =>
+                m.role == UiMessageRole.tool && m.text.contains('web_search'),
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
       'mid-stream error drops the in-progress turn, preserves prior turns',
       build: () => ChatBloc(service: service),
       act: (bloc) async {
         bloc.add(const MessageSubmitted('one'));
         await _tick();
-        service.controllers.last.add('A');
+        service.controllers.last.add(const LlmChatEvent.output('A'));
         await _tick();
         await service.controllers.last.close();
         await _tick();
 
         bloc.add(const MessageSubmitted('two'));
         await _tick();
-        service.controllers.last.add('Bp');
+        service.controllers.last.add(const LlmChatEvent.output('Bp'));
         await _tick();
         service.controllers.last.addError(StateError('boom'));
         await _tick();
@@ -155,7 +194,7 @@ void main() {
       act: (bloc) async {
         bloc.add(const MessageSubmitted('hi'));
         await _tick();
-        service.controllers.last.add('partial');
+        service.controllers.last.add(const LlmChatEvent.output('partial'));
         await _tick();
         bloc.add(const ChatCleared());
         await _tick();

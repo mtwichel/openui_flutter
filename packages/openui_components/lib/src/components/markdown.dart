@@ -94,7 +94,7 @@ Component<Widget> markdownComponent() {
               scope?.isStreaming == true &&
               (scope?.incomplete.contains(id) ?? false);
           return MarkDownRendererWidget(
-            source: props['source'] as String? ?? '',
+            source: props['source']?.toString() ?? '',
             isStreaming: streaming,
           );
         },

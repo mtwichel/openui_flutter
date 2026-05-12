@@ -65,7 +65,7 @@ Component<Widget> codeBlockComponent() {
     ),
     render: (ctx, props, renderNode, id) {
       return CodeBlockWidget(
-        code: props['code'] as String? ?? '',
+        code: props['code']?.toString() ?? '',
         language: props['language'] as String?,
       );
     },

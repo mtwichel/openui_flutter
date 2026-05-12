@@ -142,7 +142,7 @@ Component<Widget> formControlComponent() {
           (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??
           const <Widget>[];
       return FormControlWidget(
-        label: props['label'] as String? ?? '',
+        label: props['label']?.toString() ?? '',
         helperText: props['helperText'] as String?,
         children: children,
       );

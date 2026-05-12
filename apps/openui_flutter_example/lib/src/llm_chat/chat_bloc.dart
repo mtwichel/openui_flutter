@@ -21,8 +21,8 @@ enum ChatStatus {
 
 /// Immutable state of [ChatBloc].
 ///
-/// When [status] is [ChatStatus.streaming] the last entry of [messages]
-/// is the in-progress assistant turn — its text grows on every chunk.
+/// When [status] is [ChatStatus.streaming], [messages] contains the
+/// in-progress assistant turn plus optional thinking/tool activity entries.
 class ChatState extends Equatable {
   /// Creates a [ChatState].
   const ChatState({
@@ -34,8 +34,8 @@ class ChatState extends Equatable {
   /// Current lifecycle status.
   final ChatStatus status;
 
-  /// Transcript, oldest first. May contain an in-progress trailing
-  /// assistant message during streaming.
+  /// Transcript, oldest first. During streaming this may include assistant
+  /// deltas plus thinking/tool activity messages.
   final List<UiMessage> messages;
 
   /// Last error message, or null. Cleared on the next successful submit.
@@ -90,7 +90,7 @@ class ChatCleared extends ChatEvent {
 
 class _StreamChunkReceived extends ChatEvent {
   const _StreamChunkReceived(this.chunk);
-  final String chunk;
+  final LlmChatEvent chunk;
   @override
   List<Object?> get props => [chunk];
 }
@@ -123,7 +123,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   final LlmChatService _service;
   int _idCounter = 0;
-  StreamSubscription<String>? _streamSub;
+  StreamSubscription<LlmChatEvent>? _streamSub;
 
   String _nextId() => 'msg-${_idCounter++}';
 
@@ -175,19 +175,52 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     Emitter<ChatState> emit,
   ) {
     final messages = [...state.messages];
-    if (messages.isEmpty || messages.last.role != UiMessageRole.assistant) {
-      return;
+    switch (event.chunk.type) {
+      case LlmChatEventType.output:
+        final assistantIndex = messages.lastIndexWhere(
+          (m) => m.role == UiMessageRole.assistant,
+        );
+        if (assistantIndex < 0) return;
+        final assistant = messages[assistantIndex];
+        messages[assistantIndex] = assistant.copyWith(
+          text: assistant.text + event.chunk.text,
+        );
+        break;
+      case LlmChatEventType.thinking:
+        final thinkingIndex = messages.lastIndexWhere(
+          (m) => m.role == UiMessageRole.thinking,
+        );
+        if (thinkingIndex < 0) {
+          messages.add(
+            UiMessage(
+              id: _nextId(),
+              role: UiMessageRole.thinking,
+              text: event.chunk.text,
+            ),
+          );
+        } else {
+          final thinking = messages[thinkingIndex];
+          messages[thinkingIndex] = thinking.copyWith(
+            text: '${thinking.text}${event.chunk.text}',
+          );
+        }
+        break;
+      case LlmChatEventType.tool:
+        messages.add(
+          UiMessage(
+            id: _nextId(),
+            role: UiMessageRole.tool,
+            text: event.chunk.text,
+          ),
+        );
+        break;
     }
-    final last = messages.last;
-    messages[messages.length - 1] = last.copyWith(
-      text: last.text + event.chunk,
-    );
     emit(state.copyWith(messages: messages));
   }
 
   void _onFailed(_StreamFailed event, Emitter<ChatState> emit) {
     final messages = [...state.messages];
-    if (messages.isNotEmpty && messages.last.role == UiMessageRole.assistant) {
+    while (messages.isNotEmpty && messages.last.role != UiMessageRole.user) {
       messages.removeLast();
     }
     emit(

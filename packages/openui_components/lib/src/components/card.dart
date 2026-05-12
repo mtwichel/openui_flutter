@@ -120,7 +120,7 @@ Component<Widget> cardHeaderComponent() {
     ),
     render: (ctx, props, renderNode, id) {
       return CardHeaderWidget(
-        title: props['title'] as String? ?? '',
+        title: props['title']?.toString() ?? '',
         subtitle: props['subtitle'] as String?,
       );
     },

@@ -68,7 +68,7 @@ Component<Widget> calloutComponent() {
     ),
     render: (ctx, props, renderNode, id) {
       return CalloutWidget(
-        text: props['text'] as String? ?? '',
+        text: props['text']?.toString() ?? '',
         variant: props['variant'] as String? ?? 'info',
       );
     },

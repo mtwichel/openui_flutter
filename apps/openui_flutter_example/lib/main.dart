@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:dartantic_ai/dartantic_ai.dart';
-
+import 'package:flutter/material.dart';
 import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
 import 'package:openui_flutter_example/src/shell/app_shell.dart';
 

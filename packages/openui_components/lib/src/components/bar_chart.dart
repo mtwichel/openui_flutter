@@ -45,6 +45,34 @@ class BarChartWidget extends StatelessWidget {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              tooltipBorderRadius: BorderRadius.circular(10),
+              tooltipPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              getTooltipColor: (_) => scheme.inverseSurface,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final seriesName = series[rodIndex].name;
+                final label = labels != null && group.x < labels!.length
+                    ? labels![group.x]
+                    : '${group.x}';
+                final value = _formatTooltipValue(rod.toY);
+                return BarTooltipItem(
+                  '$seriesName\n$label: $value',
+                  TextStyle(
+                    color: scheme.onInverseSurface,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                );
+              },
+            ),
+          ),
           barGroups: <BarChartGroupData>[
             for (var i = 0; i < groupCount; i++)
               BarChartGroupData(
@@ -142,4 +170,9 @@ Map<String, Object?>? _coerceSeriesMap(Object? value) {
 List<num> _coerceNumList(Object? value) {
   if (value is! List<Object?>) return const <num>[];
   return value.whereType<num>().toList(growable: false);
+}
+
+String _formatTooltipValue(double value) {
+  final rounded = value.toStringAsFixed(2);
+  return rounded.contains('.') ? rounded.replaceFirst(RegExp(r'\.?0+$'), '') : rounded;
 }

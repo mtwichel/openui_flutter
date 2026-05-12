@@ -2,6 +2,8 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -31,6 +33,20 @@ class LineChartWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (series.isEmpty) return SizedBox(height: height);
+    final pointCount = series.map((s) => s.values.length).fold(0, math.max);
+    if (pointCount == 0) return SizedBox(height: height);
+    final yValues = <double>[
+      for (final s in series) ...s.values.map((value) => value.toDouble()),
+    ];
+    final minValue = yValues.reduce(math.min);
+    final maxValue = yValues.reduce(math.max);
+    final yRange = maxValue - minValue;
+    final yPadding = yRange == 0
+        ? (maxValue == 0 ? 1.0 : maxValue.abs() * 0.1)
+        : yRange * 0.08;
+    final minY = minValue - yPadding;
+    final maxY = maxValue + yPadding;
+
     final scheme = Theme.of(context).colorScheme;
     final palette = <Color>[
       scheme.primary,
@@ -42,10 +58,15 @@ class LineChartWidget extends StatelessWidget {
       height: height,
       child: LineChart(
         LineChartData(
+          minX: 0,
+          maxX: (pointCount - 1).toDouble(),
+          minY: minY,
+          maxY: maxY,
           lineBarsData: <LineChartBarData>[
             for (var s = 0; s < series.length; s++)
               LineChartBarData(
                 isCurved: true,
+                preventCurveOverShooting: true,
                 color: palette[s % palette.length],
                 dotData: const FlDotData(show: false),
                 spots: <FlSpot>[
@@ -54,6 +75,33 @@ class LineChartWidget extends StatelessWidget {
                 ],
               ),
           ],
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+              tooltipBorderRadius: BorderRadius.circular(10),
+              tooltipPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              getTooltipColor: (_) => scheme.inverseSurface,
+              getTooltipItems: (touchedSpots) {
+                return touchedSpots.map((spot) {
+                  final seriesName = series[spot.barIndex].name;
+                  final value = _formatTooltipValue(spot.y);
+                  return LineTooltipItem(
+                    '$seriesName\n$value',
+                    TextStyle(
+                      color: scheme.onInverseSurface,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  );
+                }).toList(growable: false);
+              },
+            ),
+          ),
           titlesData: FlTitlesData(
             leftTitles: const AxisTitles(
               sideTitles: SideTitles(showTitles: true, reservedSize: 32),
@@ -63,7 +111,13 @@ class LineChartWidget extends StatelessWidget {
                 showTitles: true,
                 reservedSize: 24,
                 getTitlesWidget: (value, meta) {
-                  final i = value.toInt();
+                  if ((value - value.roundToDouble()).abs() > 0.001) {
+                    return const SizedBox.shrink();
+                  }
+                  final i = value.round();
+                  if (i < 0 || i >= pointCount) {
+                    return const SizedBox.shrink();
+                  }
                   final label = labels != null && i < labels!.length
                       ? labels![i]
                       : '$i';
@@ -132,4 +186,9 @@ Map<String, Object?>? _coerceSeriesMap(Object? value) {
 List<num> _coerceNumList(Object? value) {
   if (value is! List<Object?>) return const <num>[];
   return value.whereType<num>().toList(growable: false);
+}
+
+String _formatTooltipValue(double value) {
+  final rounded = value.toStringAsFixed(2);
+  return rounded.contains('.') ? rounded.replaceFirst(RegExp(r'\.?0+$'), '') : rounded;
 }

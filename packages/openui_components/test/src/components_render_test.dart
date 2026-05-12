@@ -4,7 +4,7 @@
 // the matching raw-string form is less readable than the escapes.
 // ignore_for_file: experimental_member_use, leading_newlines_in_multiline_strings, use_raw_strings, lines_longer_than_80_chars
 
-import 'package:fl_chart/fl_chart.dart' show LineChart;
+import 'package:fl_chart/fl_chart.dart' show BarChart, LineChart;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openui/openui.dart';
@@ -231,6 +231,26 @@ root = LineChart(
       expect(find.byType(LineChartWidget), findsOneWidget);
     });
 
+    testWidgets('LineChart uses legible tooltip styling', (tester) async {
+      await tester.pumpWidget(
+        _app('''
+root = LineChart(
+  series: [{name: "y", values: [1, 2, 3]}],
+  labels: ["a", "b", "c"]
+)
+'''),
+      );
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      final tooltipData = chart.data.lineTouchData.touchTooltipData;
+      expect(tooltipData.fitInsideHorizontally, isTrue);
+      expect(tooltipData.fitInsideVertically, isTrue);
+      expect(tooltipData.tooltipBorderRadius, BorderRadius.circular(10));
+      expect(
+        tooltipData.tooltipPadding,
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      );
+    });
+
     testWidgets('LineChart accepts `data` as an alias for `values`', (
       tester,
     ) async {
@@ -249,6 +269,39 @@ root = LineChart(
       expect(chart.data.lineBarsData.first.spots, hasLength(3));
     });
 
+    testWidgets('LineChart adds y-axis headroom to avoid clipping peaks', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app('''
+root = LineChart(
+  series: [
+    {name: "CA", values: [0.5, 0.7, 0.6]},
+    {name: "TX", values: [1.8, 1.82, 1.75]}
+  ],
+  labels: ["2014", "2015", "2016"]
+)
+'''),
+      );
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      expect(chart.data.maxY, isNotNull);
+      expect(chart.data.maxY, greaterThan(1.82));
+    });
+
+    testWidgets('LineChart renders each x-axis label once', (tester) async {
+      await tester.pumpWidget(
+        _app('''
+root = LineChart(
+  series: [{name: "y", values: [1, 2, 3]}],
+  labels: ["2014", "2015", "2016"]
+)
+'''),
+      );
+      expect(find.text('2014'), findsOneWidget);
+      expect(find.text('2015'), findsOneWidget);
+      expect(find.text('2016'), findsOneWidget);
+    });
+
     testWidgets('MarkDownRenderer renders the source as Markdown', (
       tester,
     ) async {
@@ -256,6 +309,26 @@ root = LineChart(
         _app('root = MarkDownRenderer(source: "**bold**")'),
       );
       expect(find.byType(MarkDownRendererWidget), findsOneWidget);
+    });
+
+    testWidgets('BarChart uses legible tooltip styling', (tester) async {
+      await tester.pumpWidget(
+        _app('''
+root = BarChart(
+  series: [{name: "y", values: [1, 2, 3]}],
+  labels: ["a", "b", "c"]
+)
+'''),
+      );
+      final chart = tester.widget<BarChart>(find.byType(BarChart));
+      final tooltipData = chart.data.barTouchData.touchTooltipData;
+      expect(tooltipData.fitInsideHorizontally, isTrue);
+      expect(tooltipData.fitInsideVertically, isTrue);
+      expect(tooltipData.tooltipBorderRadius, BorderRadius.circular(10));
+      expect(
+        tooltipData.tooltipPadding,
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      );
     });
 
     testWidgets(

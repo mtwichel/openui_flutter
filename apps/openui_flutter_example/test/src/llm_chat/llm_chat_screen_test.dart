@@ -71,6 +71,29 @@ const _twoAssistantTurns = ChatState(
   ],
 );
 
+const _streamingPartialRender = ChatState(
+  status: ChatStatus.streaming,
+  messages: [
+    UiMessage(id: 'u1', role: UiMessageRole.user, text: 'build ui'),
+    UiMessage(
+      id: 'a1',
+      role: UiMessageRole.assistant,
+      text: 'root = Stack(children: [TextContent(text: "Partial")])',
+    ),
+  ],
+);
+
+const _idleFinalRender = ChatState(
+  messages: [
+    UiMessage(id: 'u1', role: UiMessageRole.user, text: 'build ui'),
+    UiMessage(
+      id: 'a1',
+      role: UiMessageRole.assistant,
+      text: 'root = Stack(children: [TextContent(text: "Final")])',
+    ),
+  ],
+);
+
 const _errorState = ChatState(
   status: ChatStatus.error,
   messages: [UiMessage(id: 'u1', role: UiMessageRole.user, text: 'hi')],
@@ -157,6 +180,27 @@ void main() {
 
       expect(find.text('r=1'), findsNWidgets(2));
       expect(find.text('r=2'), findsNWidgets(2));
+    });
+
+    testWidgets('renderer uses final assistant response after streaming ends', (
+      tester,
+    ) async {
+      _setWideViewport(tester);
+      when(() => bloc.state).thenReturn(_idleFinalRender);
+      whenListen(
+        bloc,
+        Stream<ChatState>.fromIterable([
+          _streamingPartialRender,
+          _idleFinalRender,
+        ]),
+        initialState: _streamingPartialRender,
+      );
+
+      await tester.pumpWidget(_viewHarness(bloc));
+      await tester.pump();
+
+      expect(find.text('Final'), findsOneWidget);
+      expect(find.text('Partial'), findsNothing);
     });
 
     testWidgets('Clear icon dispatches ChatCleared', (tester) async {

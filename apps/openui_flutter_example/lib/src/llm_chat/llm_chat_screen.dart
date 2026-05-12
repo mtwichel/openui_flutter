@@ -314,9 +314,9 @@ class _RendererPaneState extends State<_RendererPane> {
             .lastOrNull;
         final response = lastAssistant?.text ?? '';
         final isStreaming = state.status == ChatStatus.streaming;
-        final rendererResponse = isStreaming
+        final rendererResponse = response.isNotEmpty
             ? response
-            : (_lastParseableResponse.isNotEmpty ? _lastParseableResponse : response);
+            : (isStreaming ? '' : _lastParseableResponse);
         return Column(
           children: [
             Expanded(

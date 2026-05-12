@@ -18,32 +18,30 @@ const String _recaptchaSiteKey = String.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    if (_recaptchaSiteKey.isEmpty) {
-      throw StateError(
-        'RECAPTCHA_ENTERPRISE_SITE_KEY is empty. Refusing to activate App '
-        'Check without a site key — the Live chat surface would otherwise '
-        'ship without abuse protection. See README "Live chat setup".',
-      );
-    }
-    await FirebaseAppCheck.instance.activate(
-      providerWeb: ReCaptchaEnterpriseProvider(_recaptchaSiteKey),
-    );
-    Agent.providerFactories[kFirebaseVertexProvider] = () =>
-        FirebaseAIProvider(backend: FirebaseAIBackend.vertexAI);
-  } on Object catch (error, stackTrace) {
-    // Firebase or App Check init failed. The Scripts destination of
-    // `AppShell` does not depend on either and still works; the Live
-    // destination will surface this error if the user navigates to it.
-    debugPrint(
-      'Live chat unavailable — Firebase/App Check init failed.\n'
-      'See apps/openui_flutter_example/README.md "Live chat setup".\n'
-      'Error: $error\n$stackTrace',
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  if (_recaptchaSiteKey.isEmpty) {
+    throw StateError(
+      'RECAPTCHA_ENTERPRISE_SITE_KEY is empty. Refusing to activate App '
+      'Check without a site key — the Live chat surface would otherwise '
+      'ship without abuse protection. See README "Live chat setup".',
     );
   }
+  await FirebaseAppCheck.instance.activate(
+    providerWeb: ReCaptchaEnterpriseProvider(_recaptchaSiteKey),
+  );
+
+  // dartantic_firebase_ai does not pick up `FirebaseAppCheck.instance`
+  // globally — the instance must be threaded into the provider so it
+  // attaches App Check tokens to every Vertex AI call.
+  Agent.providerFactories[kFirebaseVertexProvider] = () => FirebaseAIProvider(
+    backend: FirebaseAIBackend.vertexAI,
+    appCheck: FirebaseAppCheck.instance,
+  );
+
   runApp(const OpenUIExampleApp());
 }
 

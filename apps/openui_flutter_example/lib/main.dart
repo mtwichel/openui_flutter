@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'package:openui_flutter_example/firebase_options.dart';
+import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
 import 'package:openui_flutter_example/src/shell/app_shell.dart';
 
 /// Web reCAPTCHA Enterprise site key, injected at build time via
@@ -14,11 +15,6 @@ import 'package:openui_flutter_example/src/shell/app_shell.dart';
 const String _recaptchaSiteKey = String.fromEnvironment(
   'RECAPTCHA_ENTERPRISE_SITE_KEY',
 );
-
-/// Dartantic agent string registered for the live-chat surface. Mirrors
-/// the constant in `DartanticChatService` — kept in lockstep so the
-/// factory and the consumer agree.
-const String _firebaseVertexAgent = 'firebase-vertex';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +32,7 @@ Future<void> main() async {
     await FirebaseAppCheck.instance.activate(
       providerWeb: ReCaptchaEnterpriseProvider(_recaptchaSiteKey),
     );
-    Agent.providerFactories[_firebaseVertexAgent] = () =>
+    Agent.providerFactories[kFirebaseVertexProvider] = () =>
         FirebaseAIProvider(backend: FirebaseAIBackend.vertexAI);
   } on Object catch (error, stackTrace) {
     // Firebase or App Check init failed. The Scripts destination of

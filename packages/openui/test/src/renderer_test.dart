@@ -545,12 +545,12 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
     testWidgets(
       '@Run on a mutation fires the mutation and halts on failure',
       (tester) async {
-        // $flag defaults to false; @Set targets true. A halted plan
-        // leaves $flag false; a passing-by-coincidence value cannot
-        // arise — @Set is the only writer.
+        // $flag defaults to 0; @Set targets 999. A halted plan leaves
+        // $flag at 0; a passing-by-coincidence value cannot arise —
+        // @Set is the only writer.
         const program = '''refresh = Mutation(name: "fail")
-\$flag = false
-root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, true)])
+\$flag = 0
+root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
 ''';
         final stateUpdates = <Map<String, Object?>>[];
         await tester.pumpWidget(
@@ -571,11 +571,12 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, true)])
         await tester.pump();
         await tester.pumpAndSettle();
 
-        // @Set after the failed @Run did not run — $flag is still false.
-        final lastFlag = stateUpdates.isEmpty
-            ? false
-            : stateUpdates.last[r'$flag'];
-        expect(lastFlag, isFalse);
+        // @Set after the failed @Run did not run — $flag is still 0.
+        final lastFlag = stateUpdates.isEmpty ? 0 : stateUpdates.last[r'$flag'];
+        expect(lastFlag, 0);
+        // Drain the expected mutation failure so flutter_test does not
+        // treat it as "unexpected" exception.
+        expect(tester.takeException(), isA<StateError>());
       },
     );
 

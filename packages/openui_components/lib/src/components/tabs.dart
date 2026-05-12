@@ -68,9 +68,13 @@ class TabItemDescription {
 Component<Widget> tabsComponent() {
   return defineComponent<Widget>(
     name: 'Tabs',
-    schema: objectSchema(const <String, Object?>{
-      'children': <String, Object?>{'type': 'array'},
-    }),
+    description: 'tabbed content switcher',
+    schema: objectSchema(
+      const <String, Object?>{
+        'children': <String, Object?>{'type': 'array'},
+      },
+      required: const ['children'],
+    ),
     render: (ctx, props, renderNode, id) {
       // The renderer wraps `TabItem(...)` into a Widget that carries
       // its label as a fallback Text. To present a real TabBar, we
@@ -120,10 +124,14 @@ Component<Widget> tabsComponent() {
 Component<Widget> tabItemComponent() {
   return defineComponent<Widget>(
     name: 'TabItem',
-    schema: objectSchema(const <String, Object?>{
-      'label': <String, Object?>{'type': 'string'},
-      'content': <String, Object?>{},
-    }),
+    internal: true,
+    schema: objectSchema(
+      const <String, Object?>{
+        'label': <String, Object?>{'type': 'string'},
+        'content': <String, Object?>{},
+      },
+      required: const ['label', 'content'],
+    ),
     render: (ctx, props, renderNode, id) {
       final content = props['content'];
       if (content is Widget) return content;

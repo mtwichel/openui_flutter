@@ -52,6 +52,38 @@ void main() {
         openuiLibrary().names.toSet(),
       );
     });
+
+    test('prompt excludes Col and TabItem, includes all other components', () {
+      final result = openuiLibrary().prompt(const PromptOptions());
+      // Internal components must not appear.
+      expect(result, isNot(contains('Col(')));
+      expect(result, isNot(contains('TabItem(')));
+      // All non-internal components must be present.
+      const expected = <String>[
+        'Stack',
+        'Card',
+        'CardHeader',
+        'Separator',
+        'Callout',
+        'TextContent',
+        'MarkDownRenderer',
+        'Image',
+        'CodeBlock',
+        'Form',
+        'FormControl',
+        'Input',
+        'Select',
+        'Button',
+        'Buttons',
+        'Table',
+        'Tabs',
+        'BarChart',
+        'LineChart',
+      ];
+      for (final name in expected) {
+        expect(result, contains('$name('), reason: '$name missing from prompt');
+      }
+    });
   });
 
   group('component render type', () {

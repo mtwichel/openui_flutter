@@ -87,10 +87,14 @@ class LineChartWidget extends StatelessWidget {
 Component<Widget> lineChartComponent() {
   return defineComponent<Widget>(
     name: 'LineChart',
-    schema: objectSchema(const <String, Object?>{
-      'series': <String, Object?>{'type': 'array'},
-      'labels': <String, Object?>{'type': 'array'},
-    }),
+    description: 'multi-series line chart',
+    schema: objectSchema(
+      const <String, Object?>{
+        'series': <String, Object?>{'type': 'array'},
+        'labels': <String, Object?>{'type': 'array'},
+      },
+      required: const ['series'],
+    ),
     render: (ctx, props, renderNode, id) {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
       final series = <({String name, List<num> values})>[

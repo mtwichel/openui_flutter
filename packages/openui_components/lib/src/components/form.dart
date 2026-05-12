@@ -65,10 +65,14 @@ class FormWidget extends StatelessWidget {
 Component<Widget> formComponent() {
   return defineComponent<Widget>(
     name: 'Form',
-    schema: objectSchema(const <String, Object?>{
-      'name': <String, Object?>{'type': 'string'},
-      'children': <String, Object?>{'type': 'array'},
-    }),
+    description: 'named form container for inputs',
+    schema: objectSchema(
+      const <String, Object?>{
+        'name': <String, Object?>{'type': 'string'},
+        'children': <String, Object?>{'type': 'array'},
+      },
+      required: const ['name', 'children'],
+    ),
     render: (ctx, props, renderNode, id) {
       final children =
           (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??
@@ -124,11 +128,15 @@ class FormControlWidget extends StatelessWidget {
 Component<Widget> formControlComponent() {
   return defineComponent<Widget>(
     name: 'FormControl',
-    schema: objectSchema(const <String, Object?>{
-      'label': <String, Object?>{'type': 'string'},
-      'helperText': <String, Object?>{'type': 'string'},
-      'children': <String, Object?>{'type': 'array'},
-    }),
+    description: 'labeled field wrapper',
+    schema: objectSchema(
+      const <String, Object?>{
+        'label': <String, Object?>{'type': 'string'},
+        'helperText': <String, Object?>{'type': 'string'},
+        'children': <String, Object?>{'type': 'array'},
+      },
+      required: const ['label', 'children'],
+    ),
     render: (ctx, props, renderNode, id) {
       final children =
           (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??

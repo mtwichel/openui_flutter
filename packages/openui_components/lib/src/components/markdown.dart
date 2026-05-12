@@ -79,9 +79,13 @@ class _MarkDownRendererState extends State<MarkDownRendererWidget> {
 Component<Widget> markdownComponent() {
   return defineComponent<Widget>(
     name: 'MarkDownRenderer',
-    schema: objectSchema(const <String, Object?>{
-      'source': <String, Object?>{'type': 'string'},
-    }),
+    description: 'renders Markdown source text',
+    schema: objectSchema(
+      const <String, Object?>{
+        'source': <String, Object?>{'type': 'string'},
+      },
+      required: const ['source'],
+    ),
     render: (ctx, props, renderNode, id) {
       return Builder(
         builder: (context) {

@@ -50,6 +50,44 @@ void main() {
       expect(c.render, isA<ComponentRender<String>>());
     });
 
+    test('description defaults to null', () {
+      final c = defineComponent<String>(
+        name: 'X',
+        schema: Schema.object(),
+        render: (c, p, r, id) => '',
+      );
+      expect(c.description, isNull);
+    });
+
+    test('defineComponent with description sets the field', () {
+      final c = defineComponent<String>(
+        name: 'X',
+        description: 'a test component',
+        schema: Schema.object(),
+        render: (c, p, r, id) => '',
+      );
+      expect(c.description, 'a test component');
+    });
+
+    test('internal defaults to false', () {
+      final c = defineComponent<String>(
+        name: 'X',
+        schema: Schema.object(),
+        render: (c, p, r, id) => '',
+      );
+      expect(c.internal, isFalse);
+    });
+
+    test('defineComponent with internal: true sets the field', () {
+      final c = defineComponent<String>(
+        name: 'X',
+        internal: true,
+        schema: Schema.object(),
+        render: (c, p, r, id) => '',
+      );
+      expect(c.internal, isTrue);
+    });
+
     test('the render callback can be invoked', () {
       var capturedId = '';
       final c = defineComponent<String>(

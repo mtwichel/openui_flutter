@@ -49,6 +49,8 @@ class Component<W> {
     required this.name,
     required this.schema,
     required this.render,
+    this.description,
+    this.internal = false,
   });
 
   /// The TYPE-token name used in source (e.g. `'Stack'`, `'Card'`).
@@ -62,6 +64,14 @@ class Component<W> {
   /// Render callback invoked when the renderer dispatches a
   /// matching `CompCall`.
   final ComponentRender<W> render;
+
+  /// Optional LLM-facing description, rendered in generated prompts.
+  final String? description;
+
+  /// When `true`, this component is excluded from generated prompts.
+  /// Use for definitional helpers (e.g. `Col`) or components only
+  /// valid as children of another (e.g. `TabItem`).
+  final bool internal;
 }
 
 /// Sugar over the [Component] constructor.
@@ -72,8 +82,16 @@ Component<W> defineComponent<W>({
   required String name,
   required Schema schema,
   required ComponentRender<W> render,
+  String? description,
+  bool internal = false,
 }) {
-  return Component<W>(name: name, schema: schema, render: render);
+  return Component<W>(
+    name: name,
+    schema: schema,
+    render: render,
+    description: description,
+    internal: internal,
+  );
 }
 
 /// Registry of [Component]s keyed by name.
@@ -102,6 +120,9 @@ class Library<W> {
 
   /// Names of every registered component, in registration order.
   Iterable<String> get names => _byName.keys;
+
+  /// Every registered component, in registration order.
+  Iterable<Component<W>> get components => _byName.values;
 
   /// Returns a new library that adds [extra]'s components on top of
   /// this one's. Last-write-wins on duplicate names.

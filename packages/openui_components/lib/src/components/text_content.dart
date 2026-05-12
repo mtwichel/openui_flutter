@@ -63,10 +63,14 @@ class TextContentWidget extends StatelessWidget {
 Component<Widget> textContentComponent() {
   return defineComponent<Widget>(
     name: 'TextContent',
-    schema: objectSchema(const <String, Object?>{
-      'text': <String, Object?>{'type': 'string'},
-      'size': <String, Object?>{'type': 'string'},
-    }),
+    description: 'styled paragraph text',
+    schema: objectSchema(
+      const <String, Object?>{
+        'text': <String, Object?>{'type': 'string'},
+        'size': <String, Object?>{'type': 'string'},
+      },
+      required: const ['text'],
+    ),
     render: (ctx, props, renderNode, id) {
       return Builder(
         builder: (context) {

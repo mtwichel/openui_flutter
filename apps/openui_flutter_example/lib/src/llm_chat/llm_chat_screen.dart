@@ -27,6 +27,11 @@ class LlmChatScreen extends StatelessWidget {
   /// Creates an [LlmChatScreen].
   const LlmChatScreen({super.key, this.onMenuTap, this.serviceFactory});
 
+  // Computed once at class load time so build() never regenerates it.
+  static final String _systemPrompt = openuiLibrary().prompt(
+    const PromptOptions(),
+  );
+
   /// Optional callback that opens the surrounding shell's drawer. Non-null
   /// only in narrow-viewport mode.
   final VoidCallback? onMenuTap;
@@ -37,7 +42,9 @@ class LlmChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final factory = serviceFactory ?? DartanticChatService.new;
+    final factory =
+        serviceFactory ??
+        () => DartanticChatService(systemPrompt: _systemPrompt);
     return BlocProvider<ChatBloc>(
       create: (_) => ChatBloc(service: factory()),
       child: LlmChatView(onMenuTap: onMenuTap),
@@ -184,7 +191,9 @@ class _GeneratedCodeViewer extends StatelessWidget {
       width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

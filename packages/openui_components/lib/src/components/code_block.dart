@@ -55,10 +55,14 @@ class CodeBlockWidget extends StatelessWidget {
 Component<Widget> codeBlockComponent() {
   return defineComponent<Widget>(
     name: 'CodeBlock',
-    schema: objectSchema(const <String, Object?>{
-      'code': <String, Object?>{'type': 'string'},
-      'language': <String, Object?>{'type': 'string'},
-    }),
+    description: 'monospace code display block',
+    schema: objectSchema(
+      const <String, Object?>{
+        'code': <String, Object?>{'type': 'string'},
+        'language': <String, Object?>{'type': 'string'},
+      },
+      required: const ['code'],
+    ),
     render: (ctx, props, renderNode, id) {
       return CodeBlockWidget(
         code: props['code'] as String? ?? '',

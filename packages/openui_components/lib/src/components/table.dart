@@ -89,10 +89,14 @@ class _TableWidgetState extends State<TableWidget> {
 Component<Widget> tableComponent() {
   return defineComponent<Widget>(
     name: 'Table',
-    schema: objectSchema(const <String, Object?>{
-      'columns': <String, Object?>{'type': 'array'},
-      'rows': <String, Object?>{'type': 'array'},
-    }),
+    description: 'paginated data table',
+    schema: objectSchema(
+      const <String, Object?>{
+        'columns': <String, Object?>{'type': 'array'},
+        'rows': <String, Object?>{'type': 'array'},
+      },
+      required: const ['columns', 'rows'],
+    ),
     render: (ctx, props, renderNode, id) {
       final cols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
       final rows = (props['rows'] as List<Object?>?) ?? const <Object?>[];
@@ -117,10 +121,14 @@ Component<Widget> tableComponent() {
 Component<Widget> colComponent() {
   return defineComponent<Widget>(
     name: 'Col',
-    schema: objectSchema(const <String, Object?>{
-      'name': <String, Object?>{'type': 'string'},
-      'label': <String, Object?>{'type': 'string'},
-    }),
+    internal: true,
+    schema: objectSchema(
+      const <String, Object?>{
+        'name': <String, Object?>{'type': 'string'},
+        'label': <String, Object?>{'type': 'string'},
+      },
+      required: const ['name'],
+    ),
     render: (ctx, props, renderNode, id) {
       // Col is a definitional helper; in practice consumers build the
       // columns list as object literals. If a `Col(...)` actually

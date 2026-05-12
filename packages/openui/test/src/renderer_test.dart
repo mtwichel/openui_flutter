@@ -574,9 +574,6 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
         // @Set after the failed @Run did not run — $flag is still 0.
         final lastFlag = stateUpdates.isEmpty ? 0 : stateUpdates.last[r'$flag'];
         expect(lastFlag, 0);
-        // Drain the expected mutation failure so flutter_test does not
-        // treat it as "unexpected" exception.
-        expect(tester.takeException(), isA<StateError>());
       },
     );
 

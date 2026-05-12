@@ -186,10 +186,10 @@ class _ApiKeyGate extends StatelessWidget {
 class LlmChatView extends StatefulWidget {
   /// Creates an [LlmChatView].
   const LlmChatView({
-    super.key,
+    required this.systemPrompt,
     this.onMenuTap,
     this.onChangeApiKey,
-    required this.systemPrompt,
+    super.key,
   });
 
   /// Optional callback that opens the surrounding shell's drawer.
@@ -337,7 +337,8 @@ class _RendererPaneState extends State<_RendererPane> {
                         isStreaming: isStreaming,
                         library: widget.library,
                         onParseResult: (result) {
-                          if (result.root != null && result.meta.errors.isEmpty) {
+                          if (result.root != null &&
+                              result.meta.errors.isEmpty) {
                             _lastParseableResponse = rendererResponse;
                           }
                         },

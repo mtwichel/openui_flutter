@@ -185,7 +185,6 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         messages[assistantIndex] = assistant.copyWith(
           text: assistant.text + event.chunk.text,
         );
-        break;
       case LlmChatEventType.thinking:
         final thinkingIndex = messages.lastIndexWhere(
           (m) => m.role == UiMessageRole.thinking,
@@ -204,7 +203,6 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             text: '${thinking.text}${event.chunk.text}',
           );
         }
-        break;
       case LlmChatEventType.tool:
         messages.add(
           UiMessage(
@@ -213,7 +211,6 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             text: event.chunk.text,
           ),
         );
-        break;
     }
     emit(state.copyWith(messages: messages));
   }

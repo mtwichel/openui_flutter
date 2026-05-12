@@ -1,5 +1,14 @@
 /// Event kinds emitted by [LlmChatService.sendMessage].
-enum LlmChatEventType { output, thinking, tool }
+enum LlmChatEventType {
+  /// Assistant-visible output text.
+  output,
+
+  /// Model reasoning/thinking updates.
+  thinking,
+
+  /// Tool-use activity emitted by the model.
+  tool,
+}
 
 /// Stream event emitted by the backing LLM service.
 class LlmChatEvent {

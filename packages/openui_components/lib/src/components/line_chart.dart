@@ -179,7 +179,7 @@ Map<String, Object?>? _coerceSeriesMap(Object? value) {
   if (value is! Map<Object?, Object?>) return null;
   return <String, Object?>{
     for (final entry in value.entries)
-      if (entry.key is String) entry.key as String: entry.value,
+      if (entry.key case final String key) key: entry.value,
   };
 }
 

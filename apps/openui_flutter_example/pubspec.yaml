@@ -10,8 +10,23 @@ environment:
   flutter: ^3.35.0
 
 dependencies:
+  bloc: ^9.2.0
+  dartantic_ai: ^3.4.0
+  dartantic_firebase_ai: ^0.2.0
+  equatable: ^2.0.8
+  # Pinned: dartantic_firebase_ai 0.2.0 has a non-exhaustive switch on
+  # FinishReason that breaks against firebase_ai >= 3.10.0 (the
+  # FinishReason.blocklist case was added there). The pin cascades to
+  # firebase_core / firebase_app_check via firebase_core_platform_interface
+  # (firebase_core 4.8 uses platform_interface ^7, which conflicts with
+  # firebase_ai <3.10's ^6). Remove the upper bound when
+  # dartantic_firebase_ai releases a fix.
+  firebase_ai: '>=3.8.0 <3.10.0'
+  firebase_app_check: '>=0.4.0 <0.5.0'
+  firebase_core: '>=4.4.0 <4.8.0'
   flutter:
     sdk: flutter
+  flutter_bloc: ^9.1.1
   http: ^1.6.0
   openui: ^0.1.0
   openui_chat: ^0.1.0
@@ -19,8 +34,10 @@ dependencies:
   openui_core: ^0.1.0
 
 dev_dependencies:
+  bloc_test: ^10.0.0
   flutter_test:
     sdk: flutter
+  mocktail: ^1.0.5
   very_good_analysis: ^10.2.0
 
 flutter:

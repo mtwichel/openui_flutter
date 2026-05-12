@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:openui_chat/openui_chat.dart';
-import 'package:openui_flutter_example/src/stub_llm.dart';
+import 'package:openui_flutter_example/src/scripts_chat/stub_llm.dart';
 
 class _InMemoryBundle extends CachingAssetBundle {
   _InMemoryBundle(this._files);

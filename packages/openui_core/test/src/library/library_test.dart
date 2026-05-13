@@ -70,24 +70,37 @@ void main() {
     );
 
     test('lookup returns the registered component', () {
-      final lib = Library<String>([comp('Stack'), comp('Card')]);
-      expect(lib['Stack'], isNotNull);
-      expect(lib['Stack']!.name, 'Stack');
-      expect(lib['Card']!.name, 'Card');
+      final lib = Library<String>(
+        components: [comp('Stack'), comp('Card')],
+        tools: const [],
+      );
+      expect(lib.component('Stack'), isNotNull);
+      expect(lib.component('Stack')!.name, 'Stack');
+      expect(lib.component('Card')!.name, 'Card');
     });
 
     test('lookup returns null for unknown names', () {
-      final lib = Library<String>([comp('Stack')]);
-      expect(lib['Missing'], isNull);
+      final lib = Library<String>(
+        components: [comp('Stack')],
+        tools: const [],
+      );
+      expect(lib.component('Missing'), isNull);
     });
 
     test('names enumerates registrations in insertion order', () {
-      final lib = Library<String>([
-        comp('Stack'),
-        comp('Card'),
-        comp('Button'),
+      final lib = Library<String>(
+        components: [
+          comp('Stack'),
+          comp('Card'),
+          comp('Button'),
+        ],
+        tools: const [],
+      );
+      expect(lib.components.map((c) => c.name).toList(), [
+        'Stack',
+        'Card',
+        'Button',
       ]);
-      expect(lib.names.toList(), ['Stack', 'Card', 'Button']);
     });
 
     test('duplicate names collapse to last-write-wins', () {
@@ -101,43 +114,56 @@ void main() {
         schema: Schema.object(),
         render: (c, p, r, id) => 'second',
       );
-      final lib = Library<String>([first, second]);
-      expect(lib.names, ['Stack']);
+      final lib = Library<String>(
+        components: [first, second],
+        tools: const [],
+      );
+      expect(lib.components.map((c) => c.name).toSet(), {'Stack'});
       // The second registration wins.
       expect(
-        lib['Stack']!.render(
-          EvalContext(statements: const [], store: Store()),
-          const {},
-          (n, c) => 'stub',
-          'r',
-        ),
+        lib
+            .component('Stack')!
+            .render(
+              EvalContext(statements: const [], store: Store()),
+              const {},
+              (n, c) => 'stub',
+              'r',
+            ),
         'second',
       );
     });
 
     test('extend layers extra components on top of the base', () {
-      final base = Library<String>([comp('Stack')]);
-      final extended = base.extend([comp('Card')]);
-      expect(extended.names.toSet(), {'Stack', 'Card'});
+      final base = Library<String>(
+        components: [comp('Stack')],
+        tools: const [],
+      );
+      final extended = base.extend(components: [comp('Card')], tools: const []);
+      expect(extended.components.map((c) => c.name).toSet(), {'Stack', 'Card'});
       // Original library is untouched.
-      expect(base['Card'], isNull);
+      expect(base.component('Card'), isNull);
     });
 
     test('extend supports overriding a base component', () {
-      final base = Library<String>([comp('Stack')]);
+      final base = Library<String>(
+        components: [comp('Stack')],
+        tools: const [],
+      );
       final replacement = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'overridden',
       );
-      final extended = base.extend([replacement]);
+      final extended = base.extend(components: [replacement], tools: const []);
       expect(
-        extended['Stack']!.render(
-          EvalContext(statements: const [], store: Store()),
-          const {},
-          (n, c) => 'stub',
-          'r',
-        ),
+        extended
+            .component('Stack')!
+            .render(
+              EvalContext(statements: const [], store: Store()),
+              const {},
+              (n, c) => 'stub',
+              'r',
+            ),
         'overridden',
       );
     });

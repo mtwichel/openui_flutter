@@ -1,8 +1,0 @@
-data: {"choices":[{"delta":{"role":"assistant"}}]}
-
-data: {"choices":[{"delta":{"content":"root = "}}]}
-
-data: {"choices":[{"delta":{"content":"Text(text: \"hi\")"}}]}
-
-data: [DONE]
-

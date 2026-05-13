@@ -7,6 +7,6 @@ library;
 
 export 'src/error_boundary.dart' show ErrorBoundary;
 export 'src/form_state_cache.dart' show FormStateCache;
-export 'src/query_manager.dart' show QueryEntry, QueryLoader, QueryManager;
+export 'src/query_manager.dart' show QueryEntry, QueryManager;
 export 'src/renderer.dart' show ComponentWidgetRenderer, Renderer;
 export 'src/renderer_scope.dart' show RendererScope;

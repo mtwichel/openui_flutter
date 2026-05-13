@@ -23,25 +23,28 @@ import 'package:openui_core/openui_core.dart';
 /// Builds the v0.1 `Library<Widget>` with every builtin component
 /// registered.
 Library<Widget> standardLibrary() {
-  return Library<Widget>(<Component<Widget>>[
-    stackComponent(),
-    cardComponent(),
-    cardHeaderComponent(),
-    separatorComponent(),
-    calloutComponent(),
-    textContentComponent(),
-    markdownComponent(),
-    imageComponent(),
-    formComponent(),
-    formControlComponent(),
-    inputComponent(),
-    selectComponent(),
-    buttonComponent(),
-    tableComponent(),
-    colComponent(),
-    tabsComponent(),
-    tabItemComponent(),
-    barChartComponent(),
-    lineChartComponent(),
-  ]);
+  return Library<Widget>(
+    components: [
+      stackComponent(),
+      cardComponent(),
+      cardHeaderComponent(),
+      separatorComponent(),
+      calloutComponent(),
+      textContentComponent(),
+      markdownComponent(),
+      imageComponent(),
+      formComponent(),
+      formControlComponent(),
+      inputComponent(),
+      selectComponent(),
+      buttonComponent(),
+      tableComponent(),
+      colComponent(),
+      tabsComponent(),
+      tabItemComponent(),
+      barChartComponent(),
+      lineChartComponent(),
+    ],
+    tools: const [],
+  );
 }

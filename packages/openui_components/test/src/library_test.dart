@@ -32,13 +32,13 @@ void main() {
         'BarChart',
         'LineChart',
       };
-      expect(lib.names.toSet(), expected);
+      expect(lib.components.map((c) => c.name).toSet(), expected);
     });
 
     test('each registration carries a non-empty schema', () {
       final lib = standardLibrary();
-      for (final name in lib.names) {
-        final component = lib[name]!;
+      for (final name in lib.components.map((c) => c.name)) {
+        final component = lib.component(name)!;
         expect(component.schema, isNotNull);
         expect(component.schema.value['type'], 'object');
       }
@@ -70,7 +70,11 @@ void main() {
         'LineChart',
       ];
       for (final name in expected) {
-        expect(result, contains('$name('), reason: '$name missing from prompt');
+        expect(
+          result,
+          contains('$name('),
+          reason: '$name missing from prompt',
+        );
       }
     });
   });
@@ -88,9 +92,9 @@ void main() {
       Widget stubRender(AstNode _, EvalContext _) => const SizedBox.shrink();
 
       // Smoke test: call render with empty props and a stub renderNode.
-      for (final name in lib.names) {
-        final component = lib[name];
-        final widget = component?.render(
+      for (final name in lib.components.map((c) => c.name)) {
+        final component = lib.component(name)!;
+        final widget = component.render(
           ctx,
           const <String, Object?>{},
           stubRender,

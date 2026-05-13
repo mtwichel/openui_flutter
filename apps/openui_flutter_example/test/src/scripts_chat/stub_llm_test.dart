@@ -1,13 +1,7 @@
-// The example app consumes openui_chat experimental types — the
-// entire openui_chat surface is marked @experimental in v0.1.
-// ignore_for_file: experimental_member_use
-
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:openui_chat/openui_chat.dart';
 import 'package:openui_flutter_example/src/scripts_chat/stub_llm.dart';
 
 class _InMemoryBundle extends CachingAssetBundle {
@@ -26,15 +20,10 @@ class _InMemoryBundle extends CachingAssetBundle {
   }
 }
 
-http.Request _stubRequest() =>
-    http.Request('POST', Uri.parse('stub://playback'));
-
 Future<String> _stream(StubLlmService service) async {
-  final response = await service.buildClient().send(_stubRequest());
-  final events = await plainSseAdapter()(response.stream).toList();
   final buffer = StringBuffer();
-  for (final event in events) {
-    if (event is AssistantTextDelta) buffer.write(event.delta);
+  await for (final delta in service.streamScript()) {
+    buffer.write(delta);
   }
   return buffer.toString();
 }
@@ -42,7 +31,7 @@ Future<String> _stream(StubLlmService service) async {
 void main() {
   group('StubLlmService', () {
     test(
-      'streams a multi-line script faithfully through plainSseAdapter',
+      'streams a multi-line script faithfully',
       () async {
         const source = '''
 root = Card(children: [
@@ -61,8 +50,7 @@ root = Card(children: [
           source,
           reason:
               'Every character of the source must round-trip through '
-              'the framer. A regression here means embedded newlines '
-              'are again being treated as event boundaries.',
+              'the local stream playback path.',
         );
       },
     );

@@ -7,7 +7,6 @@ environment:
 workspace:
   - packages/openui_core
   - packages/openui
-  - packages/openui_chat
   - packages/openui_components
   - packages/openui_mcp
   - packages/openui_test_helpers

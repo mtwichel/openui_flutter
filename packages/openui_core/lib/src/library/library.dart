@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:openui_core/openui_core.dart';
 
@@ -85,43 +86,50 @@ class Component<W> {
 class Library<W> {
   /// Creates a [Library] from the given component definitions.
   /// Last-write-wins on duplicate names.
-  Library(List<Component<W>> components, {this.libraryPrompt})
-    : _byName = Map<String, Component<W>>.unmodifiable(<String, Component<W>>{
-        for (final c in components) c.name: c,
-      });
+  const Library({
+    required this.components,
+    required this.tools,
+    this.libraryPrompt,
+  });
 
-  final Map<String, Component<W>> _byName;
+  /// The components in the library.
+  final List<Component<W>> components;
 
-  /// Explains to the LLM how to use the components in the library.
+  /// The tools in the library.
+  final List<Tool> tools;
+
+  /// Explains to the LLM how to use the components and tools in the library.
   final String? libraryPrompt;
 
   /// Returns the component with the given [name], or `null` when no
   /// matching component is registered.
-  Component<W>? operator [](String name) => _byName[name];
+  Component<W>? component(String name) =>
+      components.firstWhereOrNull((c) => c.name == name);
 
-  /// Names of every registered component, in registration order.
-  Iterable<String> get names => _byName.keys;
+  /// Returns the tool with the given [name], or `null` when no
+  /// matching tool is registered.
+  Tool? tool(String name) => tools.firstWhereOrNull((t) => t.name == name);
 
-  /// Every registered component, in registration order.
-  Iterable<Component<W>> get components => _byName.values;
-
-  /// Returns a new library that adds [extra]'s components on top of
-  /// this one's. Last-write-wins on duplicate names.
-  Library<W> extend(List<Component<W>> extra) =>
-      Library<W>(<Component<W>>[..._byName.values, ...extra]);
+  /// Returns a new library that adds components on top of
+  /// this one's and  tools on top of this one's.
+  /// Last-write-wins on duplicate names.
+  Library<W> extend({
+    List<Component<W>> components = const [],
+    List<Tool> tools = const [],
+  }) => Library<W>(
+    components: [...this.components, ...components],
+    tools: [...this.tools, ...tools],
+  );
 
   /// Generates a system prompt from all non-internal registered components.
   String prompt({
-    List<ToolSpec> tools = const [],
     String? preamble,
     List<String> examples = const [],
     List<String> additionalRules = const [],
   }) {
     final filtered = components.where((c) => !c.internal).toList();
     return generatePrompt(
-      filtered,
-      libraryPrompt: libraryPrompt,
-      tools: tools,
+      Library<W>(components: filtered, tools: tools),
       preamble: preamble,
       examples: examples,
       additionalRules: additionalRules,

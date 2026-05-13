@@ -92,6 +92,6 @@ export 'src/parser/streaming.dart'
         StateDecl,
         StreamParser,
         createStreamingParser;
-export 'src/prompt/prompt.dart' show ToolSpec, generatePrompt;
+export 'src/prompt/prompt.dart' show generatePrompt;
 export 'src/state/store.dart' show Store;
-export 'src/tools/tools.dart' show ToolProvider, ToolResult, extractToolResult;
+export 'src/tools/tools.dart' show Tool, ToolResult;

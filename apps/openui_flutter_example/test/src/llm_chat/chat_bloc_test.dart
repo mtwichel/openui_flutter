@@ -62,18 +62,18 @@ void main() {
         predicate<ChatState>(
           (s) =>
               s.status == ChatStatus.streaming &&
-              s.messages.length == 2 &&
+              s.messages.length == 1 &&
               s.messages[0].role == UiMessageRole.user &&
-              s.messages[0].text == 'hi' &&
-              s.messages[1].role == UiMessageRole.assistant &&
-              s.messages[1].text == '',
-          'streaming with user + empty assistant',
+              s.messages[0].text == 'hi',
+          'streaming with user turn only',
         ),
         predicate<ChatState>(
           (s) =>
               s.status == ChatStatus.streaming &&
+              s.messages.length == 2 &&
+              s.messages.last.role == UiMessageRole.assistant &&
               s.messages.last.text == 'Hello',
-          'first chunk appended',
+          'assistant created on first output chunk',
         ),
         predicate<ChatState>(
           (s) =>
@@ -139,8 +139,10 @@ void main() {
       verify: (bloc) {
         expect(bloc.state.status, ChatStatus.streaming);
         expect(bloc.state.messages[0].role, UiMessageRole.user);
-        expect(bloc.state.messages[1].role, UiMessageRole.assistant);
-        expect(bloc.state.messages[1].text, 'Answer');
+        expect(bloc.state.messages[1].role, UiMessageRole.thinking);
+        expect(bloc.state.messages[2].role, UiMessageRole.tool);
+        expect(bloc.state.messages[3].role, UiMessageRole.assistant);
+        expect(bloc.state.messages[3].text, 'Answer');
         expect(
           bloc.state.messages.any(
             (m) =>

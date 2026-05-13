@@ -1,10 +1,11 @@
-// The example app consumes openui_chat / openui experimental types —
+// The example app consumes openui / openui_core experimental types —
 // the entire surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:openui/openui.dart';
-import 'package:openui_chat/openui_chat.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 import 'package:openui_flutter_example/src/scripts_chat/stub_llm.dart';
@@ -33,37 +34,60 @@ class ScriptsChatScreen extends StatefulWidget {
 
 class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
   late StubLlmService _service;
-  late OpenUiChatController _controller;
   late StubScript _active;
   final Library<Widget> _library = standardLibrary();
   final List<OpenUIError> _renderErrors = <OpenUIError>[];
+  StreamSubscription<String>? _activePlayback;
+  String _assistantResponse = '';
+  bool _isStreaming = false;
+  Object? _error;
+  int _chunksReceived = 0;
 
   @override
   void initState() {
     super.initState();
     _active = kStubScripts.first;
     _service = StubLlmService(scriptPath: _active.assetPath);
-    _controller = buildStubChatController(service: _service);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    unawaited(_activePlayback?.cancel());
     super.dispose();
   }
 
   Future<void> _play(StubScript script) async {
+    await _activePlayback?.cancel();
     setState(() {
       _active = script;
       _service.scriptPath = script.assetPath;
       _renderErrors.clear();
+      _assistantResponse = '';
+      _isStreaming = true;
+      _error = null;
+      _chunksReceived = 0;
     });
-    try {
-      await _controller.sendMessage('Run ${script.name}');
-    } on Object catch (error, stackTrace) {
-      debugPrint('sendMessage failed: $error\n$stackTrace');
-      if (mounted) setState(() {});
-    }
+    _activePlayback = _service.streamScript().listen(
+      (delta) {
+        if (!mounted) return;
+        setState(() {
+          _assistantResponse += delta;
+          _chunksReceived += 1;
+        });
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('script playback failed: $error\n$stackTrace');
+        if (!mounted) return;
+        setState(() {
+          _error = error;
+          _isStreaming = false;
+        });
+      },
+      onDone: () {
+        if (!mounted) return;
+        setState(() => _isStreaming = false);
+      },
+    );
   }
 
   @override
@@ -94,7 +118,7 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
                   return ChoiceChip(
                     label: Text(script.name),
                     selected: selected,
-                    onSelected: (_) => _play(script),
+                    onSelected: (_) => unawaited(_play(script)),
                   );
                 },
               ),
@@ -102,62 +126,55 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
           ),
         ),
       ),
-      body: StreamBuilder<ChatState>(
-        stream: _controller.stateStream,
-        initialData: _controller.currentState,
-        builder: (context, snapshot) {
-          final state = snapshot.data ?? _controller.currentState;
-          final assistant = state.messages
-              .whereType<AssistantMessage>()
-              .lastOrNull;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (kDebugPanel) ...[
-                  _DiagnosticPanel(
-                    state: state,
-                    assistant: assistant,
-                    errors: _renderErrors,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (assistant == null)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Text('Pick a script above to start streaming.'),
-                    ),
-                  )
-                else ...[
-                  Renderer(
-                    response: assistant.response,
-                    isStreaming: assistant.isStreaming,
-                    library: _library,
-                    onStateUpdate: (snapshot) {
-                      debugPrint('onStateUpdate: $snapshot');
-                    },
-                    onAction: (event) {
-                      debugPrint('onAction: $event');
-                    },
-                    onError: kDebugPanel
-                        ? (errors) {
-                            setState(() {
-                              _renderErrors
-                                ..clear()
-                                ..addAll(errors);
-                            });
-                          }
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  _GeneratedCodeViewer(response: assistant.response),
-                ],
-              ],
-            ),
-          );
-        },
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (kDebugPanel) ...[
+              _DiagnosticPanel(
+                isRunning: _isStreaming,
+                hasResponse: _assistantResponse.isNotEmpty,
+                response: _assistantResponse,
+                chunksReceived: _chunksReceived,
+                error: _error,
+                errors: _renderErrors,
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_assistantResponse.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text('Pick a script above to start streaming.'),
+                ),
+              )
+            else ...[
+              Renderer(
+                response: _assistantResponse,
+                isStreaming: _isStreaming,
+                library: _library,
+                onStateUpdate: (snapshot) {
+                  debugPrint('onStateUpdate: $snapshot');
+                },
+                onAction: (event) {
+                  debugPrint('onAction: $event');
+                },
+                onError: kDebugPanel
+                    ? (errors) {
+                        setState(() {
+                          _renderErrors
+                            ..clear()
+                            ..addAll(errors);
+                        });
+                      }
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              _GeneratedCodeViewer(response: _assistantResponse),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -165,26 +182,30 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
 
 class _DiagnosticPanel extends StatelessWidget {
   const _DiagnosticPanel({
-    required this.state,
-    required this.assistant,
+    required this.isRunning,
+    required this.hasResponse,
+    required this.response,
+    required this.chunksReceived,
+    required this.error,
     required this.errors,
   });
 
-  final ChatState state;
-  final AssistantMessage? assistant;
+  final bool isRunning;
+  final bool hasResponse;
+  final String response;
+  final int chunksReceived;
+  final Object? error;
   final List<OpenUIError> errors;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final lines = <String>[
-      'isRunning: ${state.isRunning}',
-      'messages: ${state.messages.length}',
-      if (assistant != null) ...[
-        'assistant.streaming: ${assistant!.isStreaming}',
-        'assistant.responseLen: ${assistant!.response.length}',
-      ],
-      if (state.error != null) 'state.error: ${state.error}',
+      'isRunning: $isRunning',
+      'hasResponse: $hasResponse',
+      'responseLen: ${response.length}',
+      'chunksReceived: $chunksReceived',
+      if (error != null) 'playback.error: $error',
       if (errors.isNotEmpty) 'renderErrors: ${errors.length}',
       for (final e in errors) '  • $e',
     ];

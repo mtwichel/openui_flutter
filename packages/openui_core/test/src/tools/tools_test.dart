@@ -1,133 +1,114 @@
-// ToolProvider, ToolResult, and extractToolResult contract tests.
-//
-// Mirrors the spike S0.3 branch table:
-//   - isError → throws McpToolError with the joined text
-//   - isError with empty text → throws with the fallback message
-//   - structuredContent non-null → returned directly
-//   - empty text and no structured content → null
-//   - text parses as JSON → decoded value
-//   - text doesn't parse as JSON → raw string
-// Plus a smoke test that ToolProvider can be implemented.
+// Internal use of openui_core experimental types — the entire
+// openui_core surface is marked @experimental in v0.1.
 
 import 'package:openui_core/openui_core.dart';
 import 'package:test/test.dart';
 
-class _StubProvider implements ToolProvider {
-  _StubProvider(this.handler);
-
-  final Future<Object?> Function(String, Map<String, Object?>) handler;
-
-  @override
-  Future<Object?> callTool(
-    String name,
-    Map<String, Object?> args,
-  ) => handler(name, args);
-}
-
 void main() {
-  group('ToolResult', () {
-    test('default fields: not an error, no structured content, empty text', () {
-      const r = ToolResult();
-      expect(r.isError, isFalse);
-      expect(r.structuredContent, isNull);
-      expect(r.text, '');
-    });
-
-    test('exposes the supplied fields', () {
-      const r = ToolResult(
-        isError: true,
-        structuredContent: {'k': 1},
-        text: 'msg',
-      );
-      expect(r.isError, isTrue);
-      expect(r.structuredContent, {'k': 1});
-      expect(r.text, 'msg');
-    });
-  });
-
-  group('extractToolResult', () {
-    test(
-      'isError with non-empty text throws McpToolError carrying the text',
-      () {
-        const r = ToolResult(isError: true, text: 'permission denied');
-        expect(
-          () => extractToolResult(r),
-          throwsA(
-            isA<McpToolError>().having(
-              (e) => e.message,
-              'message',
-              'permission denied',
-            ),
-          ),
-        );
-      },
-    );
-
-    test('isError with empty text throws with the fallback message', () {
-      const r = ToolResult(isError: true);
-      expect(
-        () => extractToolResult(r),
-        throwsA(
-          isA<McpToolError>().having(
-            (e) => e.message,
-            'message',
-            'tool reported error',
-          ),
+  group('Tool', () {
+    test('stores metadata and optional schemas', () {
+      final tool = _TestTool(
+        name: 'weather',
+        description: 'Returns weather data for a city.',
+        input: Schema.object(
+          properties: {'city': Schema.string()},
+          required: ['city'],
+        ),
+        output: Schema.object(
+          properties: {'tempC': Schema.number()},
+          required: ['tempC'],
         ),
       );
+
+      expect(tool.name, 'weather');
+      expect(tool.description, 'Returns weather data for a city.');
+      expect(tool.input, isNotNull);
+      expect(tool.output, isNotNull);
+      expect(tool.input!.value['type'], 'object');
+      expect(tool.output!.value['type'], 'object');
     });
 
-    test('structuredContent takes precedence over text', () {
-      const r = ToolResult(
-        structuredContent: {'id': 1, 'name': 'alice'},
-        text: '{"id": 999}',
+    test('supports tools without input/output schemas', () {
+      final tool = _TestTool(
+        name: 'ping',
+        description: 'Health check.',
       );
-      expect(extractToolResult(r), {'id': 1, 'name': 'alice'});
+
+      expect(tool.input, isNull);
+      expect(tool.output, isNull);
     });
 
-    test('empty text returns null when there is no structured content', () {
-      const r = ToolResult();
-      expect(extractToolResult(r), isNull);
-    });
-
-    test('text JSON is decoded into the matching Dart shape', () {
-      const r = ToolResult(text: '[1, 2, 3]');
-      expect(extractToolResult(r), [1, 2, 3]);
-    });
-
-    test('text JSON object is decoded into a Map', () {
-      const r = ToolResult(text: '{"ok": true}');
-      expect(extractToolResult(r), {'ok': true});
-    });
-
-    test('non-JSON text is returned verbatim', () {
-      const r = ToolResult(text: 'hello world');
-      expect(extractToolResult(r), 'hello world');
-    });
-  });
-
-  group('ToolProvider', () {
     test(
-      'a stub implementation can be exercised through the interface',
+      'callTool forwards args to implementation and returns ToolResult',
       () async {
-        final provider = _StubProvider((name, args) async {
-          return 'called $name with ${args.length} args';
-        });
-        expect(
-          await provider.callTool('echo', {'x': 1, 'y': 2}),
-          'called echo with 2 args',
+        final tool = _TestTool(
+          name: 'echo',
+          description: 'Echoes arguments.',
+          onCall: (args) async => ToolResult({'echo': args}),
         );
+        final args = <String, Object?>{'message': 'hi', 'count': 2};
+
+        final result = await tool.callTool(args);
+
+        expect(tool.lastArgs, same(args));
+        expect(result.isError, isFalse);
+        expect(result.result, {
+          'echo': {'message': 'hi', 'count': 2},
+        });
       },
     );
 
-    test('a stub implementation may throw ToolNotFoundError', () async {
-      final provider = _StubProvider((name, args) async {
-        throw ToolNotFoundError(toolName: name);
-      });
+    test('callTool may surface tool-level errors', () {
+      final tool = _TestTool(
+        name: 'missing',
+        description: 'Always missing.',
+        onCall: (args) => throw const ToolNotFoundError(toolName: 'missing'),
+      );
+
       expect(
-        () => provider.callTool('missing', const {}),
+        () => tool.callTool(const {}),
         throwsA(isA<ToolNotFoundError>()),
       );
     });
   });
+
+  group('ToolResult', () {
+    test('defaults isError to false', () {
+      const result = ToolResult('ok');
+      expect(result.result, 'ok');
+      expect(result.isError, isFalse);
+    });
+
+    test('supports null result payload', () {
+      const result = ToolResult(null);
+      expect(result.result, isNull);
+      expect(result.isError, isFalse);
+    });
+
+    test('preserves explicit error flag', () {
+      const result = ToolResult('permission denied', isError: true);
+      expect(result.result, 'permission denied');
+      expect(result.isError, isTrue);
+    });
+  });
+}
+
+class _TestTool extends Tool {
+  _TestTool({
+    required super.name,
+    required super.description,
+    super.input,
+    super.output,
+    this.onCall,
+  });
+
+  final Future<ToolResult> Function(Map<String, Object?> args)? onCall;
+  Map<String, Object?>? lastArgs;
+
+  @override
+  Future<ToolResult> callTool(Map<String, Object?> args) {
+    lastArgs = args;
+    if (onCall != null) return onCall!(args);
+    return Future.value(const ToolResult({'ok': true}));
+  }
 }

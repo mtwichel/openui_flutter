@@ -43,34 +43,7 @@ const List<String> _kDefaultRules = [
   'Keep responses focused — render only the UI the user asked for.',
 ];
 
-/// Caller-constructed tool metadata for generated prompts.
-///
-/// Marked `@experimental` per D12.
-@experimental
-@immutable
-class ToolSpec {
-  /// Creates a [ToolSpec].
-  const ToolSpec({
-    required this.name,
-    required this.description,
-    required this.inputSchema,
-    this.outputSchema,
-  });
-
-  /// Tool name as it appears in the prompt.
-  final String name;
-
-  /// Human-facing description.
-  final String description;
-
-  /// JSON schema describing the tool's input.
-  final Map<String, Object?> inputSchema;
-
-  /// JSON schema describing the tool's output, or `null` if not applicable.
-  final Map<String, Object?>? outputSchema;
-}
-
-/// Builds a complete system prompt from [components] and other options.
+/// Builds a complete system prompt from a [Library] and other options.
 ///
 /// The output structure:
 /// ```text
@@ -97,9 +70,7 @@ class ToolSpec {
 /// Marked `@experimental` per D12.
 @experimental
 String generatePrompt<W>(
-  List<Component<W>> components, {
-  String? libraryPrompt,
-  List<ToolSpec> tools = const [],
+  Library<W> library, {
   String? preamble,
   List<String> examples = const [],
   List<String> additionalRules = const [],
@@ -110,58 +81,22 @@ String generatePrompt<W>(
     ..writeln('GRAMMAR (essential):')
     ..writeln(_kGrammarPrimer)
     ..writeln()
-    ..writeln(libraryPrompt != null ? 'HOW TO USE THE COMPONENTS' : '')
-    ..writeln(libraryPrompt ?? '')
+    ..writeln(library.libraryPrompt != null ? 'HOW TO USE THE COMPONENTS' : '')
+    ..writeln(library.libraryPrompt ?? '')
     ..writeln('COMPONENTS (use only these):');
-  for (final component in components) {
-    final schemaValue = component.schema.value;
-    final properties = schemaValue['properties'];
-    final required = schemaValue['required'];
-    final propMap = properties is Map<String, Object?>
-        ? properties
-        : const <String, Object?>{};
-    final innerSig = _schemaToSignature(
-      propMap,
-      required: _toStringList(required),
-    );
-    final sig = '${component.name}($innerSig)';
+  for (final component in library.components) {
+    final sig = '${component.name}(${component.schema.toJson()})';
     final desc = component.description;
     buf.writeln(desc != null ? '$sig — $desc' : sig);
   }
   buf.writeln();
 
-  if (tools.isNotEmpty) {
+  if (library.tools.isNotEmpty) {
     buf.writeln('TOOLS:');
-    for (final tool in tools) {
-      final inputProps = tool.inputSchema['properties'];
-      final inputRequired = tool.inputSchema['required'];
-      final inputPropMap = inputProps is Map<String, Object?>
-          ? inputProps
-          : const <String, Object?>{};
-      final inputSig = _schemaToSignature(
-        inputPropMap,
-        required: _toStringList(inputRequired),
+    for (final tool in library.tools) {
+      buf.writeln(
+        '''${tool.name}(input: ${tool.input?.toJson()}, output: ${tool.output?.toJson()}) — ${tool.description}''',
       );
-
-      final outSchema = tool.outputSchema;
-      final String outputSig;
-      if (outSchema == null) {
-        outputSig = '';
-      } else {
-        final outProps = outSchema['properties'];
-        if (outProps is Map<String, Object?>) {
-          final outRequired = outSchema['required'];
-          final outSig = _schemaToSignature(
-            outProps,
-            required: _toStringList(outRequired),
-          );
-          outputSig = ' → {$outSig}';
-        } else {
-          outputSig = ' → ${outSchema['type'] as String? ?? 'any'}';
-        }
-      }
-
-      buf.writeln('${tool.name}($inputSig)$outputSig — ${tool.description}');
     }
     buf.writeln();
   }
@@ -178,56 +113,4 @@ String generatePrompt<W>(
   }
 
   return buf.toString();
-}
-
-/// Maps a component's `properties` map to a parameter signature string.
-///
-/// Props in [required] render without `?`; all others render with `?`.
-/// Typeless props (`{}`) render as `any`.
-/// Reactive props (`x-reactive: true`) render their base `type`.
-/// Props with a JSON schema `description` render `/* description */` inline.
-String _schemaToSignature(
-  Map<String, Object?> properties, {
-  List<String> required = const [],
-}) {
-  if (properties.isEmpty) return '';
-  final parts = <String>[];
-  for (final entry in properties.entries) {
-    final propName = entry.key;
-    final propSchema = entry.value;
-
-    String type;
-    String? propDescription;
-
-    if (propSchema is Map<String, Object?>) {
-      type = switch (propSchema['type']) {
-        'string' => 'string',
-        'number' => 'number',
-        'integer' => 'integer',
-        'boolean' => 'boolean',
-        'array' => 'array',
-        'object' => 'object',
-        _ => 'any',
-      };
-      propDescription = propSchema['description'] as String?;
-    } else {
-      type = 'any';
-    }
-
-    final qualifier = required.contains(propName) ? '' : '?';
-    if (propDescription != null) {
-      parts.add('$propName$qualifier: $type /* $propDescription */');
-    } else {
-      parts.add('$propName$qualifier: $type');
-    }
-  }
-  return parts.join(', ');
-}
-
-List<String> _toStringList(Object? value) {
-  if (value is! List) return const [];
-  return [
-    for (final item in value)
-      if (item is String) item,
-  ];
 }

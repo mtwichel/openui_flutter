@@ -1,8 +1,0 @@
-data: {"type":"response.created","response":{}}
-
-data: {"type":"response.output_text.delta","delta":"root = "}
-
-data: {"type":"response.output_text.delta","delta":"Text(text: \"hi\")"}
-
-data: {"type":"response.completed"}
-

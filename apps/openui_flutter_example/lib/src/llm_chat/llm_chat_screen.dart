@@ -2,7 +2,7 @@
 // the entire surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:dartantic_ai/dartantic_ai.dart';
+import 'package:dartantic_ai/dartantic_ai.dart' hide Tool;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,8 +12,11 @@ import 'package:openui_core/openui_core.dart';
 import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
 import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
 import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
+import 'package:openui_flutter_example/src/llm_chat/snackbar_tool.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 import 'package:openui_flutter_example/src/responsive.dart';
+
+const _kDartDefineGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
 /// Factory signature for constructing the [LlmChatService] consumed by
 /// [LlmChatScreen]. Defaults to `DartanticChatService.new`; tests inject
@@ -27,7 +30,12 @@ typedef LlmChatServiceFactory = LlmChatService Function();
 /// real wrapper without touching dartantic.
 class LlmChatScreen extends StatefulWidget {
   /// Creates an [LlmChatScreen].
-  const LlmChatScreen({super.key, this.onMenuTap, this.serviceFactory});
+  const LlmChatScreen({
+    super.key,
+    this.onMenuTap,
+    this.serviceFactory,
+    this.dartDefineGeminiApiKey = _kDartDefineGeminiApiKey,
+  });
 
   // Computed once at class load time so build() never regenerates it.
 
@@ -46,6 +54,12 @@ class LlmChatScreen extends StatefulWidget {
   /// `DartanticChatService.new`. Provided for tests to inject fakes.
   final LlmChatServiceFactory? serviceFactory;
 
+  /// API key from `--dart-define=GEMINI_API_KEY=...`.
+  ///
+  /// Defaults to [String.fromEnvironment] for production builds; tests can
+  /// inject a value directly.
+  final String dartDefineGeminiApiKey;
+
   // In-memory session key only. It is intentionally not persisted.
   static String _sessionGeminiApiKey = '';
 
@@ -55,6 +69,16 @@ class LlmChatScreen extends StatefulWidget {
 
 class _LlmChatScreenState extends State<LlmChatScreen> {
   late final TextEditingController _apiKeyController;
+
+  String get _effectiveGeminiApiKey {
+    final sessionApiKey = LlmChatScreen._sessionGeminiApiKey.trim();
+    if (sessionApiKey.isNotEmpty) return sessionApiKey;
+    return widget.dartDefineGeminiApiKey.trim();
+  }
+
+  bool get _isUsingDartDefineApiKey =>
+      LlmChatScreen._sessionGeminiApiKey.trim().isEmpty &&
+      widget.dartDefineGeminiApiKey.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -91,7 +115,7 @@ class _LlmChatScreenState extends State<LlmChatScreen> {
 
     // Test-only override path: injected service can bypass API-key gating.
     if (widget.serviceFactory == null) {
-      final apiKey = LlmChatScreen._sessionGeminiApiKey;
+      final apiKey = _effectiveGeminiApiKey;
       if (apiKey.isEmpty) {
         return _ApiKeyGate(
           onMenuTap: widget.onMenuTap,
@@ -103,11 +127,14 @@ class _LlmChatScreenState extends State<LlmChatScreen> {
           GoogleProvider(apiKey: apiKey);
     }
     return BlocProvider<ChatBloc>(
-      key: ValueKey(LlmChatScreen._sessionGeminiApiKey),
+      key: ValueKey(_effectiveGeminiApiKey),
       create: (_) => ChatBloc(service: factory()),
       child: LlmChatView(
         onMenuTap: widget.onMenuTap,
-        onChangeApiKey: widget.serviceFactory == null ? _clearApiKey : null,
+        onChangeApiKey:
+            widget.serviceFactory == null && !_isUsingDartDefineApiKey
+            ? _clearApiKey
+            : null,
         systemPrompt: LlmChatScreen._systemPrompt,
       ),
     );
@@ -209,7 +236,11 @@ class LlmChatView extends StatefulWidget {
 }
 
 class _LlmChatViewState extends State<LlmChatView> {
-  final Library<Widget> _library = standardLibrary();
+  final Library<Widget> _library = standardLibrary().extend(
+    tools: [
+      SnackbarTool(),
+    ],
+  );
   final TextEditingController _inputController = TextEditingController();
 
   @override

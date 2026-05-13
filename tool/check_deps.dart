@@ -20,10 +20,6 @@ const _rules = <String, _PackageRule>{
     type: _PackageType.flutter,
     allowed: {'flutter', 'meta', 'openui_core'},
   ),
-  'openui_chat': _PackageRule(
-    type: _PackageType.dart,
-    allowed: {'http', 'meta', 'openui_core', 'uuid'},
-  ),
   'openui_components': _PackageRule(
     type: _PackageType.flutter,
     allowed: {

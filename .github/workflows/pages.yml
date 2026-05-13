@@ -7,7 +7,6 @@ on:
       - .github/workflows/pages.yml
       - apps/openui_flutter_example/**
       - packages/openui/**
-      - packages/openui_chat/**
       - packages/openui_components/**
       - packages/openui_core/**
       - pubspec.yaml

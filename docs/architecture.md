@@ -1,6 +1,6 @@
 # Architecture
 
-OpenUI Flutter is a five-package monorepo plus example app. The shape mirrors the JS reference at [thesysdev/openui](https://github.com/thesysdev/openui), with VGV layered-architecture conventions baked in.
+OpenUI Flutter is a four-package monorepo plus example app. The shape mirrors the JS reference at [thesysdev/openui](https://github.com/thesysdev/openui), with VGV layered-architecture conventions baked in.
 
 ## Package map
 
@@ -8,7 +8,6 @@ OpenUI Flutter is a five-package monorepo plus example app. The shape mirrors th
 |---|---|---|
 | `openui_core` | pure Dart | OpenUI Lang lexer, parser, AST, evaluator, reactive store, library DSL, action steps, mergeStatements, tool-provider interface |
 | `openui` | Flutter | `Renderer` widget, error boundary, form-state cache, query manager wiring |
-| `openui_chat` | pure Dart | `OpenUiChatController`, SSE adapters (4 in v0.1), message format, action dispatch |
 | `openui_components` | Flutter | ~15 builtin widgets (Stack, Card, Form, Tabs, Table, charts, ...) |
 | `openui_mcp` | pure Dart | `McpToolProvider` over `mcp_dart`; `extractToolResult` envelope |
 | `openui_test_helpers` | pure Dart, private (publish_to: none) | Shared mocks and fakes |
@@ -20,18 +19,15 @@ OpenUI Flutter is a five-package monorepo plus example app. The shape mirrors th
 graph TD
   core[openui_core]
   ui[openui]
-  chat[openui_chat]
   comps[openui_components]
   mcp[openui_mcp]
   example[openui_flutter_example]
 
   ui --> core
-  chat --> core
   comps --> ui
   comps --> core
   mcp --> core
   example --> ui
-  example --> chat
   example --> comps
 ```
 
@@ -41,9 +37,8 @@ that demonstrates MCP integration will add the edge.
 The graph is a DAG. Forbidden edges:
 
 - `openui_core` cannot depend on Flutter, on any sibling package, or on `flutter_test`.
-- `openui_chat` cannot depend on Flutter or on `openui` / `openui_components`.
-- `openui_mcp` cannot depend on Flutter or on `openui` / `openui_components` / `openui_chat`.
-- `openui_components` cannot depend on `openui_chat` or `openui_mcp`.
+- `openui_mcp` cannot depend on Flutter or on `openui` / `openui_components`.
+- `openui_components` cannot depend on `openui_mcp`.
 - `openui` cannot depend on `openui_components` (the renderer must work with any library).
 
 These are enforced by `tool/check_deps.dart` in CI (see decision D13).
@@ -52,11 +47,8 @@ These are enforced by `tool/check_deps.dart` in CI (see decision D13).
 
 ```mermaid
 flowchart TD
-  User[User input] --> Controller[OpenUiChatController]
-  Controller -->|http.send| Backend[LLM backend SSE]
-  Backend -->|raw bytes| Adapter[StreamProtocolAdapter]
-  Adapter -->|AssistantMessage.text deltas| State[ChatState stream]
-  State --> Renderer
+  User[User input] --> LLM[LLM provider stream]
+  LLM -->|cumulative response String| Renderer
   Renderer -->|response prop| Parser[StreamParser]
   Parser -->|ParseResult| Evaluator[evaluator + Store]
   Evaluator -->|ElementNode tree| ComponentMap[Library component lookup]
@@ -66,9 +58,8 @@ flowchart TD
   ActionPlan -->|Run| QueryManager
   QueryManager -->|toolProvider.callTool| Tool[MCP / function map]
   Tool -->|result| Evaluator
-  ActionPlan -->|ContinueConversation| Controller
   ActionPlan -->|OpenUrl| UrlLauncher[url_launcher]
-  Renderer -->|onError| Controller
+  Renderer -->|onError| App
 ```
 
 ## Public API discipline
@@ -81,7 +72,7 @@ AST node types and `ParseResult` are exported from `openui_core` but marked `@ex
 
 The dependency direction is strict. Concretely:
 
-1. **Core layer** (`openui_core`, `openui_chat`, `openui_mcp`) is pure Dart. It runs in a server process, in a Flutter app, in a Cloudflare Worker — no Flutter imports.
+1. **Core layer** (`openui_core`, `openui_mcp`) is pure Dart. It runs in a server process, in a Flutter app, in a Cloudflare Worker — no Flutter imports.
 2. **Renderer layer** (`openui`) is Flutter. It owns the `Renderer` widget plus the form-state cache and error boundary. It depends only on `openui_core`.
 3. **Component layer** (`openui_components`) is Flutter. It depends on the renderer layer plus core. It is the policy layer that maps the OpenUI Lang component vocabulary to specific Flutter widgets.
 4. **Application layer** (`openui_flutter_example`) is Flutter. It depends on everything; consumers replace it.
@@ -92,7 +83,7 @@ A `Renderer` rendering output for an LLM that emits an unknown component name do
 
 Per Decision D4, one `Store` instance per `Renderer`. The store is backed by `ChangeNotifier` and lives inside `_RendererState`. Dispose is automatic.
 
-The chat layer (`OpenUiChatController`) is a `ChangeNotifier`-style class with no Flutter dependency. It exposes `Stream<ChatState>`. Consumers wire it into Bloc, Provider, Riverpod, or `setState` themselves. We do not ship a default state-management binding in v0.1.
+Chat/state management is app-owned. The example app wires `dartantic` streaming into Bloc and forwards cumulative text into `Renderer`.
 
 ## Streaming model
 

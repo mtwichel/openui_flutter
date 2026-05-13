@@ -28,7 +28,6 @@ dependencies:
   flutter_bloc: ^9.1.1
   http: ^1.6.0
   openui: ^0.1.0
-  openui_chat: ^0.1.0
   openui_components: ^0.1.0
   openui_core: ^0.1.0
 

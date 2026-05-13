@@ -78,7 +78,7 @@ root = Card(children: [
                 response: r'''$count = 0
 root = Button(label: "Click", onClick: @Set($count, $count + 1))
 ''',
-                library: openuiLibrary(),
+                library: standardLibrary(),
                 onAction: events.add,
                 onStateUpdate: updates.add,
               ),
@@ -106,7 +106,7 @@ root = Button(label: "Click", onClick: @Set($count, $count + 1))
               body: Renderer(
                 response:
                     'root = Button(label: "Retry", onClick: @ToAssistant("retry"))',
-                library: openuiLibrary(),
+                library: standardLibrary(),
                 isStreaming: true,
                 onAction: events.add,
               ),

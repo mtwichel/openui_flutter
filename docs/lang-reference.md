@@ -174,7 +174,7 @@ Forward references are allowed: `root = Stack([chart])` may appear before `chart
 
 `autoClose(text)` is the partial-recovery pass. It scans for unmatched `"` / `[` / `(` / `{` and inserts the missing closer. The pass runs only on the pending tail (after the last bracket-depth-zero newline), so completed statements are unaffected.
 
-**Dart note.** The JS reference uses Web `ReadableStream` for input. The Dart port is transport-agnostic: `push(String)` works in any context. The `OpenUiChatController`'s adapters bridge SSE bytes to chunked strings via `Utf8Decoder(allowMalformed: true)`.
+**Dart note.** The JS reference uses Web `ReadableStream` for input. The Dart port is transport-agnostic: `push(String)` works in any context. If you consume SSE, decode bytes with `Utf8Decoder(allowMalformed: true)` before chunk framing so malformed code units do not tear down the stream.
 
 ## Cyclic state
 

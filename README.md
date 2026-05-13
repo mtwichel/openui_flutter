@@ -16,8 +16,6 @@ There is no separate “codegen” step: **valid OpenUI Lang is just a string** 
 2. **`Library<Widget>`** — Registers component names (`Stack`, `Card`, `Form`, …) to Flutter builders. For most apps, use the built-in library from **`openui_components`** (`openuiLibrary()` or `openuiChatLibrary()`).
 3. **`Renderer`** (from **`openui`**) — Takes `library`, the full `response` string so far, and `isStreaming`. On each update it re-parses and rebuilds the tree; set `isStreaming: true` while chunks are still arriving.
 
-Optional: **`openui_chat`** — If your backend speaks HTTP + SSE in a supported shape, `OpenUiChatController` can manage the wire protocol and message list; you still read the latest assistant text and pass it into `Renderer`. See [packages/openui_chat/README.md](packages/openui_chat/README.md).
-
 ---
 
 ## Step-by-step: use OpenUI in your own Flutter app
@@ -59,8 +57,6 @@ Chat(
 ```
 
 That prompt is **curated**, not machine-generated from the library: a short grammar primer aligned with [docs/lang-reference.md](docs/lang-reference.md), an **explicit allowlist** of component names the prompt author chose to expose to the model (a subset of the full builtin set), action-step rules (`@Set`, `@Reset`, …), and **few-shot** OpenUI Lang programs (the project’s plans describe mirroring [`apps/openui_flutter_example/assets/scripts/`](apps/openui_flutter_example/assets/scripts/) such as `01_hello.txt`, `02_counter.txt`, `04_form.txt`). You can keep the string in Dart, split it across files, or load paragraphs from `rootBundle`—the runtime only sees the final `String` passed to the model.
-
-**HTTP + SSE (`openui_chat`).** [`OpenUiChatController`](packages/openui_chat/lib/src/controller.dart) accepts `initialMessages`. Put a [`SystemMessage`](packages/openui_chat/lib/src/message.dart) first so your [`MessageFormat`](packages/openui_chat/lib/src/formats/message_format.dart) (for example [`openAiFormat`](packages/openui_chat/lib/src/formats/message_format.dart)) serializes it as `role: system` in the JSON your `requestBuilder` posts. The assistant’s cumulative OpenUI Lang still lives on [`AssistantMessage.response`](packages/openui_chat/lib/src/message.dart); you forward that string to `Renderer` as shown in step 5.
 
 #### Keeping prompts aligned with `openuiLibrary()`
 
@@ -133,7 +129,7 @@ class _GenUiPaneState extends State<GenUiPane> {
 }
 ```
 
-Wire `_onLlmTextDelta` / `_onLlmStreamFinished` to your provider (`dartantic`, `firebase_ai`, raw HTTP, `OpenUiChatController`, etc.). The only contract `Renderer` cares about is **cumulative text + streaming flag**.
+Wire `_onLlmTextDelta` / `_onLlmStreamFinished` to your provider (`dartantic`, `firebase_ai`, raw HTTP, etc.). The only contract `Renderer` cares about is **cumulative text + streaming flag**.
 
 ### 6. Queries, mutations, and actions (when you need them)
 
@@ -147,7 +143,6 @@ If the OpenUI Lang program uses `Query` / `Mutation` or action steps (`@Set`, `@
 | --- | --- | --- |
 | [`openui_core`](packages/openui_core) | pure Dart | Lexer, parser, AST, evaluator, reactive store, library DSL, action steps |
 | [`openui`](packages/openui) | Flutter | `Renderer` widget, error boundary, form-state cache |
-| [`openui_chat`](packages/openui_chat) | pure Dart | `OpenUiChatController`, SSE adapters, message format |
 | [`openui_components`](packages/openui_components) | Flutter | Built-in widget library (`openuiLibrary` / `openuiChatLibrary`) |
 | [`openui_mcp`](packages/openui_mcp) | pure Dart | `McpToolProvider` over `mcp_dart` |
 
@@ -194,7 +189,7 @@ Flutter pin rationale: **[docs/decisions/2026-05-10-phase0-decisions.md](docs/de
 
 ### Status (v0.1)
 
-Feature-complete for the initial scope: core language + streaming parser, Flutter `Renderer` + components, chat controller + SSE adapters, MCP tool provider, and the example app. Post–v0.1 backlog is deferred; see **docs/architecture.md** and repo issues for direction.
+Feature-complete for the initial scope: core language + streaming parser, Flutter `Renderer` + components, MCP tool provider, and the example app. Post–v0.1 backlog is deferred; see **docs/architecture.md** and repo issues for direction.
 
 ### Contributing
 

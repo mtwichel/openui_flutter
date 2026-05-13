@@ -115,15 +115,17 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<MessageSubmitted>(_onMessageSubmitted);
     on<ChatCleared>(_onChatCleared);
     on<_StreamChunkReceived>(_onChunkReceived);
-    on<_StreamCompleted>(
-      (_, emit) => emit(state.copyWith(status: ChatStatus.idle)),
-    );
+    on<_StreamCompleted>((_, emit) {
+      _activeAssistantMessageId = null;
+      emit(state.copyWith(status: ChatStatus.idle));
+    });
     on<_StreamFailed>(_onFailed);
   }
 
   final LlmChatService _service;
   int _idCounter = 0;
   StreamSubscription<LlmChatEvent>? _streamSub;
+  String? _activeAssistantMessageId;
 
   String _nextId() => 'msg-${_idCounter++}';
 
@@ -135,21 +137,17 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     // streaming, but we cancel any active subscription anyway.
     await _streamSub?.cancel();
     _streamSub = null;
+    _activeAssistantMessageId = null;
 
     final userMsg = UiMessage(
       id: _nextId(),
       role: UiMessageRole.user,
       text: event.text,
     );
-    final assistantPlaceholder = UiMessage(
-      id: _nextId(),
-      role: UiMessageRole.assistant,
-      text: '',
-    );
     emit(
       state.copyWith(
         status: ChatStatus.streaming,
-        messages: [...state.messages, userMsg, assistantPlaceholder],
+        messages: [...state.messages, userMsg],
         error: null,
       ),
     );
@@ -177,10 +175,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final messages = [...state.messages];
     switch (event.chunk.type) {
       case LlmChatEventType.output:
-        final assistantIndex = messages.lastIndexWhere(
-          (m) => m.role == UiMessageRole.assistant,
-        );
-        if (assistantIndex < 0) return;
+        final activeAssistantId = _activeAssistantMessageId;
+        final assistantIndex = activeAssistantId == null
+            ? -1
+            : messages.lastIndexWhere((m) => m.id == activeAssistantId);
+        if (assistantIndex < 0) {
+          final assistant = UiMessage(
+            id: _nextId(),
+            role: UiMessageRole.assistant,
+            text: event.chunk.text,
+          );
+          _activeAssistantMessageId = assistant.id;
+          messages.add(assistant);
+          emit(state.copyWith(messages: messages));
+          return;
+        }
         final assistant = messages[assistantIndex];
         messages[assistantIndex] = assistant.copyWith(
           text: assistant.text + event.chunk.text,
@@ -220,6 +229,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     while (messages.isNotEmpty && messages.last.role != UiMessageRole.user) {
       messages.removeLast();
     }
+    _activeAssistantMessageId = null;
     emit(
       state.copyWith(
         status: ChatStatus.error,
@@ -235,6 +245,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     await _streamSub?.cancel();
     _streamSub = null;
+    _activeAssistantMessageId = null;
     _service.reset();
     emit(const ChatState());
   }

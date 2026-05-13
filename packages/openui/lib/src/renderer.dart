@@ -36,8 +36,6 @@ class Renderer extends StatefulWidget {
     this.onStateUpdate,
     this.initialState,
     this.onParseResult,
-    this.toolProvider,
-    this.queryLoader,
     this.onError,
     this.rootName = 'root',
     super.key,
@@ -47,7 +45,7 @@ class Renderer extends StatefulWidget {
   /// parse pass (`StreamParser.set`).
   final String? response;
 
-  /// Component library used to dispatch each `CompCall`.
+  /// Component and tool library used to dispatch each `CompCall` and `Query` / `Mutation`.
   final Library<Widget> library;
 
   /// Whether `response` is still being appended to by the upstream
@@ -68,15 +66,6 @@ class Renderer extends StatefulWidget {
 
   /// Notified after every parse pass with the latest [ParseResult].
   final void Function(ParseResult result)? onParseResult;
-
-  /// Tool transport for `Query` / `Mutation` statements. Mutually
-  /// exclusive with [queryLoader] in practice — when both are set,
-  /// [queryLoader] wins.
-  final ToolProvider? toolProvider;
-
-  /// Test seam — receives the statement id and raw arg list and
-  /// returns the resolved value directly.
-  final QueryLoader? queryLoader;
 
   /// Notified when the active [OpenUIError] set changes. Errors are
   /// deduplicated structurally — repeated identical sets do not fire
@@ -124,10 +113,8 @@ class _RendererState extends State<Renderer> {
   @override
   void didUpdateWidget(Renderer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final providerChanged =
-        widget.toolProvider != oldWidget.toolProvider ||
-        widget.queryLoader != oldWidget.queryLoader;
-    if (providerChanged) {
+    final libraryChanged = widget.library != oldWidget.library;
+    if (libraryChanged) {
       _queryManager?.dispose();
       _queryManager = _buildQueryManager();
       _queryManager?.onChange = _handleQueryChange;
@@ -137,7 +124,7 @@ class _RendererState extends State<Renderer> {
     }
     if (widget.response != oldWidget.response ||
         widget.rootName != oldWidget.rootName ||
-        providerChanged) {
+        libraryChanged) {
       _runPipeline();
     }
   }
@@ -151,11 +138,9 @@ class _RendererState extends State<Renderer> {
     super.dispose();
   }
 
-  QueryManager? _buildQueryManager() {
-    if (widget.toolProvider == null && widget.queryLoader == null) return null;
+  QueryManager _buildQueryManager() {
     return QueryManager(
-      toolProvider: widget.toolProvider,
-      loader: widget.queryLoader,
+      library: widget.library,
     );
   }
 
@@ -412,7 +397,7 @@ class _RendererState extends State<Renderer> {
     EvalContext ctx, {
     String? statementHint,
   }) {
-    final component = widget.library[call.type];
+    final component = widget.library.component(call.type);
     if (component == null) {
       return _errorPlaceholder(
         UnknownComponentError(

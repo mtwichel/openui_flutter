@@ -17,8 +17,8 @@ import 'package:openui_core/src/parser/parser.dart';
 ///   second arg a "transform ref", but at the evaluator layer the
 ///   semantics are identical.
 ///
-/// Action-step builtins (`@Set`, `@Reset`, `@Run`, `@ToAssistant`,
-/// `@OpenUrl`) are in a separate dispatcher and not part of this
+/// Action-step builtins (`@Set`, `@Reset`, `@Run`, `@ToAssistant`)
+/// are in a separate dispatcher and not part of this
 /// registry — they are not value-producing.
 ///
 /// Marked `@experimental` per D12.

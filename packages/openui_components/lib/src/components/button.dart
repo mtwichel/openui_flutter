@@ -4,7 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:openui/openui.dart';
-import 'package:openui_components/src/components/form.dart';
+import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `Button(label, onClick, variant?)` — a Material button wired to an
@@ -51,30 +51,25 @@ Component<Widget> buttonComponent() {
     schema: Schema.object(
       properties: {
         'label': Schema.string(),
-        'variant': Schema.string(),
-        'onClick': Schema.any(),
+        'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
+        'onClick': Schema.any().xAction(),
       },
       required: ['label'],
     ),
     render: (ctx, props, renderNode, id) {
       final label = props['label']?.toString() ?? '';
       final variant = props['variant'] as String? ?? 'primary';
-      // The renderer sets `props['onClick']` to `null` when the AST is
-      // action-shaped but disabled mid-stream. Distinguish that case
-      // from "user omitted onClick" by checking the key — the latter
-      // is the implicit-@ToAssistant path.
       final hasOnClickProp = props.containsKey('onClick');
-      final action = props['onClick'] as ActionPlan?;
+      final rawOnClick = props['onClick'];
+      final action = rawOnClick is ActionPlan ? rawOnClick : null;
       final disabled = hasOnClickProp && action == null;
       return Builder(
         builder: (context) {
           final scope = RendererScope.maybeFind(context);
-          final formName = FormScope.maybeFind(context)?.name;
           final onPressed = (scope == null || disabled)
               ? null
               : () => scope.triggerAction(
                   label,
-                  formName: formName,
                   action: action,
                 );
           return ButtonWidget(

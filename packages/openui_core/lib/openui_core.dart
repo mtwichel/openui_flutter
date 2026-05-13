@@ -16,7 +16,6 @@ export 'src/actions/actions.dart'
         BuiltinActionType,
         ContinueConversationStep,
         CustomActionStep,
-        OpenUrlStep,
         ResetStep,
         RunStep,
         SetStep,

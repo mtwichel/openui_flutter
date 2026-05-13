@@ -51,7 +51,10 @@ Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
           'type': 'object',
           'properties': <String, Object?>{
             'value': <String, Object?>{'type': 'integer'},
-            'onIncrement': <String, Object?>{'type': 'object'},
+            'onIncrement': <String, Object?>{
+              'type': 'object',
+              'x-action': true,
+            },
           },
         }),
         render: (ctx, props, renderNode, id) {
@@ -266,8 +269,8 @@ root = Column(children: [Input(name: "field", value: \$name), Input(name: "secon
     );
 
     testWidgets(
-      'action prop dispatches Set step against the store and emits zero '
-      'ActionEvents (host-internal step)',
+      'action prop dispatches Set step against the store and emits a set '
+      'ActionEvent',
       (tester) async {
         final events = <ActionEvent>[];
         const program = '''\$count = 0
@@ -287,7 +290,9 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
         expect(find.text('count=1'), findsOneWidget);
-        expect(events, isEmpty);
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.set);
+        expect(events.single.params['target'], r'$count');
       },
     );
 
@@ -313,7 +318,8 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
         expect(find.text('count=1'), findsOneWidget);
-        expect(events, isEmpty);
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.set);
       },
     );
 
@@ -393,6 +399,39 @@ root = Counter(value: \$tick, onIncrement: @Run(refresh))
       await tester.pumpAndSettle();
       // `refresh` invalidated and fired.
       expect(calls, 2);
+    });
+
+    testWidgets('Run step can invoke a tool directly by name', (tester) async {
+      var calls = 0;
+      Map<String, Object?>? lastArgs;
+      final tools = <Tool>[
+        _StubTool(
+          name: 'snackbar',
+          description: 'snackbar tool',
+          handler: (args) async {
+            calls++;
+            lastArgs = args;
+            return const ToolResult(null);
+          },
+        ),
+      ];
+      const program =
+          'root = Counter(value: 0, onIncrement: @Run(snackbar, message: "Hello"))';
+      await tester.pumpWidget(
+        _TestRoot(
+          child: Renderer(
+            response: program,
+            library: _testLibrary(tools: tools),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(GestureDetector));
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(calls, 1);
+      expect(lastArgs, isNotNull);
+      expect(lastArgs!['message'], 'Hello');
     });
 
     testWidgets('error boundary captures component throws', (tester) async {
@@ -510,10 +549,10 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
     );
 
     testWidgets(
-      '@ToAssistant emits a continueConversation ActionEvent with the '
+      '@ToAssistant emits a continue-conversation callback with the '
       'evaluated message',
       (tester) async {
-        final events = <ActionEvent>[];
+        final messages = <String>[];
         const program =
             '''root = Counter(value: 0, onIncrement: @ToAssistant("retry"))
 ''';
@@ -522,7 +561,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
             child: Renderer(
               response: program,
               library: _testLibrary(),
-              onAction: events.add,
+              onContinueConversation: messages.add,
             ),
           ),
         );
@@ -530,35 +569,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
 
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.continueConversation);
-        expect(events.single.humanFriendlyMessage, 'retry');
-      },
-    );
-
-    testWidgets(
-      '@OpenUrl emits an openUrl ActionEvent with url in params',
-      (tester) async {
-        final events = <ActionEvent>[];
-        const program =
-            '''root = Counter(value: 0, onIncrement: @OpenUrl("https://example.com"))
-''';
-        await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-              onAction: events.add,
-            ),
-          ),
-        );
-
-        await tester.tap(find.byType(GestureDetector));
-        await tester.pump();
-
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.openUrl);
-        expect(events.single.params['url'], 'https://example.com');
+        expect(messages, ['retry']);
       },
     );
 

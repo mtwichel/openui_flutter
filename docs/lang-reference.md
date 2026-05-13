@@ -95,7 +95,6 @@ Action-step builtins (only valid inside an `actions: ActionPlan(steps: [...])` a
 | `@Reset` | `@Reset(target1, target2, ...)` | Reset each target to its declared default |
 | `@Run` | `@Run(statementId)` | Re-fire a query or mutation by statement id |
 | `@ToAssistant` | `@ToAssistant(message, context?)` | Enqueue a user message in the chat controller |
-| `@OpenUrl` | `@OpenUrl(url)` | Call `url_launcher` (provided as a callback) |
 
 The action plan dispatcher executes steps sequentially. `@Run` returning an error halts the plan unless a `catch` field is provided (deferred to v0.2).
 
@@ -137,11 +136,6 @@ for (final step in plan.steps) {
         type: BuiltinActionType.continueConversation,
         humanFriendlyMessage: evaluate(messageAst),
         params: contextAst == null ? {} : {'context': evaluate(contextAst)},
-      ));
-    case OpenUrlStep(:final urlAst):
-      onHostStep(ActionEvent(
-        type: BuiltinActionType.openUrl,
-        params: {'url': evaluate(urlAst)},
       ));
   }
 }

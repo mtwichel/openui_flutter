@@ -11,13 +11,26 @@ import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 
-Widget _app(String response, {void Function(ActionEvent)? onAction}) {
+class _ContinueConversationCall {
+  _ContinueConversationCall({
+    required this.message,
+  });
+
+  final String message;
+}
+
+Widget _app(
+  String response, {
+  void Function(ActionEvent)? onAction,
+  void Function(String message)? onContinueConversation,
+}) {
   return MaterialApp(
     home: Scaffold(
       body: Renderer(
         response: response,
         library: standardLibrary(),
         onAction: onAction,
+        onContinueConversation: onContinueConversation,
       ),
     ),
   );
@@ -25,6 +38,14 @@ Widget _app(String response, {void Function(ActionEvent)? onAction}) {
 
 void main() {
   group('Renderer + openuiLibrary', () {
+    test('Button schema marks onClick as action-capable', () {
+      final button = standardLibrary().component('Button');
+      expect(button, isNotNull);
+      final props = button!.schema.value['properties']! as Map<String, Object?>;
+      final onClick = props['onClick']! as Map<String, Object?>;
+      expect(onClick['x-action'], isTrue);
+    });
+
     testWidgets('renders a Stack of TextContent', (tester) async {
       await tester.pumpWidget(
         _app(
@@ -124,85 +145,42 @@ root = Button(label: "Click", onClick: @Set($count, $count + 1))
     );
 
     testWidgets(
-      'Button without onClick fires implicit @ToAssistant with its label',
+      'Button with invalid onClick payload stays inert and does not throw',
       (tester) async {
         final events = <ActionEvent>[];
         await tester.pumpWidget(
           _app(
-            'root = Button(label: "Retry")\n',
+            'root = Button(label: "Retry", onClick: Mystery())\n',
             onAction: events.add,
           ),
         );
         await tester.tap(find.text('Retry'));
         await tester.pumpAndSettle();
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.continueConversation);
-        expect(events.single.humanFriendlyMessage, 'Retry');
-        expect(events.single.formName, isNull);
-        expect(events.single.formState, isNull);
+        expect(events, isEmpty);
+        expect(tester.takeException(), isNull);
       },
     );
 
     testWidgets(
-      'Button inside a Form populates formName and formState',
+      'Button without onClick fires implicit @ToAssistant with its label',
       (tester) async {
-        final events = <ActionEvent>[];
+        final calls = <_ContinueConversationCall>[];
         await tester.pumpWidget(
           _app(
-            '''
-\$x = ""
-root = Form(name: "f", children: [
-  Input(name: "x", value: \$x),
-  Button(label: "Send")
-])
-''',
-            onAction: events.add,
+            'root = Button(label: "Retry")\n',
+            onContinueConversation: (message) {
+              calls.add(
+                _ContinueConversationCall(
+                  message: message,
+                ),
+              );
+            },
           ),
         );
-        await tester.enterText(
-          find.byKey(const ValueKey('input-f-x')),
-          'typed',
-        );
-        await tester.pump();
-        await tester.tap(find.text('Send'));
+        await tester.tap(find.text('Retry'));
         await tester.pumpAndSettle();
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.continueConversation);
-        expect(events.single.humanFriendlyMessage, 'Send');
-        expect(events.single.formName, 'f');
-        expect(events.single.formState!['x'], 'typed');
-      },
-    );
-
-    testWidgets(
-      'Button inside a Form with AST onClick carries formName and '
-      'formState on the emitted event',
-      (tester) async {
-        final events = <ActionEvent>[];
-        await tester.pumpWidget(
-          _app(
-            '''
-\$x = ""
-root = Form(name: "f", children: [
-  Input(name: "x", value: \$x),
-  Button(label: "Go", onClick: @ToAssistant("submit"))
-])
-''',
-            onAction: events.add,
-          ),
-        );
-        await tester.enterText(
-          find.byKey(const ValueKey('input-f-x')),
-          'typed',
-        );
-        await tester.pump();
-        await tester.tap(find.text('Go'));
-        await tester.pumpAndSettle();
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.continueConversation);
-        expect(events.single.humanFriendlyMessage, 'submit');
-        expect(events.single.formName, 'f');
-        expect(events.single.formState!['x'], 'typed');
+        expect(calls, hasLength(1));
+        expect(calls.single.message, 'Retry');
       },
     );
 
@@ -216,9 +194,7 @@ root = Form(name: "f", children: [
             body: Renderer(
               response: '''
 \$name = ""
-root = Form(name: "f", children: [
-  Input(name: "field", value: \$name)
-])
+root = Input(name: "field", value: \$name)
 ''',
               library: standardLibrary(),
               onStateUpdate: updates.add,
@@ -227,7 +203,7 @@ root = Form(name: "f", children: [
         ),
       );
       await tester.enterText(
-        find.byKey(const ValueKey('input-f-field')),
+        find.byKey(const ValueKey('input-default-field')),
         'hello',
       );
       await tester.pump();

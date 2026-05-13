@@ -7,7 +7,6 @@ import 'package:openui_components/src/components/bar_chart.dart';
 import 'package:openui_components/src/components/button.dart';
 import 'package:openui_components/src/components/callout.dart';
 import 'package:openui_components/src/components/card.dart';
-import 'package:openui_components/src/components/form.dart';
 import 'package:openui_components/src/components/image.dart';
 import 'package:openui_components/src/components/input.dart';
 import 'package:openui_components/src/components/line_chart.dart';
@@ -33,8 +32,6 @@ Library<Widget> standardLibrary() {
       textContentComponent(),
       markdownComponent(),
       imageComponent(),
-      formComponent(),
-      formControlComponent(),
       inputComponent(),
       selectComponent(),
       buttonComponent(),

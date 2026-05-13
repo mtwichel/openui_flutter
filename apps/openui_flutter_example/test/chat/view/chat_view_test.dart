@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:openui_flutter_example/src/llm_chat/llm_chat.dart';
-import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
+import 'package:openui_components/openui_components.dart';
+import 'package:openui_core/openui_core.dart';
+import 'package:openui_flutter_example/chat/chat.dart';
+import 'package:openui_flutter_example/chat/snackbar_tool.dart';
 
 class _MockChatBloc extends MockBloc<ChatEvent, ChatState>
     implements ChatBloc {}
@@ -19,10 +21,17 @@ class _NoopService implements DartanticChatService {
   void reset() {}
 }
 
+final Library<Widget> _testChatLibrary = standardLibrary().extend(
+  tools: [SnackbarTool()],
+);
+
 Widget _viewHarness(ChatBloc bloc) => MaterialApp(
   home: BlocProvider<ChatBloc>.value(
     value: bloc,
-    child: const LlmChatView(systemPrompt: 'system prompt'),
+    child: ChatView(
+      library: _testChatLibrary,
+      systemPrompt: 'system prompt',
+    ),
   ),
 );
 
@@ -95,12 +104,43 @@ const _errorState = ChatState(
   error: 'Boom',
 );
 
+/// Keys must match collapsible panel header keys in `chat_view.dart`.
+const _kGeneratedOpenUICodePanelHeaderKey = ValueKey<String>(
+  'generated-openui-code-panel-header',
+);
+const _kStoreInspectorPanelHeaderKey = ValueKey<String>(
+  'store-inspector-panel-header',
+);
+const _kActionLogPanelHeaderKey = ValueKey<String>(
+  'action-log-panel-header',
+);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(const MessageSubmitted(''));
+    registerFallbackValue(
+      const RenderStoreSnapshotUpdated(<String, Object?>{}),
+    );
+    registerFallbackValue(
+      OpenUiHostActionLogged(
+        OpenUiActionLogEntry(
+          loggedAt: DateTime(2000),
+          type: 'fallback',
+        ),
+      ),
+    );
+    registerFallbackValue(const OpenUiActionLogCleared());
+    registerFallbackValue(const GeminiApiKeySubmitted(''));
+    registerFallbackValue(const GeminiSessionApiKeyCleared());
+    registerFallbackValue(
+      const LlmDebugPanelExpansionChanged(
+        panel: LlmDebugPanel.generatedOpenUiCode,
+        expanded: true,
+      ),
+    );
   });
 
-  group('LlmChatView', () {
+  group('ChatView', () {
     late _MockChatBloc bloc;
 
     setUp(() {
@@ -150,21 +190,120 @@ void main() {
       await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.text('hi'), findsOneWidget);
-      expect(find.text('root = Card(children: [])'), findsNWidgets(2));
+      expect(find.text('root = Card(children: [])'), findsOneWidget);
     });
 
-    testWidgets('shows generated OpenUI code viewer under renderer', (
+    testWidgets('shows collapsible generated code, store, and action panels', (
       tester,
     ) async {
       _setWideViewport(tester);
       _stub(bloc, _streamingTwoMessages);
 
       await tester.pumpWidget(_viewHarness(bloc));
+      await tester.pumpAndSettle();
 
       expect(find.text('Generated OpenUI code'), findsOneWidget);
-      // The assistant text appears in both the transcript bubble and
-      // the code viewer below it.
-      expect(find.text('root = Card(children: [])'), findsNWidgets(2));
+      expect(find.text('Store inspector'), findsOneWidget);
+      expect(find.text('Action log'), findsOneWidget);
+      // Collapsed by default: code body is not built.
+      expect(
+        find.text('// Generated OpenUI code will appear here.'),
+        findsNothing,
+      );
+      expect(find.text('// No store keys yet.'), findsNothing);
+      expect(find.text('// No actions logged yet.'), findsNothing);
+
+      await tester.tap(find.byKey(_kGeneratedOpenUICodePanelHeaderKey));
+      await tester.pump();
+      verify(
+        () => bloc.add(
+          const LlmDebugPanelExpansionChanged(
+            panel: LlmDebugPanel.generatedOpenUiCode,
+            expanded: true,
+          ),
+        ),
+      ).called(1);
+
+      await tester.tap(find.byKey(_kStoreInspectorPanelHeaderKey));
+      await tester.pump();
+      verify(
+        () => bloc.add(
+          const LlmDebugPanelExpansionChanged(
+            panel: LlmDebugPanel.storeInspector,
+            expanded: true,
+          ),
+        ),
+      ).called(1);
+
+      await tester.tap(find.byKey(_kActionLogPanelHeaderKey));
+      await tester.pump();
+      verify(
+        () => bloc.add(
+          const LlmDebugPanelExpansionChanged(
+            panel: LlmDebugPanel.actionLog,
+            expanded: true,
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('store inspector shows renderStoreSnapshot from ChatState', (
+      tester,
+    ) async {
+      _setWideViewport(tester);
+      _stub(
+        bloc,
+        const ChatState(
+          messages: [
+            UiMessage(id: 'u1', role: UiMessageRole.user, text: 'x'),
+            UiMessage(
+              id: 'a1',
+              role: UiMessageRole.assistant,
+              text: 'root = Text(text: "hi")',
+            ),
+          ],
+          renderStoreSnapshot: <String, Object?>{r'$count': 3},
+          isStoreInspectorPanelExpanded: true,
+        ),
+      );
+
+      await tester.pumpWidget(_viewHarness(bloc));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining(r'$count'), findsWidgets);
+      expect(find.textContaining('3'), findsWidgets);
+    });
+
+    testWidgets('action log shows actionLog from ChatState', (tester) async {
+      _setWideViewport(tester);
+      _stub(
+        bloc,
+        ChatState(
+          messages: const [
+            UiMessage(id: 'u1', role: UiMessageRole.user, text: 'x'),
+            UiMessage(
+              id: 'a1',
+              role: UiMessageRole.assistant,
+              text: 'root = Text(text: "hi")',
+            ),
+          ],
+          actionLog: [
+            OpenUiActionLogEntry(
+              loggedAt: DateTime(2024, 6, 15, 14, 30, 5),
+              type: 'Snack',
+              humanFriendlyMessage: 'Popped',
+            ),
+          ],
+          isActionLogPanelExpanded: true,
+        ),
+      );
+
+      await tester.pumpWidget(_viewHarness(bloc));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Snack'), findsWidgets);
+      expect(find.textContaining('Popped'), findsWidgets);
+      expect(find.textContaining('14:30:05'), findsWidgets);
     });
 
     testWidgets('assistant transcript renders each assistant response text', (
@@ -175,11 +314,10 @@ void main() {
 
       await tester.pumpWidget(_viewHarness(bloc));
 
-      // r=1 appears once (transcript bubble); r=2 appears twice
-      // (transcript bubble + code viewer, which mirrors the latest
-      // assistant response).
+      // r=1 appears once (transcript bubble); r=2 appears once (latest
+      // assistant bubble only — generated code panel is collapsed by default).
       expect(find.text('r=1'), findsOneWidget);
-      expect(find.text('r=2'), findsNWidgets(2));
+      expect(find.text('r=2'), findsOneWidget);
     });
 
     testWidgets('renderer uses final assistant response after streaming ends', (
@@ -201,6 +339,23 @@ void main() {
 
       expect(find.text('Final'), findsOneWidget);
       expect(find.text('Partial'), findsNothing);
+    });
+
+    testWidgets('clear state removes stale renderer fallback', (tester) async {
+      _setWideViewport(tester);
+      when(() => bloc.state).thenReturn(_idleEmpty);
+      whenListen(
+        bloc,
+        Stream<ChatState>.fromIterable([_idleEmpty]),
+        initialState: _idleFinalRender,
+      );
+
+      await tester.pumpWidget(_viewHarness(bloc));
+      expect(find.text('Final'), findsOneWidget);
+
+      await tester.pump();
+      expect(find.text('Final'), findsNothing);
+      expect(find.text('Ask the model to build something.'), findsOneWidget);
     });
 
     testWidgets('Clear icon dispatches ChatCleared', (tester) async {
@@ -277,7 +432,7 @@ void main() {
     });
   });
 
-  group('LlmChatScreen', () {
+  group('ChatPage', () {
     testWidgets('constructs its own bloc via the injected service factory', (
       tester,
     ) async {
@@ -289,12 +444,11 @@ void main() {
       }
 
       await tester.pumpWidget(
-        MaterialApp(home: LlmChatScreen(serviceFactory: factory)),
+        MaterialApp(home: ChatPage(chatServiceFactory: factory)),
       );
 
       expect(factoryCalls, 1);
-      // The wrapper provides a ChatBloc to the subtree.
-      final view = tester.element(find.byType(LlmChatView));
+      final view = tester.element(find.byType(ChatView));
       expect(BlocProvider.of<ChatBloc>(view), isA<ChatBloc>());
       // Default idle state — input enabled, no error banner.
       final tf = tester.widget<TextField>(find.byType(TextField));

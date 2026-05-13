@@ -10,7 +10,6 @@ export 'src/components/bar_chart.dart' show BarChartWidget;
 export 'src/components/button.dart' show ButtonWidget;
 export 'src/components/callout.dart' show CalloutWidget;
 export 'src/components/card.dart' show CardHeaderWidget, CardWidget;
-export 'src/components/form.dart' show FormControlWidget, FormScope, FormWidget;
 export 'src/components/image.dart' show ImageWidget;
 export 'src/components/input.dart' show InputWidget;
 export 'src/components/line_chart.dart' show LineChartWidget;

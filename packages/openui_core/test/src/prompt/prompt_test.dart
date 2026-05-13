@@ -48,6 +48,43 @@ void main() {
       expect(result, contains('Programs are a sequence of statements'));
     });
 
+    test('grammar primer explains x-action requires Action([...])', () {
+      final result = generatePrompt<String>(
+        const Library<String>(components: [], tools: []),
+      );
+      expect(result, contains('x-action: true'));
+      expect(result, contains('Action([...])'));
+      expect(result, contains('do not pass a bare `@Step(...)`'));
+    });
+
+    test('grammar primer is explicit about valid built-in action calls', () {
+      final result = generatePrompt<String>(
+        const Library<String>(components: [], tools: []),
+      );
+      expect(result, contains('All `@Name(...)` calls are built-ins'));
+      expect(
+        result,
+        contains(r'`$varName` is a store variable'),
+      );
+      expect(
+        result,
+        contains(
+          'Only these action calls are valid: `@Set`, `@Reset`, `@Run`, `@ToAssistant`',
+        ),
+      );
+      expect(
+        result,
+        contains(
+          '`@Run(toolName, argName: value, ...)` triggers a declared tool',
+        ),
+      );
+      expect(result, contains('No other action calls are valid'));
+      expect(
+        result,
+        contains('`@ToAssistant("message", "context?")` emits'),
+      );
+    });
+
     test('component with description renders Name(props) — description', () {
       final c = _comp(
         'Card',

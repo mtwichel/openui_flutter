@@ -17,6 +17,9 @@ import 'package:openui_core/openui_core.dart';
 /// signature.
 typedef ComponentWidgetRenderer = ComponentRender<Widget>;
 
+/// Callback fired when a continue-conversation action occurs.
+typedef ContinueConversationCallback = void Function(String message);
+
 /// The Flutter renderer for OpenUI Lang.
 ///
 /// Mirrors the JS reference's `<Renderer />` shape: pass the cumulative
@@ -33,6 +36,7 @@ class Renderer extends StatefulWidget {
     this.response,
     this.isStreaming = false,
     this.onAction,
+    this.onContinueConversation,
     this.onStateUpdate,
     this.initialState,
     this.onParseResult,
@@ -53,9 +57,17 @@ class Renderer extends StatefulWidget {
   /// `RendererScope.isStreaming`.
   final bool isStreaming;
 
-  /// Notified when an action plan fires. Receives the parsed plan plus
-  /// the component-emitted payload (e.g. form submit values).
+  /// Notified for each host-routed step, including continue-conversation
+  /// (`@ToAssistant` and implicit Button activations), failed `@Run`
+  /// steps, skipped `@Reset` targets, and invalid `@ToAssistant`
+  /// messages (`params['success'] == false` where applicable).
   final void Function(ActionEvent event)? onAction;
+
+  /// Invoked after [onAction] for continue-conversation steps whose
+  /// evaluated message is a non-empty string (including implicit Button
+  /// activations). Failed or skipped `@ToAssistant` steps still call
+  /// [onAction] but do not invoke this callback.
+  final ContinueConversationCallback? onContinueConversation;
 
   /// Notified after every write to the internal [Store], with the
   /// full post-write snapshot.
@@ -226,19 +238,16 @@ class _RendererState extends State<Renderer> {
 
   Future<void> _triggerAction(
     String userMessage, {
-    String? formName,
     ActionPlan? action,
   }) async {
-    final formState = _formStateCache.snapshot(formName);
     if (action == null) {
       widget.onAction?.call(
         ActionEvent(
           type: BuiltinActionType.continueConversation,
           humanFriendlyMessage: userMessage,
-          formState: formState,
-          formName: formName,
         ),
       );
+      widget.onContinueConversation?.call(userMessage);
       return;
     }
     final result = _lastResult;
@@ -248,14 +257,23 @@ class _RendererState extends State<Renderer> {
         for (final decl in result.meta.stateDecls) decl.name: decl.defaultValue,
     };
     final onAction = widget.onAction;
+    final onContinueConversation = widget.onContinueConversation;
     await dispatchAction(
       plan: action,
       context: ctx,
       stateDefaults: stateDefaults,
-      onRun: (step) => _onRun(result, step),
-      onHostStep: onAction ?? (_) {},
-      formState: formState,
-      formName: formName,
+      onRun: (step, args) => _onRun(result, step, args),
+      onHostStep: (event) {
+        if (event.type == BuiltinActionType.continueConversation) {
+          onAction?.call(event);
+          final message = event.humanFriendlyMessage;
+          if (message != null) {
+            onContinueConversation?.call(message);
+          }
+          return;
+        }
+        onAction?.call(event);
+      },
       humanFriendlyMessage: userMessage,
     );
     // dispatchAction collects @Reset-target-not-declared and similar
@@ -265,7 +283,11 @@ class _RendererState extends State<Renderer> {
     if (result != null) _maybeReportErrors(result);
   }
 
-  Future<void> _onRun(ParseResult? result, RunStep step) async {
+  Future<void> _onRun(
+    ParseResult? result,
+    RunStep step,
+    Map<String, Object?> args,
+  ) async {
     final manager = _queryManager;
     if (manager == null) return;
     final id = step.statementId;
@@ -280,6 +302,11 @@ class _RendererState extends State<Renderer> {
         manager.invalidate(id, q.args);
         return;
       }
+    }
+    final directTool = widget.library.tool(id);
+    if (directTool != null) {
+      await directTool.callTool(args);
+      return;
     }
     throw EvaluationError(
       message: '@Run target "$id" is not a declared query or mutation',
@@ -474,6 +501,7 @@ class _RendererState extends State<Renderer> {
       if (propName == null) continue;
       final value = arg.value;
       final isReactive = _isReactivePropName(properties, propName);
+      final isAction = _isActionPropName(properties, propName);
       if (isReactive && value is StateRef) {
         final fullName = '\$${value.name}';
         props[propName] = ReactiveAssign(
@@ -482,7 +510,12 @@ class _RendererState extends State<Renderer> {
         );
         continue;
       }
-      props[propName] = _resolvePropValue(value, ctx, statementId);
+      props[propName] = _resolvePropValue(
+        value,
+        ctx,
+        statementId,
+        allowAction: isAction,
+      );
     }
     return props;
   }
@@ -490,9 +523,10 @@ class _RendererState extends State<Renderer> {
   Object? _resolvePropValue(
     AstNode value,
     EvalContext ctx,
-    String statementId,
-  ) {
-    final asAction = actionPlanFromAst(value);
+    String statementId, {
+    bool allowAction = false,
+  }) {
+    final asAction = allowAction ? actionPlanFromAst(value) : null;
     if (asAction != null && asAction.steps.isNotEmpty) {
       // Disable interactivity while the containing statement is still
       // being streamed (Acceptance Gap A6).
@@ -548,6 +582,12 @@ class _RendererState extends State<Renderer> {
     final spec = properties[name];
     if (spec is! Map<String, Object?>) return false;
     return spec['x-reactive'] == true;
+  }
+
+  bool _isActionPropName(Map<String, Object?> properties, String name) {
+    final spec = properties[name];
+    if (spec is! Map<String, Object?>) return false;
+    return spec['x-action'] == true;
   }
 
   /// Routes [error] through the [Renderer.onError] callback with the

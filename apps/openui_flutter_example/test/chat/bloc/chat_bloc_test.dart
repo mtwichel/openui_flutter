@@ -2,14 +2,12 @@ import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:openui_flutter_example/src/llm_chat/llm_chat.dart';
-import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
+import 'package:openui_flutter_example/chat/chat.dart';
 
 class _FakeService implements DartanticChatService {
   final List<StreamController<LlmChatEvent>> controllers =
       <StreamController<LlmChatEvent>>[];
   int resetCount = 0;
-  int closeCount = 0;
 
   @override
   Stream<LlmChatEvent> sendMessage(String text) {
@@ -41,7 +39,7 @@ void main() {
 
     blocTest<ChatBloc, ChatState>(
       'happy-path single turn streams chunks into the trailing message',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       act: (bloc) async {
         bloc.add(const MessageSubmitted('hi'));
         await _tick();
@@ -86,7 +84,7 @@ void main() {
 
     blocTest<ChatBloc, ChatState>(
       'multi-turn grows the transcript and preserves prior turns',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       act: (bloc) async {
         bloc.add(const MessageSubmitted('one'));
         await _tick();
@@ -113,8 +111,146 @@ void main() {
     );
 
     blocTest<ChatBloc, ChatState>(
+      'RenderStoreSnapshotUpdated replaces renderStoreSnapshot',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      seed: () => const ChatState(
+        renderStoreSnapshot: <String, Object?>{'k': 'v'},
+      ),
+      act: (bloc) async {
+        bloc.add(const RenderStoreSnapshotUpdated(<String, Object?>{'a': 1}));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.renderStoreSnapshot, <String, Object?>{'a': 1});
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
+      'MessageSubmitted clears renderStoreSnapshot',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      seed: () => const ChatState(
+        messages: [
+          UiMessage(id: 'a', role: UiMessageRole.user, text: 'old'),
+        ],
+        renderStoreSnapshot: <String, Object?>{r'$x': 'stale'},
+      ),
+      act: (bloc) async {
+        bloc.add(const MessageSubmitted('next'));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.renderStoreSnapshot, isEmpty);
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
+      'MessageSubmitted preserves actionLog',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      seed: () => ChatState(
+        messages: const [
+          UiMessage(id: 'a', role: UiMessageRole.user, text: 'old'),
+        ],
+        actionLog: [
+          OpenUiActionLogEntry(
+            loggedAt: DateTime(2000),
+            type: 'prior',
+          ),
+        ],
+      ),
+      act: (bloc) async {
+        bloc.add(const MessageSubmitted('next'));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.actionLog, hasLength(1));
+        expect(bloc.state.actionLog.single.type, 'prior');
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
+      'OpenUiHostActionLogged appends to actionLog',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      seed: () => ChatState(
+        actionLog: [
+          OpenUiActionLogEntry(loggedAt: DateTime(2000), type: 'first'),
+        ],
+      ),
+      act: (bloc) async {
+        bloc.add(
+          OpenUiHostActionLogged(
+            OpenUiActionLogEntry(
+              loggedAt: DateTime(2000, 1, 2),
+              type: 'second',
+            ),
+          ),
+        );
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.actionLog, hasLength(2));
+        expect(bloc.state.actionLog.last.type, 'second');
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
+      'OpenUiActionLogCleared empties actionLog',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      seed: () => ChatState(
+        actionLog: [
+          OpenUiActionLogEntry(loggedAt: DateTime(2000), type: 'x'),
+        ],
+      ),
+      act: (bloc) async {
+        bloc.add(const OpenUiActionLogCleared());
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.actionLog, isEmpty);
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
+      'LlmDebugPanelExpansionChanged updates matching panel flag',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      act: (bloc) async {
+        bloc.add(
+          const LlmDebugPanelExpansionChanged(
+            panel: LlmDebugPanel.storeInspector,
+            expanded: true,
+          ),
+        );
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.isStoreInspectorPanelExpanded, isTrue);
+        expect(bloc.state.isGeneratedOpenUiCodePanelExpanded, isFalse);
+        expect(bloc.state.isActionLogPanelExpanded, isFalse);
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
+      'mid-stream error clears actionLog',
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
+      seed: () => ChatState(
+        actionLog: [
+          OpenUiActionLogEntry(loggedAt: DateTime(2000), type: 'stale'),
+        ],
+      ),
+      act: (bloc) async {
+        bloc.add(const MessageSubmitted('one'));
+        await _tick();
+        service.controllers.last.addError(StateError('boom'));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.status, ChatStatus.error);
+        expect(bloc.state.actionLog, isEmpty);
+      },
+    );
+
+    blocTest<ChatBloc, ChatState>(
       'thinking and tool events appear in transcript during streaming',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       act: (bloc) async {
         bloc.add(const MessageSubmitted('search this'));
         await _tick();
@@ -155,7 +291,7 @@ void main() {
 
     blocTest<ChatBloc, ChatState>(
       'mid-stream error drops the in-progress turn, preserves prior turns',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       act: (bloc) async {
         bloc.add(const MessageSubmitted('one'));
         await _tick();
@@ -185,7 +321,7 @@ void main() {
 
     blocTest<ChatBloc, ChatState>(
       'clear-while-streaming cancels the subscription and resets the service',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       act: (bloc) async {
         bloc.add(const MessageSubmitted('hi'));
         await _tick();
@@ -205,7 +341,7 @@ void main() {
 
     blocTest<ChatBloc, ChatState>(
       'submitting after an error clears state.error',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       seed: () => const ChatState(
         status: ChatStatus.error,
         messages: [
@@ -225,7 +361,7 @@ void main() {
 
     blocTest<ChatBloc, ChatState>(
       'clear-while-idle empties the transcript and resets the service',
-      build: () => ChatBloc(service: service),
+      build: () => ChatBloc(service: service, skipGeminiAuth: true),
       seed: () => const ChatState(
         messages: [
           UiMessage(id: 'a', role: UiMessageRole.user, text: 'old'),
@@ -241,19 +377,15 @@ void main() {
       },
     );
 
-    test(
-      'bloc.close() invokes service.close() and cancels any subscription',
-      () async {
-        final bloc = ChatBloc(service: service)
-          ..add(const MessageSubmitted('hi'));
-        await _tick();
-        expect(service.controllers.last.hasListener, isTrue);
+    test('bloc.close() cancels any active stream subscription', () async {
+      final bloc = ChatBloc(service: service, skipGeminiAuth: true)
+        ..add(const MessageSubmitted('hi'));
+      await _tick();
+      expect(service.controllers.last.hasListener, isTrue);
 
-        await bloc.close();
+      await bloc.close();
 
-        expect(service.closeCount, 1);
-        expect(service.controllers.last.hasListener, isFalse);
-      },
-    );
+      expect(service.controllers.last.hasListener, isFalse);
+    });
   });
 }

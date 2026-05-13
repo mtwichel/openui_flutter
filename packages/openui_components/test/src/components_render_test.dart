@@ -16,7 +16,7 @@ Widget _app(String response, {void Function(ActionEvent)? onAction}) {
     home: Scaffold(
       body: Renderer(
         response: response,
-        library: openuiLibrary(),
+        library: standardLibrary(),
         onAction: onAction,
       ),
     ),
@@ -206,26 +206,6 @@ root = Form(name: "f", children: [
       },
     );
 
-    testWidgets('Buttons lays out children horizontally', (tester) async {
-      await tester.pumpWidget(
-        _app('''
-root = Buttons(children: [
-  Button(label: "A"),
-  Button(label: "B")
-])
-'''),
-      );
-      expect(find.byType(ElevatedButton), findsNWidgets(2));
-    });
-
-    testWidgets('CodeBlock uses SelectableText', (tester) async {
-      await tester.pumpWidget(
-        _app('root = CodeBlock(code: "let x = 1", language: "dart")'),
-      );
-      expect(find.byType(SelectableText), findsOneWidget);
-      expect(find.text('dart'), findsOneWidget);
-    });
-
     testWidgets('Form + Input two-way binding writes to the store', (
       tester,
     ) async {
@@ -240,7 +220,7 @@ root = Form(name: "f", children: [
   Input(name: "field", value: \$name)
 ])
 ''',
-              library: openuiLibrary(),
+              library: standardLibrary(),
               onStateUpdate: updates.add,
             ),
           ),

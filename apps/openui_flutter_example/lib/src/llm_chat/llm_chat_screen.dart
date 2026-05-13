@@ -30,13 +30,12 @@ class LlmChatScreen extends StatefulWidget {
   const LlmChatScreen({super.key, this.onMenuTap, this.serviceFactory});
 
   // Computed once at class load time so build() never regenerates it.
-  static final String _systemPrompt = openuiLibrary().prompt(
-    const PromptOptions(
-      examples: [
-        // Send the user's choice back to the assistant when tapped.
-        'root = Buttons(children: [Button(label: "Yes"), Button(label: "No")])',
-      ],
-    ),
+
+  static final String _systemPrompt = standardLibrary().prompt(
+    examples: [
+      // Send the user's choice back to the assistant when tapped.
+      'root = Buttons(children: [Button(label: "Yes"), Button(label: "No")])',
+    ],
   );
 
   /// Optional callback that opens the surrounding shell's drawer. Non-null
@@ -210,9 +209,8 @@ class LlmChatView extends StatefulWidget {
 }
 
 class _LlmChatViewState extends State<LlmChatView> {
-  final Library<Widget> _library = openuiChatLibrary();
+  final Library<Widget> _library = standardLibrary();
   final TextEditingController _inputController = TextEditingController();
-  bool _showSystemMessage = false;
 
   @override
   void dispose() {
@@ -246,19 +244,7 @@ class _LlmChatViewState extends State<LlmChatView> {
               icon: const Icon(Icons.key),
               onPressed: widget.onChangeApiKey,
             ),
-          IconButton(
-            tooltip: _showSystemMessage
-                ? 'Hide system prompt'
-                : 'Show system prompt',
-            icon: Icon(
-              _showSystemMessage ? Icons.visibility_off : Icons.visibility,
-            ),
-            onPressed: () {
-              setState(() {
-                _showSystemMessage = !_showSystemMessage;
-              });
-            },
-          ),
+
           IconButton(
             tooltip: 'Clear chat',
             icon: const Icon(Icons.delete_outline),
@@ -273,7 +259,6 @@ class _LlmChatViewState extends State<LlmChatView> {
           final chat = _ChatPane(
             controller: _inputController,
             onSend: _send,
-            showSystemMessage: _showSystemMessage,
             systemPrompt: widget.systemPrompt,
           );
           if (wide) {
@@ -410,13 +395,11 @@ class _ChatPane extends StatelessWidget {
   const _ChatPane({
     required this.controller,
     required this.onSend,
-    required this.showSystemMessage,
     required this.systemPrompt,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
-  final bool showSystemMessage;
   final String systemPrompt;
 
   @override
@@ -429,7 +412,6 @@ class _ChatPane extends StatelessWidget {
             Expanded(
               child: _Transcript(
                 messages: state.messages,
-                showSystemMessage: showSystemMessage,
                 systemPrompt: systemPrompt,
               ),
             ),
@@ -450,41 +432,26 @@ class _ChatPane extends StatelessWidget {
 class _Transcript extends StatelessWidget {
   const _Transcript({
     required this.messages,
-    required this.showSystemMessage,
     required this.systemPrompt,
   });
 
   final List<UiMessage> messages;
-  final bool showSystemMessage;
   final String systemPrompt;
 
   @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty && !showSystemMessage) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'No messages yet.',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
-    final tiles = <Widget>[];
-    if (showSystemMessage) {
-      tiles.add(
-        _CopyableMessageBubble(
-          key: const ValueKey('system-prompt'),
-          roleLabel: 'System',
-          text: systemPrompt,
-          alignment: Alignment.center,
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.tertiaryContainer.withValues(alpha: 0.6),
-        ),
-      );
-    }
+    final tiles = <Widget>[
+      _CopyableMessageBubble(
+        key: const ValueKey('system-prompt'),
+        roleLabel: 'System',
+        text: systemPrompt,
+        alignment: Alignment.center,
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.tertiaryContainer.withValues(alpha: 0.6),
+      ),
+    ];
+
     for (final message in messages) {
       final roleLabel = switch (message.role) {
         UiMessageRole.user => 'User',

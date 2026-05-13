@@ -12,7 +12,7 @@ import 'package:openui_core/openui_core.dart';
 
 Library<Widget> _testLibrary() {
   return Library<Widget>(<Component<Widget>>[
-    defineComponent<Widget>(
+    Component<Widget>(
       name: 'Text',
       schema: Schema.fromMap(const <String, Object?>{
         'type': 'object',
@@ -24,7 +24,7 @@ Library<Widget> _testLibrary() {
         return Text(props['text'] as String? ?? '');
       },
     ),
-    defineComponent<Widget>(
+    Component<Widget>(
       name: 'Column',
       schema: Schema.fromMap(const <String, Object?>{
         'type': 'object',
@@ -43,7 +43,7 @@ Library<Widget> _testLibrary() {
         );
       },
     ),
-    defineComponent<Widget>(
+    Component<Widget>(
       name: 'Counter',
       schema: Schema.fromMap(const <String, Object?>{
         'type': 'object',
@@ -73,7 +73,7 @@ Library<Widget> _testLibrary() {
         );
       },
     ),
-    defineComponent<Widget>(
+    Component<Widget>(
       name: 'Input',
       schema: Schema.fromMap(<String, Object?>{
         'type': 'object',
@@ -111,7 +111,7 @@ Library<Widget> _testLibrary() {
         );
       },
     ),
-    defineComponent<Widget>(
+    Component<Widget>(
       name: 'Throwing',
       schema: Schema.fromMap(const <String, Object?>{'type': 'object'}),
       render: (ctx, props, renderNode, id) {

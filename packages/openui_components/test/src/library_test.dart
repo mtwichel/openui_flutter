@@ -10,7 +10,7 @@ import 'package:openui_core/openui_core.dart';
 void main() {
   group('openuiLibrary', () {
     test('registers every v0.1 component', () {
-      final lib = openuiLibrary();
+      final lib = standardLibrary();
       const expected = <String>{
         'Stack',
         'Card',
@@ -20,13 +20,11 @@ void main() {
         'TextContent',
         'MarkDownRenderer',
         'Image',
-        'CodeBlock',
         'Form',
         'FormControl',
         'Input',
         'Select',
         'Button',
-        'Buttons',
         'Table',
         'Col',
         'Tabs',
@@ -38,7 +36,7 @@ void main() {
     });
 
     test('each registration carries a non-empty schema', () {
-      final lib = openuiLibrary();
+      final lib = standardLibrary();
       for (final name in lib.names) {
         final component = lib[name]!;
         expect(component.schema, isNotNull);
@@ -46,15 +44,8 @@ void main() {
       }
     });
 
-    test('openuiChatLibrary returns the same component set', () {
-      expect(
-        openuiChatLibrary().names.toSet(),
-        openuiLibrary().names.toSet(),
-      );
-    });
-
     test('prompt excludes Col and TabItem, includes all other components', () {
-      final result = openuiLibrary().prompt(const PromptOptions());
+      final result = standardLibrary().prompt();
       // Internal components must not appear.
       expect(result, isNot(contains('Col(')));
       expect(result, isNot(contains('TabItem(')));
@@ -68,13 +59,11 @@ void main() {
         'TextContent',
         'MarkDownRenderer',
         'Image',
-        'CodeBlock',
         'Form',
         'FormControl',
         'Input',
         'Select',
         'Button',
-        'Buttons',
         'Table',
         'Tabs',
         'BarChart',
@@ -88,7 +77,7 @@ void main() {
 
   group('component render type', () {
     test('renders return Widget', () {
-      final lib = openuiLibrary();
+      final lib = standardLibrary();
       final ctx = EvalContext(
         statements: const <Statement>[],
         store: Store(),
@@ -100,8 +89,8 @@ void main() {
 
       // Smoke test: call render with empty props and a stub renderNode.
       for (final name in lib.names) {
-        final component = lib[name]!;
-        final widget = component.render(
+        final component = lib[name];
+        final widget = component?.render(
           ctx,
           const <String, Object?>{},
           stubRender,

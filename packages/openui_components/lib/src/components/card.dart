@@ -3,8 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// Renders the OpenUI Lang `Card`. `variant` is `'card'` (default,
@@ -84,15 +82,17 @@ class CardHeaderWidget extends StatelessWidget {
 
 /// Registration for the `Card` component.
 Component<Widget> cardComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Card',
     description: 'elevated surface container',
-    schema: objectSchema(
-      const <String, Object?>{
-        'variant': <String, Object?>{'type': 'string'},
-        'children': <String, Object?>{'type': 'array'},
+    schema: Schema.object(
+      properties: {
+        'variant': Schema.string(
+          enumValues: ['card', 'sunk', 'clear'],
+        ),
+        'children': Schema.list(items: Schema.any()),
       },
-      required: const ['children'],
+      required: ['children'],
     ),
     render: (ctx, props, renderNode, id) {
       final children =
@@ -108,15 +108,15 @@ Component<Widget> cardComponent() {
 
 /// Registration for the `CardHeader` component.
 Component<Widget> cardHeaderComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'CardHeader',
     description: 'title and optional subtitle block',
-    schema: objectSchema(
-      const <String, Object?>{
-        'title': <String, Object?>{'type': 'string'},
-        'subtitle': <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'title': Schema.string(),
+        'subtitle': Schema.string(),
       },
-      required: const ['title'],
+      required: ['title'],
     ),
     render: (ctx, props, renderNode, id) {
       return CardHeaderWidget(

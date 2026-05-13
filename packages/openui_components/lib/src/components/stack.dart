@@ -3,8 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/widgets.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_components/src/internal/tokens.dart';
 import 'package:openui_core/openui_core.dart';
 
@@ -30,8 +28,8 @@ class StackWidget extends StatelessWidget {
   /// `'row'` or `'column'`.
   final String direction;
 
-  /// Gap token (`'xs'`, `'s'`, `'m'`, `'l'`, `'xl'`) or `num`.
-  final Object? gap;
+  /// Gap token (`'xs'`, `'s'`, `'m'`, `'l'`, `'xl'`).
+  final String? gap;
 
   /// `'start'`, `'center'`, `'end'`, or `'stretch'`.
   final String? align;
@@ -124,19 +122,23 @@ WrapCrossAlignment _wrapAlign(String? value) {
 
 /// Registration for the `Stack` component.
 Component<Widget> stackComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Stack',
     description: 'vertical or horizontal layout container',
-    schema: objectSchema(
-      const <String, Object?>{
-        'direction': <String, Object?>{'type': 'string'},
-        'gap': <String, Object?>{},
-        'align': <String, Object?>{'type': 'string'},
-        'justify': <String, Object?>{'type': 'string'},
-        'wrap': <String, Object?>{'type': 'boolean'},
-        'children': <String, Object?>{'type': 'array'},
+    schema: Schema.object(
+      properties: {
+        'direction': Schema.string(enumValues: ['row', 'column']),
+        'gap': Schema.string(enumValues: ['xs', 's', 'm', 'l', 'xl']),
+        'align': Schema.string(
+          enumValues: ['start', 'center', 'end', 'stretch'],
+        ),
+        'justify': Schema.string(
+          enumValues: ['start', 'center', 'end', 'between', 'around', 'evenly'],
+        ),
+        'wrap': Schema.boolean(),
+        'children': Schema.list(items: Schema.any()),
       },
-      required: const ['children'],
+      required: ['children'],
     ),
     render: (ctx, props, renderNode, id) {
       final children =
@@ -144,7 +146,7 @@ Component<Widget> stackComponent() {
           const <Widget>[];
       return StackWidget(
         direction: props['direction'] as String? ?? 'column',
-        gap: props['gap'] ?? 'm',
+        gap: props['gap'] as String?,
         align: props['align'] as String?,
         justify: props['justify'] as String?,
         wrap: props['wrap'] as bool? ?? false,

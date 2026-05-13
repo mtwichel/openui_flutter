@@ -1,7 +1,5 @@
-import 'package:json_schema_builder/json_schema_builder.dart';
 import 'package:meta/meta.dart';
-import 'package:openui_core/src/eval/evaluator.dart';
-import 'package:openui_core/src/parser/parser.dart';
+import 'package:openui_core/openui_core.dart';
 
 /// Render callback for one component definition.
 ///
@@ -57,7 +55,7 @@ class Component<W> {
   final String name;
 
   /// Prop schema. The `properties` map drives prop coercion and the
-  /// `x-reactive` keyword (set via [reactive]) marks a prop as
+  /// `x-reactive` keyword marks a prop as
   /// two-way bound.
   final Schema schema;
 
@@ -74,26 +72,6 @@ class Component<W> {
   final bool internal;
 }
 
-/// Sugar over the [Component] constructor.
-///
-/// Marked `@experimental` per D12.
-@experimental
-Component<W> defineComponent<W>({
-  required String name,
-  required Schema schema,
-  required ComponentRender<W> render,
-  String? description,
-  bool internal = false,
-}) {
-  return Component<W>(
-    name: name,
-    schema: schema,
-    render: render,
-    description: description,
-    internal: internal,
-  );
-}
-
 /// Registry of [Component]s keyed by name.
 ///
 /// Construct from a list of definitions; lookups go through `[]`.
@@ -107,12 +85,15 @@ Component<W> defineComponent<W>({
 class Library<W> {
   /// Creates a [Library] from the given component definitions.
   /// Last-write-wins on duplicate names.
-  Library(List<Component<W>> components)
+  Library(List<Component<W>> components, {this.libraryPrompt})
     : _byName = Map<String, Component<W>>.unmodifiable(<String, Component<W>>{
         for (final c in components) c.name: c,
       });
 
   final Map<String, Component<W>> _byName;
+
+  /// Explains to the LLM how to use the components in the library.
+  final String? libraryPrompt;
 
   /// Returns the component with the given [name], or `null` when no
   /// matching component is registered.
@@ -128,19 +109,25 @@ class Library<W> {
   /// this one's. Last-write-wins on duplicate names.
   Library<W> extend(List<Component<W>> extra) =>
       Library<W>(<Component<W>>[..._byName.values, ...extra]);
-}
 
-/// Wraps [inner] with the `x-reactive: true` extension keyword,
-/// marking the prop as two-way bound to a `$state` variable.
-///
-/// Spike S0.1 confirmed `json_schema_builder ^0.1.3` preserves
-/// custom extension keywords through `toJson()`, so a one-line
-/// spread merge is enough — no wrapper class is needed.
-///
-/// Marked `@experimental` per D12.
-@experimental
-Schema reactive(Schema inner) =>
-    Schema.fromMap(<String, Object?>{...inner.value, 'x-reactive': true});
+  /// Generates a system prompt from all non-internal registered components.
+  String prompt({
+    List<ToolSpec> tools = const [],
+    String? preamble,
+    List<String> examples = const [],
+    List<String> additionalRules = const [],
+  }) {
+    final filtered = components.where((c) => !c.internal).toList();
+    return generatePrompt(
+      filtered,
+      libraryPrompt: libraryPrompt,
+      tools: tools,
+      preamble: preamble,
+      examples: examples,
+      additionalRules: additionalRules,
+    );
+  }
+}
 
 /// Marker emitted by the props-evaluator when a reactive prop
 /// resolves to a `$varName` reference.
@@ -185,8 +172,8 @@ bool isReactiveAssign(Object? value) => value is ReactiveAssign;
 /// Walks the named args of [call], evaluates each value against
 /// [context], and returns a map of prop name to resolved value.
 ///
-/// Special-case: when a prop is marked reactive in [schema] (via
-/// [reactive] / the `x-reactive` extension keyword) AND the arg's
+/// Special-case: when a prop is marked reactive in [schema]
+/// the `x-reactive` extension keyword) AND the arg's
 /// value is a bare [StateRef], the entry is a [ReactiveAssign]
 /// marker carrying the current store value. The receiving component
 /// renders [ReactiveAssign.value] and writes user edits back to

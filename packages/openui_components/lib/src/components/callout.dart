@@ -3,8 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// Banner with a leading icon. `variant` selects the color scheme
@@ -56,13 +54,13 @@ class CalloutWidget extends StatelessWidget {
 
 /// Registration for the `Callout` component.
 Component<Widget> calloutComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Callout',
     description: 'tinted banner for alerts and notices',
-    schema: objectSchema(
-      const <String, Object?>{
-        'text': <String, Object?>{'type': 'string'},
-        'variant': <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'text': Schema.string(),
+        'variant': Schema.string(),
       },
       required: const ['text'],
     ),

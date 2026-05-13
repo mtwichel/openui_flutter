@@ -6,8 +6,6 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `LineChart(series, labels?)` — multi-series line chart. `series` is
@@ -141,23 +139,22 @@ class LineChartWidget extends StatelessWidget {
 
 /// Registration for `LineChart`.
 Component<Widget> lineChartComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'LineChart',
     description: 'multi-series line chart',
-    schema: objectSchema(
-      const <String, Object?>{
-        'series': <String, Object?>{
-          'type': 'array',
-          'description':
-              'array of {name: string, values: array of numbers} objects. '
-              '`data` is accepted as an alias for `values`.',
-        },
-        'labels': <String, Object?>{
-          'type': 'array',
-          'description': 'array of x-axis label strings, one per data point',
-        },
+    schema: Schema.object(
+      properties: {
+        'series': Schema.list(
+          items: Schema.object(
+            properties: {
+              'name': Schema.string(),
+              'values': Schema.list(items: Schema.number()),
+            },
+          ),
+        ),
+        'labels': Schema.list(items: Schema.string()),
       },
-      required: const ['series'],
+      required: ['series'],
     ),
     render: (ctx, props, renderNode, id) {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];

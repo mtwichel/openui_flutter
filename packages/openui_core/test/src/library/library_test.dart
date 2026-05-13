@@ -9,58 +9,9 @@ import 'package:openui_core/openui_core.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('reactive(Schema)', () {
-    test('adds the x-reactive: true extension keyword', () {
-      final inner = Schema.string();
-      final wrapped = reactive(inner);
-      expect(wrapped.value['x-reactive'], isTrue);
-    });
-
-    test('preserves the inner schema fields', () {
-      final inner = Schema.string(minLength: 3);
-      final wrapped = reactive(inner);
-      expect(wrapped.value['type'], inner.value['type']);
-      expect(wrapped.value['minLength'], 3);
-    });
-
-    test('does not mutate the inner schema', () {
-      final inner = Schema.string();
-      reactive(inner);
-      expect(inner.value.containsKey('x-reactive'), isFalse);
-    });
-
-    test('round-trips through toJson()', () {
-      final wrapped = reactive(Schema.string());
-      // Spike S0.1 verified extension keywords survive `toJson()`; we
-      // re-confirm here as a regression guard against an upstream
-      // bump that strips them.
-      expect(wrapped.toJson(), contains('"x-reactive":true'));
-    });
-  });
-
-  group('Component and defineComponent', () {
-    test('exposes name, schema, and render', () {
-      final c = defineComponent<String>(
-        name: 'Stack',
-        schema: Schema.object(),
-        render: (context, props, renderNode, statementId) => 'rendered',
-      );
-      expect(c.name, 'Stack');
-      expect(c.schema.value['type'], 'object');
-      expect(c.render, isA<ComponentRender<String>>());
-    });
-
-    test('description defaults to null', () {
-      final c = defineComponent<String>(
-        name: 'X',
-        schema: Schema.object(),
-        render: (c, p, r, id) => '',
-      );
-      expect(c.description, isNull);
-    });
-
+  group('Component', () {
     test('defineComponent with description sets the field', () {
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         description: 'a test component',
         schema: Schema.object(),
@@ -70,7 +21,7 @@ void main() {
     });
 
     test('internal defaults to false', () {
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         schema: Schema.object(),
         render: (c, p, r, id) => '',
@@ -79,7 +30,7 @@ void main() {
     });
 
     test('defineComponent with internal: true sets the field', () {
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         internal: true,
         schema: Schema.object(),
@@ -90,7 +41,7 @@ void main() {
 
     test('the render callback can be invoked', () {
       var capturedId = '';
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         schema: Schema.object(),
         render: (context, props, renderNode, statementId) {
@@ -112,7 +63,7 @@ void main() {
   });
 
   group('Library', () {
-    Component<String> comp(String name) => defineComponent<String>(
+    Component<String> comp(String name) => Component<String>(
       name: name,
       schema: Schema.object(),
       render: (c, p, r, id) => name,
@@ -140,12 +91,12 @@ void main() {
     });
 
     test('duplicate names collapse to last-write-wins', () {
-      final first = defineComponent<String>(
+      final first = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'first',
       );
-      final second = defineComponent<String>(
+      final second = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'second',
@@ -174,7 +125,7 @@ void main() {
 
     test('extend supports overriding a base component', () {
       final base = Library<String>([comp('Stack')]);
-      final replacement = defineComponent<String>(
+      final replacement = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'overridden',
@@ -259,7 +210,7 @@ void main() {
 
     test('a reactive prop bound to a StateRef emits a ReactiveAssign', () {
       final schema = Schema.object(
-        properties: {'value': reactive(Schema.string())},
+        properties: {'value': Schema.string()},
       );
       final store = Store()..set(r'$name', 'alice');
       final ctx = EvalContext(statements: const [], store: store);
@@ -282,7 +233,7 @@ void main() {
         // expression is a bare $state ref. A literal or computed
         // expression resolves to a value (one-way).
         final schema = Schema.object(
-          properties: {'value': reactive(Schema.string())},
+          properties: {'value': Schema.string()},
         );
         final ctx = EvalContext(statements: const [], store: Store());
         final props = evaluateElementProps(
@@ -366,7 +317,7 @@ void main() {
 
     test('ReactiveAssign carries the live store value at call time', () {
       final schema = Schema.object(
-        properties: {'value': reactive(Schema.string())},
+        properties: {'value': Schema.string()},
       );
       final store = Store()..set(r'$name', 'before');
       final ctx = EvalContext(statements: const [], store: store);

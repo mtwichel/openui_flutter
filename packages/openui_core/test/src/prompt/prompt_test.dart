@@ -16,7 +16,7 @@ Component<String> _comp(
     'properties': properties,
     if (required != null && required.isNotEmpty) 'required': required,
   };
-  return defineComponent<String>(
+  return Component<String>(
     name: name,
     description: description,
     internal: internal,
@@ -141,7 +141,7 @@ void main() {
       );
       final result = generatePrompt<String>(
         [],
-        options: const PromptOptions(tools: [tool]),
+        tools: [tool],
       );
       expect(result, contains('TOOLS:'));
       expect(result, contains('search('));
@@ -174,7 +174,7 @@ void main() {
       );
       final result = generatePrompt<String>(
         [],
-        options: const PromptOptions(tools: [tool]),
+        tools: [tool],
       );
       expect(result, contains('lookup('));
       expect(result, contains('→ {'));
@@ -191,7 +191,7 @@ void main() {
       );
       final result = generatePrompt<String>(
         [],
-        options: const PromptOptions(tools: [tool]),
+        tools: [tool],
       );
       expect(result, contains('→ integer'));
     });
@@ -199,9 +199,7 @@ void main() {
     test('non-empty examples list produces an EXAMPLES: section', () {
       final result = generatePrompt<String>(
         [],
-        options: const PromptOptions(
-          examples: ['Example 1 — hello world', 'Example 2 — counter'],
-        ),
+        examples: ['Example 1 — hello world', 'Example 2 — counter'],
       );
       expect(result, contains('EXAMPLES:'));
       expect(result, contains('Example 1 — hello world'));
@@ -216,9 +214,7 @@ void main() {
     test('additionalRules are appended after default rules', () {
       final result = generatePrompt<String>(
         [],
-        options: const PromptOptions(
-          additionalRules: ['Never use inline styles.'],
-        ),
+        additionalRules: ['Never use inline styles.'],
       );
       expect(result, contains('RULES:'));
       expect(result, contains('- Never use inline styles.'));
@@ -229,7 +225,7 @@ void main() {
     test('caller-supplied preamble replaces the default preamble', () {
       final result = generatePrompt<String>(
         [],
-        options: const PromptOptions(preamble: 'Custom preamble.'),
+        preamble: 'Custom preamble.',
       );
       expect(result, startsWith('Custom preamble.'));
       expect(result, isNot(contains('UI generator')));
@@ -243,7 +239,7 @@ void main() {
           _comp('Button', description: 'button'),
           _comp('Col', internal: true),
         ]);
-        final result = lib.prompt(const PromptOptions());
+        final result = lib.prompt();
         expect(result, contains('Card('));
         expect(result, contains('Button('));
         expect(result, isNot(contains('Col(')));
@@ -257,7 +253,7 @@ void main() {
           _comp('TabItem', internal: true),
           _comp('Tabs', description: 'tabs'),
         ]);
-        final result = lib.prompt(const PromptOptions());
+        final result = lib.prompt();
         expect(result, isNot(contains('TabItem(')));
         expect(result, contains('Tabs('));
       },

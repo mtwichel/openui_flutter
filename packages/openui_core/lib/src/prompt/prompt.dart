@@ -70,35 +70,7 @@ class ToolSpec {
   final Map<String, Object?>? outputSchema;
 }
 
-/// Options controlling the shape of a generated system prompt.
-///
-/// Marked `@experimental` per D12.
-@experimental
-@immutable
-class PromptOptions {
-  /// Creates a [PromptOptions].
-  const PromptOptions({
-    this.tools = const [],
-    this.preamble,
-    this.examples = const [],
-    this.additionalRules = const [],
-  });
-
-  /// Tool definitions appended under a `TOOLS:` heading. Omitted when empty.
-  final List<ToolSpec> tools;
-
-  /// Overrides the default preamble sentence when set.
-  final String? preamble;
-
-  /// Few-shot examples appended under an `EXAMPLES:` heading. Omitted when
-  /// empty.
-  final List<String> examples;
-
-  /// Extra rules appended after the default rule set.
-  final List<String> additionalRules;
-}
-
-/// Builds a complete system prompt from [components] and [options].
+/// Builds a complete system prompt from [components] and other options.
 ///
 /// The output structure:
 /// ```text
@@ -107,13 +79,15 @@ class PromptOptions {
 /// GRAMMAR (essential):
 /// <grammar primer>
 ///
+/// [libraryPrompt]
+///
 /// COMPONENTS (use only these):
 /// ComponentName(prop: type, optionalProp?: type) — description
 ///
-/// TOOLS:               ← omitted when options.tools is empty
+/// TOOLS:               ← omitted when [tools] is empty
 /// ToolName(...) → ... — description
 ///
-/// EXAMPLES:            ← omitted when options.examples is empty
+/// EXAMPLES:            ← omitted when [examples] is empty
 /// ...
 ///
 /// RULES:
@@ -124,14 +98,20 @@ class PromptOptions {
 @experimental
 String generatePrompt<W>(
   List<Component<W>> components, {
-  PromptOptions options = const PromptOptions(),
+  String? libraryPrompt,
+  List<ToolSpec> tools = const [],
+  String? preamble,
+  List<String> examples = const [],
+  List<String> additionalRules = const [],
 }) {
   final buf = StringBuffer()
-    ..writeln(options.preamble ?? _kDefaultPreamble)
+    ..writeln(preamble ?? _kDefaultPreamble)
     ..writeln()
     ..writeln('GRAMMAR (essential):')
     ..writeln(_kGrammarPrimer)
     ..writeln()
+    ..writeln(libraryPrompt != null ? 'HOW TO USE THE COMPONENTS' : '')
+    ..writeln(libraryPrompt ?? '')
     ..writeln('COMPONENTS (use only these):');
   for (final component in components) {
     final schemaValue = component.schema.value;
@@ -150,9 +130,9 @@ String generatePrompt<W>(
   }
   buf.writeln();
 
-  if (options.tools.isNotEmpty) {
+  if (tools.isNotEmpty) {
     buf.writeln('TOOLS:');
-    for (final tool in options.tools) {
+    for (final tool in tools) {
       final inputProps = tool.inputSchema['properties'];
       final inputRequired = tool.inputSchema['required'];
       final inputPropMap = inputProps is Map<String, Object?>
@@ -186,14 +166,14 @@ String generatePrompt<W>(
     buf.writeln();
   }
 
-  if (options.examples.isNotEmpty) {
+  if (examples.isNotEmpty) {
     buf.writeln('EXAMPLES:');
-    options.examples.forEach(buf.writeln);
+    examples.forEach(buf.writeln);
     buf.writeln();
   }
 
   buf.writeln('RULES:');
-  for (final rule in [..._kDefaultRules, ...options.additionalRules]) {
+  for (final rule in [..._kDefaultRules, ...additionalRules]) {
     buf.writeln('- $rule');
   }
 
@@ -250,19 +230,4 @@ List<String> _toStringList(Object? value) {
     for (final item in value)
       if (item is String) item,
   ];
-}
-
-/// Adds `.prompt(PromptOptions)` to [Library].
-///
-/// Filters components where [Component.internal] is `true` before
-/// delegating to [generatePrompt].
-///
-/// Marked `@experimental` per D12.
-@experimental
-extension LibraryPromptExtension<W> on Library<W> {
-  /// Generates a system prompt from all non-internal registered components.
-  String prompt(PromptOptions options) {
-    final filtered = components.where((c) => !c.internal).toList();
-    return generatePrompt(filtered, options: options);
-  }
 }

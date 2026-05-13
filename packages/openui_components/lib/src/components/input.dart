@@ -3,7 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
 import 'package:openui/openui.dart';
 import 'package:openui_components/src/components/form.dart';
 import 'package:openui_components/src/internal/schemas.dart';
@@ -59,14 +58,14 @@ class InputWidget extends StatelessWidget {
 /// the renderer surfaces a `ReactiveAssign` marker when bound to a
 /// `$state` var.
 Component<Widget> inputComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Input',
     description: 'text field bound to state variable',
-    schema: objectSchema(
-      <String, Object?>{
-        'name': const <String, Object?>{'type': 'string'},
-        'value': reactiveProp('string'),
-        'placeholder': const <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'name': Schema.string(),
+        'value': Schema.string().xReactive(),
+        'placeholder': Schema.string(),
       },
       required: const ['name', 'value'],
     ),

@@ -3,10 +3,8 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
 import 'package:openui/openui.dart';
 import 'package:openui_components/src/components/form.dart';
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `Button(label, onClick, variant?)` — a Material button wired to an
@@ -47,18 +45,16 @@ class ButtonWidget extends StatelessWidget {
 
 /// Registration for `Button`.
 Component<Widget> buttonComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Button',
-    description:
-        'tappable button; omit onClick to send the label '
-        'to the assistant',
-    schema: objectSchema(
-      const <String, Object?>{
-        'label': <String, Object?>{'type': 'string'},
-        'variant': <String, Object?>{'type': 'string'},
-        'onClick': <String, Object?>{},
+    description: 'tappable button with action',
+    schema: Schema.object(
+      properties: {
+        'label': Schema.string(),
+        'variant': Schema.string(),
+        'onClick': Schema.any(),
       },
-      required: const ['label'],
+      required: ['label'],
     ),
     render: (ctx, props, renderNode, id) {
       final label = props['label']?.toString() ?? '';
@@ -88,48 +84,6 @@ Component<Widget> buttonComponent() {
           );
         },
       );
-    },
-  );
-}
-
-/// `Buttons(children)` — a horizontal row of buttons with even spacing.
-class ButtonsWidget extends StatelessWidget {
-  /// Creates a [ButtonsWidget].
-  const ButtonsWidget({required this.children, super.key});
-
-  /// Pre-rendered buttons.
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final separated = <Widget>[];
-    for (var i = 0; i < children.length; i++) {
-      if (i > 0) separated.add(const SizedBox(width: 8));
-      separated.add(children[i]);
-    }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: separated,
-    );
-  }
-}
-
-/// Registration for `Buttons`.
-Component<Widget> buttonsComponent() {
-  return defineComponent<Widget>(
-    name: 'Buttons',
-    description: 'horizontal row of buttons',
-    schema: objectSchema(
-      const <String, Object?>{
-        'children': <String, Object?>{'type': 'array'},
-      },
-      required: const ['children'],
-    ),
-    render: (ctx, props, renderNode, id) {
-      final children =
-          (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??
-          const <Widget>[];
-      return ButtonsWidget(children: children);
     },
   );
 }

@@ -3,8 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// Inherited binding scope so descendant inputs know which form they
@@ -63,13 +61,13 @@ class FormWidget extends StatelessWidget {
 
 /// Registration for `Form`.
 Component<Widget> formComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Form',
     description: 'named form container for inputs',
-    schema: objectSchema(
-      const <String, Object?>{
-        'name': <String, Object?>{'type': 'string'},
-        'children': <String, Object?>{'type': 'array'},
+    schema: Schema.object(
+      properties: {
+        'name': Schema.string(),
+        'children': Schema.list(items: Schema.any()),
       },
       required: const ['name', 'children'],
     ),
@@ -126,14 +124,14 @@ class FormControlWidget extends StatelessWidget {
 
 /// Registration for `FormControl`.
 Component<Widget> formControlComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'FormControl',
     description: 'labeled field wrapper',
-    schema: objectSchema(
-      const <String, Object?>{
-        'label': <String, Object?>{'type': 'string'},
-        'helperText': <String, Object?>{'type': 'string'},
-        'children': <String, Object?>{'type': 'array'},
+    schema: Schema.object(
+      properties: {
+        'label': Schema.string(),
+        'helperText': Schema.string(),
+        'children': Schema.list(items: Schema.any()),
       },
       required: const ['label', 'children'],
     ),

@@ -40,10 +40,8 @@ export 'src/library/library.dart'
         ComponentRender,
         Library,
         ReactiveAssign,
-        defineComponent,
         evaluateElementProps,
-        isReactiveAssign,
-        reactive;
+        isReactiveAssign;
 export 'src/merge/merge.dart' show mergeStatements;
 export 'src/parse/parse.dart'
     show
@@ -94,7 +92,6 @@ export 'src/parser/streaming.dart'
         StateDecl,
         StreamParser,
         createStreamingParser;
-export 'src/prompt/prompt.dart'
-    show LibraryPromptExtension, PromptOptions, ToolSpec, generatePrompt;
+export 'src/prompt/prompt.dart' show ToolSpec, generatePrompt;
 export 'src/state/store.dart' show Store;
 export 'src/tools/tools.dart' show ToolProvider, ToolResult, extractToolResult;

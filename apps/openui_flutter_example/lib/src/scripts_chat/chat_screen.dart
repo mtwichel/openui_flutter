@@ -35,7 +35,7 @@ class _ScriptsChatScreenState extends State<ScriptsChatScreen> {
   late StubLlmService _service;
   late OpenUiChatController _controller;
   late StubScript _active;
-  final Library<Widget> _library = openuiChatLibrary();
+  final Library<Widget> _library = standardLibrary();
   final List<OpenUIError> _renderErrors = <OpenUIError>[];
 
   @override

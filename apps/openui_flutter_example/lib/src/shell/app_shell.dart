@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import 'package:openui_flutter_example/src/llm_chat/llm_chat_screen.dart';
+import 'package:openui_flutter_example/src/llm_chat/view/llm_chat_screen.dart';
 import 'package:openui_flutter_example/src/responsive.dart';
 import 'package:openui_flutter_example/src/scripts_chat/chat_screen.dart';
 

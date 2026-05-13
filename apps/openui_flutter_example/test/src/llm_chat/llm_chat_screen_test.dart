@@ -5,23 +5,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-
-import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
-import 'package:openui_flutter_example/src/llm_chat/llm_chat_screen.dart';
-import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
+import 'package:openui_flutter_example/src/llm_chat/llm_chat.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 
 class _MockChatBloc extends MockBloc<ChatEvent, ChatState>
     implements ChatBloc {}
 
-class _NoopService implements LlmChatService {
+class _NoopService implements DartanticChatService {
   @override
   Stream<LlmChatEvent> sendMessage(String text) =>
       const Stream<LlmChatEvent>.empty();
   @override
   void reset() {}
-  @override
-  Future<void> close() async {}
 }
 
 Widget _viewHarness(ChatBloc bloc) => MaterialApp(
@@ -288,7 +283,7 @@ void main() {
     ) async {
       _setWideViewport(tester);
       var factoryCalls = 0;
-      LlmChatService factory() {
+      DartanticChatService factory() {
         factoryCalls++;
         return _NoopService();
       }

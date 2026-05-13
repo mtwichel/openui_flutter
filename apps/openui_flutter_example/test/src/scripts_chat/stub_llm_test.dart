@@ -22,9 +22,7 @@ class _InMemoryBundle extends CachingAssetBundle {
 
 Future<String> _stream(StubLlmService service) async {
   final buffer = StringBuffer();
-  await for (final delta in service.streamScript()) {
-    buffer.write(delta);
-  }
+  await service.streamScript().forEach(buffer.write);
   return buffer.toString();
 }
 

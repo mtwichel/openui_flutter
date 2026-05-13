@@ -9,19 +9,24 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
-import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
-import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
-import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
+import 'package:openui_flutter_example/src/llm_chat/llm_chat.dart';
 import 'package:openui_flutter_example/src/llm_chat/snackbar_tool.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 import 'package:openui_flutter_example/src/responsive.dart';
 
+final Library<Widget> _library = standardLibrary().extend(
+  tools: [
+    SnackbarTool(),
+  ],
+);
+final String _systemPrompt = _library.prompt();
+
 const _kDartDefineGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
-/// Factory signature for constructing the [LlmChatService] consumed by
+/// Factory signature for constructing the [DartanticChatService] consumed by
 /// [LlmChatScreen]. Defaults to `DartanticChatService.new`; tests inject
 /// a fake.
-typedef LlmChatServiceFactory = LlmChatService Function();
+typedef LlmChatServiceFactory = DartanticChatService Function();
 
 /// Top-level entry point for the Live destination of `AppShell`.
 ///
@@ -37,20 +42,11 @@ class LlmChatScreen extends StatefulWidget {
     this.dartDefineGeminiApiKey = _kDartDefineGeminiApiKey,
   });
 
-  // Computed once at class load time so build() never regenerates it.
-
-  static final String _systemPrompt = standardLibrary().prompt(
-    examples: [
-      // Send the user's choice back to the assistant when tapped.
-      'root = Buttons(children: [Button(label: "Yes"), Button(label: "No")])',
-    ],
-  );
-
   /// Optional callback that opens the surrounding shell's drawer. Non-null
   /// only in narrow-viewport mode.
   final VoidCallback? onMenuTap;
 
-  /// Optional factory for the underlying [LlmChatService]. Defaults to
+  /// Optional factory for the underlying [DartanticChatService]. Defaults to
   /// `DartanticChatService.new`. Provided for tests to inject fakes.
   final LlmChatServiceFactory? serviceFactory;
 
@@ -111,7 +107,7 @@ class _LlmChatScreenState extends State<LlmChatScreen> {
   Widget build(BuildContext context) {
     final factory =
         widget.serviceFactory ??
-        () => DartanticChatService(systemPrompt: LlmChatScreen._systemPrompt);
+        () => DartanticChatService(systemPrompt: _systemPrompt);
 
     // Test-only override path: injected service can bypass API-key gating.
     if (widget.serviceFactory == null) {
@@ -135,7 +131,7 @@ class _LlmChatScreenState extends State<LlmChatScreen> {
             widget.serviceFactory == null && !_isUsingDartDefineApiKey
             ? _clearApiKey
             : null,
-        systemPrompt: LlmChatScreen._systemPrompt,
+        systemPrompt: _systemPrompt,
       ),
     );
   }
@@ -236,11 +232,6 @@ class LlmChatView extends StatefulWidget {
 }
 
 class _LlmChatViewState extends State<LlmChatView> {
-  final Library<Widget> _library = standardLibrary().extend(
-    tools: [
-      SnackbarTool(),
-    ],
-  );
   final TextEditingController _inputController = TextEditingController();
 
   @override

@@ -2,114 +2,16 @@ import 'dart:async';
 
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-
-import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
+import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 
-/// Lifecycle state of the live-chat surface.
-enum ChatStatus {
-  /// No turn in flight. Send button enabled.
-  idle,
-
-  /// A model response is currently streaming.
-  streaming,
-
-  /// The most recent turn errored. Send is enabled; an error banner is
-  /// visible until the next [MessageSubmitted].
-  error,
-}
-
-/// Immutable state of [ChatBloc].
-///
-/// When [status] is [ChatStatus.streaming], [messages] contains the
-/// in-progress assistant turn plus optional thinking/tool activity entries.
-class ChatState extends Equatable {
-  /// Creates a [ChatState].
-  const ChatState({
-    this.status = ChatStatus.idle,
-    this.messages = const [],
-    this.error,
-  });
-
-  /// Current lifecycle status.
-  final ChatStatus status;
-
-  /// Transcript, oldest first. During streaming this may include assistant
-  /// deltas plus thinking/tool activity messages.
-  final List<UiMessage> messages;
-
-  /// Last error message, or null. Cleared on the next successful submit.
-  final String? error;
-
-  /// Returns a copy with the given fields replaced. Pass [error] as
-  /// `null` explicitly to clear it; omit the argument to preserve the
-  /// current value.
-  ChatState copyWith({
-    ChatStatus? status,
-    List<UiMessage>? messages,
-    Object? error = _sentinel,
-  }) {
-    return ChatState(
-      status: status ?? this.status,
-      messages: messages ?? this.messages,
-      error: identical(error, _sentinel) ? this.error : error as String?,
-    );
-  }
-
-  static const Object _sentinel = Object();
-
-  @override
-  List<Object?> get props => [status, messages, error];
-}
-
-/// Base type for [ChatBloc] events.
-sealed class ChatEvent extends Equatable {
-  const ChatEvent();
-
-  @override
-  List<Object?> get props => const [];
-}
-
-/// User pressed send with [text].
-class MessageSubmitted extends ChatEvent {
-  /// Creates a [MessageSubmitted] event.
-  const MessageSubmitted(this.text);
-
-  /// The prompt the user entered.
-  final String text;
-
-  @override
-  List<Object?> get props => [text];
-}
-
-/// User pressed clear.
-class ChatCleared extends ChatEvent {
-  /// Creates a [ChatCleared] event.
-  const ChatCleared();
-}
-
-class _StreamChunkReceived extends ChatEvent {
-  const _StreamChunkReceived(this.chunk);
-  final LlmChatEvent chunk;
-  @override
-  List<Object?> get props => [chunk];
-}
-
-class _StreamCompleted extends ChatEvent {
-  const _StreamCompleted();
-}
-
-class _StreamFailed extends ChatEvent {
-  const _StreamFailed(this.error);
-  final Object error;
-  @override
-  List<Object?> get props => [error];
-}
+part 'chat_event.dart';
+part 'chat_state.dart';
 
 /// Bloc that owns the live-chat transcript and drives the LLM service.
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   /// Creates a [ChatBloc] over [service].
-  ChatBloc({required LlmChatService service})
+  ChatBloc({required DartanticChatService service})
     : _service = service,
       super(const ChatState()) {
     on<MessageSubmitted>(_onMessageSubmitted);
@@ -122,7 +24,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<_StreamFailed>(_onFailed);
   }
 
-  final LlmChatService _service;
+  final DartanticChatService _service;
   int _idCounter = 0;
   StreamSubscription<LlmChatEvent>? _streamSub;
   String? _activeAssistantMessageId;
@@ -253,7 +155,6 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   @override
   Future<void> close() async {
     await _streamSub?.cancel();
-    await _service.close();
     return super.close();
   }
 }

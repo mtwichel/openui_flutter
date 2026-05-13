@@ -2,12 +2,10 @@ import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:openui_flutter_example/src/llm_chat/chat_bloc.dart';
-import 'package:openui_flutter_example/src/llm_chat/llm_chat_service.dart';
+import 'package:openui_flutter_example/src/llm_chat/llm_chat.dart';
 import 'package:openui_flutter_example/src/llm_chat/ui_message.dart';
 
-class _FakeService implements LlmChatService {
+class _FakeService implements DartanticChatService {
   final List<StreamController<LlmChatEvent>> controllers =
       <StreamController<LlmChatEvent>>[];
   int resetCount = 0;
@@ -23,11 +21,6 @@ class _FakeService implements LlmChatService {
   @override
   void reset() {
     resetCount++;
-  }
-
-  @override
-  Future<void> close() async {
-    closeCount++;
   }
 }
 

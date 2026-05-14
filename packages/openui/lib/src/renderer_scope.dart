@@ -40,12 +40,11 @@ class RendererScope extends InheritedWidget {
 
   /// Single public seam for components to dispatch an action.
   ///
-  /// When `action` is `null`, the renderer emits a continue-conversation
-  /// `ActionEvent` to the host `onAction` callback (if set), then invokes
-  /// `onContinueConversation` with `userMessage` (implicit-Button path).
-  /// When non-null, the renderer dispatches the supplied plan; each step
-  /// invokes `onAction` once (including failed `@Run`, skipped `@Reset`
-  /// targets, and invalid `@ToAssistant` messages). Successful
+  /// [action] is always required. For an implicit continue-conversation
+  /// (for example a `Button` with no `onClick`), pass
+  /// [implicitContinueConversationPlan] built from the user-facing label.
+  /// Each step invokes `onAction` once (including failed `@Run`, skipped
+  /// `@Reset` targets, and invalid `@ToAssistant` messages). Successful
   /// continue-conversation steps also invoke `onContinueConversation`
   /// after `onAction`.
   final Future<void> Function(

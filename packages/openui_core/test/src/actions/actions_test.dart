@@ -154,6 +154,15 @@ void main() {
       expect(a == a, isTrue);
       expect(a, isNot(equals(const ActionPlan(steps: <ActionStep>[]))));
     });
+
+    test('implicitContinueConversationPlan mirrors @ToAssistant(...) plan', () {
+      final implicit = implicitContinueConversationPlan('Hello');
+      final parsed = actionPlanFromAst(
+        _rhs(r'a = [@ToAssistant("Hello")]'),
+      );
+      expect(parsed, isNotNull);
+      expect(implicit, equals(parsed));
+    });
   });
 
   group('actionPlanFromAst', () {

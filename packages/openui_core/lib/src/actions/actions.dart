@@ -243,6 +243,21 @@ ActionPlan? actionPlanFromAst(AstNode node) {
   return ActionPlan(steps: steps);
 }
 
+/// A one-step [ActionPlan] that sends [message] to the assistant, same
+/// outcome as `[@ToAssistant("...")]` after evaluation.
+///
+/// Use when a component (for example `Button` without `onClick`) must call
+/// [RendererScope.triggerAction] with a non-null plan per the renderer API.
+ActionPlan implicitContinueConversationPlan(String message) {
+  return ActionPlan(
+    steps: [
+      ContinueConversationStep(
+        messageAst: Literal(message, offset: 0),
+      ),
+    ],
+  );
+}
+
 ActionStep? _stepFromAst(AstNode node) {
   if (node is! BuiltinCall) return null;
   switch (node.name) {

@@ -17,7 +17,7 @@ RendererScope _scope({
   Set<String> incomplete = const <String>{},
   Future<void> Function(
     String userMessage, {
-    ActionPlan? action,
+    required ActionPlan action,
   })?
   triggerAction,
 }) {
@@ -77,15 +77,16 @@ void main() {
           Directionality(
             textDirection: TextDirection.ltr,
             child: _scope(
-              triggerAction: (msg, {action}) async {
+              triggerAction: (msg, {required action}) async {
                 fired = true;
               },
               child: Builder(
                 builder: (context) {
                   unawaited(
-                    RendererScope.of(
-                      context,
-                    ).triggerAction('hi', action: const ActionPlan(steps: [])),
+                    RendererScope.of(context).triggerAction(
+                      'hi',
+                      action: implicitContinueConversationPlan('hi'),
+                    ),
                   );
                   return const SizedBox.shrink();
                 },
@@ -107,15 +108,16 @@ void main() {
           Directionality(
             textDirection: TextDirection.ltr,
             child: _scope(
-              triggerAction: (msg, {action}) async {
+              triggerAction: (msg, {required action}) async {
                 seen = msg;
               },
               child: Builder(
                 builder: (context) {
                   unawaited(
-                    RendererScope.of(
-                      context,
-                    ).triggerAction('', action: const ActionPlan(steps: [])),
+                    RendererScope.of(context).triggerAction(
+                      '',
+                      action: implicitContinueConversationPlan('unused'),
+                    ),
                   );
                   return const SizedBox.shrink();
                 },

@@ -19,7 +19,8 @@ export 'src/actions/actions.dart'
         RunStep,
         SetStep,
         actionPlanFromAst,
-        dispatchAction;
+        dispatchAction,
+        implicitContinueConversationPlan;
 export 'src/errors/errors.dart'
     show
         AdapterMismatchError,

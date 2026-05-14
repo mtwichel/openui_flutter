@@ -63,8 +63,9 @@ String _formatActionLog(List<OpenUiActionLogEntry> entries) {
       buf.writeln('  message: $msg');
     }
     if (e.params.isNotEmpty) {
-      buf.writeln('  params:');
-      buf.writeln(encoder.convert(_jsonEncodable(e.params)));
+      buf
+        ..writeln('  params:')
+        ..writeln(encoder.convert(_jsonEncodable(e.params)));
     }
     buf.writeln();
   }

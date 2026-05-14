@@ -69,7 +69,8 @@ void main() {
       expect(
         result,
         contains(
-          'Only these action calls are valid: `@Set`, `@Reset`, `@Run`, `@ToAssistant`',
+          'Only these action calls are valid: '
+          '`@Set`, `@Reset`, `@Run`, `@ToAssistant`',
         ),
       );
       expect(

@@ -84,8 +84,8 @@ root = Card(children: [
     });
 
     testWidgets(
-      'Button onClick @Set runs as a host-internal step and emits zero '
-      'ActionEvents',
+      'Button onClick @Set dispatches to the store and emits a set '
+      'ActionEvent',
       (tester) async {
         final events = <ActionEvent>[];
         final updates = <Map<String, Object?>>[];
@@ -108,7 +108,8 @@ root = Button(label: "Click", onClick: @Set($count, $count + 1))
         );
         await tester.tap(find.text('Click'));
         await tester.pumpAndSettle();
-        expect(events, isEmpty);
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.set);
         expect(updates.last[r'$count'], 1);
       },
     );

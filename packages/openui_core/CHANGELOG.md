@@ -62,6 +62,11 @@ Decision D12.
   `actionPlanFromAst(AstNode)` bridge, and `dispatchAction(...)` that
   re-evaluates `valueAst` at click time per Decision D3. `RunStep`
   failures halt the rest of the plan.
+- **breaking (experimental)**: `actionPlanFromAst` accepts only a
+  non-empty array literal whose elements are all valid `@Set` /
+  `@Reset` / `@Run` / `@ToAssistant` calls (strict: no bare builtins,
+  no `Action(...)` wrapper, no empty `[]`, no mixed non-action
+  elements). Other shapes yield `null`.
 - **feat**: `mergeStatements(existing, patch, {rootId})` for the
   LLM "edit, don't rewrite" pathway. Strips Markdown fences, applies
   upserts and `NullLiteral` deletes, runs the materializer's orphan

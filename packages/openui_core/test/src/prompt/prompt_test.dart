@@ -48,13 +48,15 @@ void main() {
       expect(result, contains('Programs are a sequence of statements'));
     });
 
-    test('grammar primer explains x-action requires Action([...])', () {
+    test('grammar primer explains x-action requires array of builtins', () {
       final result = generatePrompt<String>(
         const Library<String>(components: [], tools: []),
       );
       expect(result, contains('x-action: true'));
-      expect(result, contains('Action([...])'));
-      expect(result, contains('not a bare `@Step(...)`'));
+      expect(result, contains('[@Set('));
+      expect(result, contains('Do not use a bare `@Step(...)`'));
+      expect(result, contains('do not wrap'));
+      expect(result, contains('Action(...)'));
     });
 
     test('grammar primer is explicit about valid built-in action calls', () {

@@ -50,7 +50,7 @@ class RendererScope extends InheritedWidget {
   /// after `onAction`.
   final Future<void> Function(
     String userMessage, {
-    ActionPlan? action,
+    required ActionPlan action,
   })
   triggerAction;
 

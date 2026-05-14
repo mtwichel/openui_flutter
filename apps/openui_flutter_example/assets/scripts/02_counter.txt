@@ -3,7 +3,7 @@ root = Card(children: [
   CardHeader(title: "Reactive counter"),
   TextContent(text: "Count: " + $count, size: "large-heavy"),
   Stack(direction: "row", children: [
-    Button(label: "Increment", onClick: @Set($count, $count + 1)),
-    Button(label: "Reset", variant: "secondary", onClick: @Reset($count))
+    Button(label: "Increment", onClick: [@Set($count, $count + 1)]),
+    Button(label: "Reset", variant: "secondary", onClick: [@Reset($count)])
   ])
 ])

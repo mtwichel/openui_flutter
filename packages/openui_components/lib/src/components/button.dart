@@ -59,14 +59,13 @@ Component<Widget> buttonComponent() {
     render: (ctx, props, renderNode, id) {
       final label = props['label']?.toString() ?? '';
       final variant = props['variant'] as String? ?? 'primary';
-      final hasOnClickProp = props.containsKey('onClick');
+
       final rawOnClick = props['onClick'];
       final action = rawOnClick is ActionPlan ? rawOnClick : null;
-      final disabled = hasOnClickProp && action == null;
       return Builder(
         builder: (context) {
           final scope = RendererScope.maybeFind(context);
-          final onPressed = (scope == null || disabled)
+          final onPressed = (scope == null || action == null)
               ? null
               : () => scope.triggerAction(
                   label,

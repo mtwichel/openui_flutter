@@ -8,6 +8,6 @@ root = Card(children: [
   ]),
   TextContent(text: "Hello, " + $name + " (" + $role + ")"),
   Stack(direction: "row", children: [
-    Button(label: "Reset", variant: "secondary", onClick: @Reset($name, $role))
+    Button(label: "Reset", variant: "secondary", onClick: [@Reset($name, $role)])
   ])
 ])

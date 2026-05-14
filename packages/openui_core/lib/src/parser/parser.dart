@@ -93,9 +93,9 @@ Program parseProgram(String source, {bool recoverable = false}) {
 /// Parses [source] as a single expression (no `name = ` prefix).
 ///
 /// Throws [ParseException] on the first error — there is no per-statement
-/// recovery for a bare expression. Used by tests and by the action
-/// dispatcher when a `SetStep.valueAst` was originally serialized as
-/// just the RHS.
+/// recovery for a bare expression. Used by tests and by callers that need
+/// an isolated RHS [AstNode] (for example `SetStep.valueAst` serialized as
+/// the RHS only).
 @experimental
 AstNode parseExpression(String source) {
   final tokens = tokenize(source).toList(growable: false);

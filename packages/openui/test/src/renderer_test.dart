@@ -274,7 +274,7 @@ root = Column(children: [Input(name: "field", value: \$name), Input(name: "secon
       (tester) async {
         final events = <ActionEvent>[];
         const program = '''\$count = 0
-root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
+root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
 ''';
         await tester.pumpWidget(
           _TestRoot(
@@ -303,7 +303,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         const program =
             r'$count = 0'
             '\n'
-            r'root = Counter(value: $count, onIncrement: @Set($count, $count + 1))';
+            r'root = Counter(value: $count, onIncrement: [@Set($count, $count + 1)])';
         await tester.pumpWidget(
           _TestRoot(
             child: Renderer(
@@ -328,8 +328,8 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
       (tester) async {
         const program = '''\$count = 7
 root = Column(children: [
-  Counter(value: \$count, onIncrement: @Set(\$count, \$count - 1)),
-  Counter(value: 0, onIncrement: @Reset(\$count))
+  Counter(value: \$count, onIncrement: [@Set(\$count, \$count - 1)]),
+  Counter(value: 0, onIncrement: [@Reset(\$count)])
 ])
 ''';
         await tester.pumpWidget(
@@ -377,7 +377,7 @@ root = Column(children: [
       ];
       const program = '''data = Query(name: "lookup")
 refresh = Mutation(name: "refresh")
-root = Counter(value: \$tick, onIncrement: @Run(refresh))
+root = Counter(value: \$tick, onIncrement: [@Run(refresh)])
 ''';
       await tester.pumpWidget(
         _TestRoot(
@@ -416,7 +416,7 @@ root = Counter(value: \$tick, onIncrement: @Run(refresh))
         ),
       ];
       const program =
-          'root = Counter(value: 0, onIncrement: @Run(snackbar, message: "Hello"))';
+          'root = Counter(value: 0, onIncrement: [@Run(snackbar, message: "Hello")])';
       await tester.pumpWidget(
         _TestRoot(
           child: Renderer(
@@ -493,7 +493,7 @@ root = Counter(value: \$tick, onIncrement: @Run(refresh))
         _TestRoot(
           child: Renderer(
             response: '''\$count = 0
-root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
+root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
 ''',
             library: _testLibrary(),
             initialState: const <String, Object?>{r'$count': 42},
@@ -554,7 +554,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
       (tester) async {
         final messages = <String>[];
         const program =
-            '''root = Counter(value: 0, onIncrement: @ToAssistant("retry"))
+            '''root = Counter(value: 0, onIncrement: [@ToAssistant("retry")])
 ''';
         await tester.pumpWidget(
           _TestRoot(
@@ -623,7 +623,7 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
           ),
         ];
         const program = '''refresh = Mutation(name: "fail")
-root = Counter(value: 0, onIncrement: @Run(refresh))
+root = Counter(value: 0, onIncrement: [@Run(refresh)])
 ''';
         var lastSnapshot = const <OpenUIError>[];
         await tester.pumpWidget(

@@ -26,7 +26,7 @@ RendererScope _scope({
     formStateCache: cache ?? FormStateCache(),
     isStreaming: isStreaming,
     incomplete: incomplete,
-    triggerAction: triggerAction ?? (_, {action}) async {},
+    triggerAction: triggerAction ?? (_, {required action}) async {},
     child: child,
   );
 }
@@ -83,7 +83,9 @@ void main() {
               child: Builder(
                 builder: (context) {
                   unawaited(
-                    RendererScope.of(context).triggerAction('hi'),
+                    RendererScope.of(
+                      context,
+                    ).triggerAction('hi', action: const ActionPlan(steps: [])),
                   );
                   return const SizedBox.shrink();
                 },
@@ -111,7 +113,9 @@ void main() {
               child: Builder(
                 builder: (context) {
                   unawaited(
-                    RendererScope.of(context).triggerAction(''),
+                    RendererScope.of(
+                      context,
+                    ).triggerAction('', action: const ActionPlan(steps: [])),
                   );
                   return const SizedBox.shrink();
                 },
@@ -189,7 +193,7 @@ void main() {
           formStateCache: cache,
           isStreaming: isStreaming,
           incomplete: incomplete,
-          triggerAction: (_, {action}) async {},
+          triggerAction: (_, {required action}) async {},
           child: const SizedBox.shrink(),
         );
       }

@@ -50,7 +50,7 @@ class MyPage extends StatelessWidget {
 $count = 0
 root = Stack(children: [
   TextContent(text: "Hello!", size: "large-heavy"),
-  Button(label: "Bump", onClick: @Set($count, $count + 1)),
+  Button(label: "Bump", onClick: [@Set($count, $count + 1)]),
   TextContent(text: $count)
 ])
 ''',

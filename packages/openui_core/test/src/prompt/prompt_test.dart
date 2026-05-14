@@ -54,7 +54,7 @@ void main() {
       );
       expect(result, contains('x-action: true'));
       expect(result, contains('Action([...])'));
-      expect(result, contains('do not pass a bare `@Step(...)`'));
+      expect(result, contains('not a bare `@Step(...)`'));
     });
 
     test('grammar primer is explicit about valid built-in action calls', () {
@@ -258,6 +258,39 @@ void main() {
       );
       expect(result, contains('→ integer'));
     });
+
+    test(
+      'ToolSpec with number outputSchema embeds JSON in the prompt line',
+      () {
+        final tool = _TestTool(
+          name: 'measure',
+          description: 'read a sensor',
+          input: Schema.object(properties: {}),
+          output: Schema.number(),
+        );
+        final result = generatePrompt<String>(
+          Library<String>(components: const [], tools: [tool]),
+        );
+        expect(result, contains('measure('));
+        expect(result, contains('"type":"number"'));
+      },
+    );
+
+    test(
+      'component schema that is not an object uses JSON in the signature',
+      () {
+        final c = Component<String>(
+          name: 'Scalar',
+          schema: Schema.number(),
+          render: _noRender,
+        );
+        final result = generatePrompt(
+          Library<String>(components: [c], tools: const []),
+        );
+        expect(result, contains('Scalar('));
+        expect(result, contains('"type":"number"'));
+      },
+    );
 
     test('non-empty examples list produces an EXAMPLES: section', () {
       final result = generatePrompt<String>(

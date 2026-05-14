@@ -472,6 +472,43 @@ void main() {
     });
 
     test(
+      'RunStep maps thrown OpenUIError with message to error string',
+      () async {
+        final ctx = fresh();
+        final plan = _planFor('a = @Run(x)');
+        final events = <ActionEvent>[];
+        await _run(
+          plan,
+          ctx,
+          onRun: (_, _) async =>
+              throw const ParseError(message: 'parse failed', offset: 0),
+          onHostStep: events.add,
+        );
+        expect(events.single.params['error'], 'parse failed');
+      },
+    );
+
+    test(
+      'RunStep maps thrown OpenUIError without message using toString',
+      () async {
+        final ctx = fresh();
+        final plan = _planFor('a = @Run(x)');
+        final events = <ActionEvent>[];
+        await _run(
+          plan,
+          ctx,
+          onRun: (_, _) async => throw const CyclicStateError(
+            cycle: [r'$a', r'$b', r'$a'],
+          ),
+          onHostStep: events.add,
+        );
+        final err = events.single.params['error']! as String;
+        expect(err, contains('CyclicStateError'));
+        expect(err, contains(r'$a'));
+      },
+    );
+
+    test(
       'RunStep callback throwing halts the rest of the plan but does '
       'not propagate',
       () async {

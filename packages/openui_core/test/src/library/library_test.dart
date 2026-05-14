@@ -167,6 +167,16 @@ void main() {
         'overridden',
       );
     });
+
+    test('duplicate tool names collapse to last-write-wins', () {
+      final first = _StubTool(name: 'search', description: 'first');
+      final second = _StubTool(name: 'search', description: 'second');
+      final lib = Library<String>(
+        components: const [],
+        tools: [first, second],
+      );
+      expect(lib.tool('search')!.description, 'second');
+    });
   });
 
   group('ReactiveAssign', () {
@@ -235,9 +245,12 @@ void main() {
     });
 
     test('a reactive prop bound to a StateRef emits a ReactiveAssign', () {
-      final schema = Schema.object(
-        properties: {'value': Schema.string()},
-      );
+      final schema = Schema.fromMap(const {
+        'type': 'object',
+        'properties': {
+          'value': {'type': 'string', 'x-reactive': true},
+        },
+      });
       final store = Store()..set(r'$name', 'alice');
       final ctx = EvalContext(statements: const [], store: store);
       final props = evaluateElementProps(
@@ -342,9 +355,12 @@ void main() {
     });
 
     test('ReactiveAssign carries the live store value at call time', () {
-      final schema = Schema.object(
-        properties: {'value': Schema.string()},
-      );
+      final schema = Schema.fromMap(const {
+        'type': 'object',
+        'properties': {
+          'value': {'type': 'string', 'x-reactive': true},
+        },
+      });
       final store = Store()..set(r'$name', 'before');
       final ctx = EvalContext(statements: const [], store: store);
       final first = evaluateElementProps(
@@ -362,4 +378,12 @@ void main() {
       expect((second['value']! as ReactiveAssign).value, 'after');
     });
   });
+}
+
+final class _StubTool extends Tool {
+  _StubTool({required super.name, required super.description});
+
+  @override
+  Future<ToolResult> callTool(Map<String, Object?> args) async =>
+      ToolResult(args);
 }

@@ -104,11 +104,12 @@ class Library<W> {
   /// Returns the component with the given [name], or `null` when no
   /// matching component is registered.
   Component<W>? component(String name) =>
-      components.firstWhereOrNull((c) => c.name == name);
+      components.reversed.firstWhereOrNull((c) => c.name == name);
 
   /// Returns the tool with the given [name], or `null` when no
   /// matching tool is registered.
-  Tool? tool(String name) => tools.firstWhereOrNull((t) => t.name == name);
+  Tool? tool(String name) =>
+      tools.reversed.firstWhereOrNull((t) => t.name == name);
 
   /// Returns a new library that adds components on top of
   /// this one's and  tools on top of this one's.

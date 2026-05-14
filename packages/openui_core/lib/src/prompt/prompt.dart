@@ -1,3 +1,4 @@
+import 'package:json_schema_builder/json_schema_builder.dart';
 import 'package:meta/meta.dart';
 import 'package:openui_core/src/library/library.dart';
 
@@ -57,6 +58,84 @@ const List<String> _kDefaultRules = [
   'Keep responses focused — render only the UI the user asked for.',
 ];
 
+String _jsonTypeKeyword(Map<String, Object?> propSchema) {
+  final stripped = Map<String, Object?>.from(propSchema)
+    ..remove('x-reactive')
+    ..remove('description');
+  if (stripped.isEmpty) return 'any';
+  final t = stripped['type'];
+  if (t == 'string') return 'string';
+  if (t == 'integer') return 'integer';
+  if (t == 'array') return 'array';
+  if (t == 'object') return 'object';
+  return 'any';
+}
+
+/// Renders [schema]'s top-level `properties` as `name: type` segments for
+/// LLM-facing prompts (not raw `toJson()`).
+String _formatObjectPropertyList(Schema schema) {
+  final root = schema.value;
+  final propsRaw = root['properties'];
+  if (propsRaw is! Map) return '';
+  final props = <String, Object?>{
+    for (final e in propsRaw.entries) '${e.key}': e.value,
+  };
+  final requiredRaw = root['required'];
+  final required = <String>{};
+  if (requiredRaw is List) {
+    for (final e in requiredRaw) {
+      required.add(e.toString());
+    }
+  }
+  final segments = <String>[];
+  for (final name in props.keys) {
+    final raw = props[name];
+    if (raw is! Map<String, Object?>) {
+      final opt = !required.contains(name);
+      segments.add('$name${opt ? '?' : ''}: any');
+      continue;
+    }
+    final opt = !required.contains(name);
+    final typeName = _jsonTypeKeyword(raw);
+    final desc = raw['description'];
+    var piece = '$name${opt ? '?' : ''}: $typeName';
+    if (desc is String && desc.isNotEmpty) {
+      piece = '$piece /* $desc */';
+    }
+    segments.add(piece);
+  }
+  return segments.join(', ');
+}
+
+String _formatComponentSignature<W>(Component<W> component) {
+  final root = component.schema.value;
+  if (root['type'] != 'object') {
+    return '${component.name}(${component.schema.toJson()})';
+  }
+  final propsAny = root['properties'];
+  if (propsAny is! Map || propsAny.isEmpty) {
+    return '${component.name}()';
+  }
+  final inner = _formatObjectPropertyList(component.schema);
+  return inner.isEmpty ? '${component.name}()' : '${component.name}($inner)';
+}
+
+String? _formatToolOutput(Schema? output) {
+  if (output == null) return 'null';
+  final root = output.value;
+  final t = root['type'];
+  if (t == 'integer') return '→ integer';
+  if (t == 'string') return '→ string';
+  if (t == 'boolean') return '→ boolean';
+  if (t == 'array') return '→ array';
+  if (t == 'object') {
+    final inner = _formatObjectPropertyList(output);
+    if (inner.isEmpty) return '→ {}';
+    return '→ {$inner}';
+  }
+  return output.toJson();
+}
+
 /// Builds a complete system prompt from a [Library] and other options.
 ///
 /// The output structure:
@@ -99,7 +178,7 @@ String generatePrompt<W>(
     ..writeln(library.libraryPrompt ?? '')
     ..writeln('COMPONENTS (use only these):');
   for (final component in library.components) {
-    final sig = '${component.name}(${component.schema.toJson()})';
+    final sig = _formatComponentSignature(component);
     final desc = component.description;
     buf.writeln(desc != null ? '$sig — $desc' : sig);
   }
@@ -109,7 +188,8 @@ String generatePrompt<W>(
     buf.writeln('TOOLS:');
     for (final tool in library.tools) {
       buf.writeln(
-        '''${tool.name}(input: ${tool.input?.toJson()}, output: ${tool.output?.toJson()}) — ${tool.description}''',
+        '${tool.name}(input: ${tool.input?.toJson()}, '
+        'output: ${_formatToolOutput(tool.output)}) — ${tool.description}',
       );
     }
     buf.writeln();

@@ -247,7 +247,7 @@ ActionPlan? actionPlanFromAst(AstNode node) {
 /// outcome as `[@ToAssistant("...")]` after evaluation.
 ///
 /// Use when a component (for example `Button` without `onClick`) must call
-/// [RendererScope.triggerAction] with a non-null plan per the renderer API.
+/// `RendererScope.triggerAction` with a non-null plan per the renderer API.
 ActionPlan implicitContinueConversationPlan(String message) {
   return ActionPlan(
     steps: [

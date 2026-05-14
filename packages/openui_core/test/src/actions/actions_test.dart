@@ -158,7 +158,7 @@ void main() {
     test('implicitContinueConversationPlan mirrors @ToAssistant(...) plan', () {
       final implicit = implicitContinueConversationPlan('Hello');
       final parsed = actionPlanFromAst(
-        _rhs(r'a = [@ToAssistant("Hello")]'),
+        _rhs('a = [@ToAssistant("Hello")]'),
       );
       expect(parsed, isNotNull);
       expect(implicit, equals(parsed));

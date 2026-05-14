@@ -17,7 +17,7 @@ RendererScope _scope({
   Set<String> incomplete = const <String>{},
   Future<void> Function(
     String userMessage, {
-    ActionPlan? action,
+    required ActionPlan action,
   })?
   triggerAction,
 }) {
@@ -26,7 +26,7 @@ RendererScope _scope({
     formStateCache: cache ?? FormStateCache(),
     isStreaming: isStreaming,
     incomplete: incomplete,
-    triggerAction: triggerAction ?? (_, {action}) async {},
+    triggerAction: triggerAction ?? (_, {required action}) async {},
     child: child,
   );
 }
@@ -77,13 +77,16 @@ void main() {
           Directionality(
             textDirection: TextDirection.ltr,
             child: _scope(
-              triggerAction: (msg, {action}) async {
+              triggerAction: (msg, {required action}) async {
                 fired = true;
               },
               child: Builder(
                 builder: (context) {
                   unawaited(
-                    RendererScope.of(context).triggerAction('hi'),
+                    RendererScope.of(context).triggerAction(
+                      'hi',
+                      action: implicitContinueConversationPlan('hi'),
+                    ),
                   );
                   return const SizedBox.shrink();
                 },
@@ -105,13 +108,16 @@ void main() {
           Directionality(
             textDirection: TextDirection.ltr,
             child: _scope(
-              triggerAction: (msg, {action}) async {
+              triggerAction: (msg, {required action}) async {
                 seen = msg;
               },
               child: Builder(
                 builder: (context) {
                   unawaited(
-                    RendererScope.of(context).triggerAction(''),
+                    RendererScope.of(context).triggerAction(
+                      '',
+                      action: implicitContinueConversationPlan('unused'),
+                    ),
                   );
                   return const SizedBox.shrink();
                 },
@@ -189,7 +195,7 @@ void main() {
           formStateCache: cache,
           isStreaming: isStreaming,
           incomplete: incomplete,
-          triggerAction: (_, {action}) async {},
+          triggerAction: (_, {required action}) async {},
           child: const SizedBox.shrink(),
         );
       }

@@ -87,7 +87,7 @@ Every statement is classified at parse time as one of:
 | `@Each` | `@Each(list, itemTemplate)` | Materializes `itemTemplate` once per item, substituting `$item` and `$index` references. Lazy: not evaluated until needed |
 | `@Map` | `@Map(list, transformRef)` | Maps each element through a comp ref |
 
-Action-step builtins (only valid inside an `actions: ActionPlan(steps: [...])` argument):
+Action-step builtins (only as elements of a **non-empty array literal** on props marked `x-action: true` in the component schema, for example `onClick: [@Set($count, $count + 1)]` or `onClick: [@Run(refresh), @Set($flag, 1)]`. Bare `@Step(...)`, empty `[]`, `Action(...)`, and arrays containing non-action expressions are rejected.)
 
 | Builtin | Signature | Semantics |
 |---|---|---|
@@ -117,7 +117,7 @@ When the evaluator encounters a reactive prop whose value resolves to a `$varNam
 
 ## Action timing
 
-`@Set($count, $count + 1)` resolves `$count + 1` **at click time**, against the current store. Per Decision D3, `SetStep.valueAst` is an `AstNode`, not a pre-evaluated `Object?`. The dispatcher loop evaluates each step's AST against the *current* store at the moment the dispatcher reaches it — long-running `@Run` steps preceding a `@Set` see the freshest state.
+`[@Set($count, $count + 1)]` (and each step in a multi-step plan) resolves values **at click time**, against the current store. Per Decision D3, `SetStep.valueAst` is an `AstNode`, not a pre-evaluated `Object?`. The dispatcher loop evaluates each step's AST against the *current* store at the moment the dispatcher reaches it — long-running `@Run` steps preceding a `@Set` see the freshest state.
 
 Pseudocode:
 
@@ -142,9 +142,7 @@ for (final step in plan.steps) {
 ```
 
 The host subscribes to `Renderer.onAction`, which fires once per
-host-routed step. `@Set`, `@Reset`, and `@Run` are runtime-internal
-and never surface there — the renderer mutates the store directly for
-the first two and routes the third through its `QueryManager`.
+host-routed step (including `@Set`, `@Reset`, and `@Run` outcomes in the current Dart implementation).
 
 ## Streaming semantics
 

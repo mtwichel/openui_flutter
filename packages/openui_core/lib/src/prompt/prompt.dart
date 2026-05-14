@@ -31,11 +31,14 @@ const String _kGrammarPrimer =
     '- Operators: `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `>`, `<=`,'
     ' `>=`, `&&`, `||`, `!`, ternary `a ? b : c`.'
     '\n'
-    '- Actions are declared as `Action([step1, step2, ...])` (typically in '
-    '`onClick`).'
+    '- If a prop has `x-action: true` (for example `onClick`), pass a '
+    'literal array of action steps only, for example '
+    r'`onClick: [@Set($count, $count + 1)]` or '
+    r'`onClick: [@Run(refresh), @Set($flag, 1)]`.'
     '\n'
-    '- If a prop has `x-action: true` (for example `onClick`), pass '
-    '`Action([...])`, not a bare `@Step(...)`.'
+    '- Do not use a bare `@Step(...)` for `x-action` props; do not wrap '
+    'steps in `Action(...)`. A single-step handler is still a '
+    'one-element array: `[@ToAssistant("hello")]`.'
     '\n'
     '- Only these action calls are valid: `@Set`, `@Reset`, `@Run`, '
     '`@ToAssistant`. No other action calls are valid.'
@@ -56,6 +59,7 @@ const List<String> _kDefaultRules = [
   'Use only components from the list above. Do not invent new component names.',
   r'Use `$variables` for any state the user interacts with.',
   'Keep responses focused — render only the UI the user asked for.',
+  r'''For every `x-action` prop (for example `onClick`), use a non-empty array of builtins only, for example `[@Set($x, 1)]` — never a bare `@Set(...)` or `Action(...)`.''',
 ];
 
 String _jsonTypeKeyword(Map<String, Object?> propSchema) {

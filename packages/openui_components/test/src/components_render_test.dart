@@ -97,7 +97,7 @@ root = Card(children: [
             home: Scaffold(
               body: Renderer(
                 response: r'''$count = 0
-root = Button(label: "Click", onClick: @Set($count, $count + 1))
+root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
 ''',
                 library: standardLibrary(),
                 onAction: events.add,
@@ -127,7 +127,7 @@ root = Button(label: "Click", onClick: @Set($count, $count + 1))
             home: Scaffold(
               body: Renderer(
                 response:
-                    'root = Button(label: "Retry", onClick: @ToAssistant("retry"))',
+                    'root = Button(label: "Retry", onClick: [@ToAssistant("retry")])',
                 library: standardLibrary(),
                 isStreaming: true,
                 onAction: events.add,

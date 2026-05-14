@@ -105,6 +105,30 @@ void main() {
       );
     });
 
+    test('RunStep argsAst equality walks map entries (missing key)', () {
+      const a = RunStep(
+        statementId: 'r',
+        argsAst: {'k': Literal(1, offset: 0)},
+      );
+      const b = RunStep(
+        statementId: 'r',
+        argsAst: {'other': Literal(1, offset: 0)},
+      );
+      expect(a, isNot(equals(b)));
+    });
+
+    test('RunStep argsAst equality walks map entries (different value)', () {
+      const a = RunStep(
+        statementId: 'r',
+        argsAst: {'k': Literal(1, offset: 0)},
+      );
+      const b = RunStep(
+        statementId: 'r',
+        argsAst: {'k': Literal(2, offset: 0)},
+      );
+      expect(a, isNot(equals(b)));
+    });
+
     test('ContinueConversationStep compares both ASTs', () {
       const a = ContinueConversationStep(
         messageAst: Literal('hi', offset: 0),
@@ -139,66 +163,6 @@ void main() {
         ),
       );
     });
-
-    group('CustomActionStep', () {
-      test('identical fields compare equal with matching hashCodes', () {
-        const a = CustomActionStep(
-          type: 'custom',
-          params: <String, Object?>{'k': 'v', 'n': 1},
-          humanFriendlyMessage: 'msg',
-        );
-        const b = CustomActionStep(
-          type: 'custom',
-          params: <String, Object?>{'k': 'v', 'n': 1},
-          humanFriendlyMessage: 'msg',
-        );
-        expect(a, equals(b));
-        expect(a.hashCode, b.hashCode);
-      });
-
-      test('different type ⇒ not equal', () {
-        const a = CustomActionStep(type: 'a');
-        const b = CustomActionStep(type: 'b');
-        expect(a, isNot(equals(b)));
-      });
-
-      test('different humanFriendlyMessage ⇒ not equal', () {
-        const a = CustomActionStep(type: 't', humanFriendlyMessage: 'x');
-        const b = CustomActionStep(type: 't', humanFriendlyMessage: 'y');
-        expect(a, isNot(equals(b)));
-      });
-
-      test('null vs empty humanFriendlyMessage ⇒ not equal', () {
-        const a = CustomActionStep(type: 't');
-        const b = CustomActionStep(type: 't', humanFriendlyMessage: '');
-        expect(a, isNot(equals(b)));
-      });
-
-      test('same params in different insertion order ⇒ still equal', () {
-        const a = CustomActionStep(
-          type: 't',
-          params: <String, Object?>{'a': 1, 'b': 2},
-        );
-        const b = CustomActionStep(
-          type: 't',
-          params: <String, Object?>{'b': 2, 'a': 1},
-        );
-        expect(a, equals(b));
-        expect(a.hashCode, b.hashCode);
-      });
-
-      test('different params keys ⇒ not equal', () {
-        const a = CustomActionStep(
-          type: 't',
-          params: <String, Object?>{'a': 1},
-        );
-        const b = CustomActionStep(
-          type: 't',
-          params: <String, Object?>{'b': 1},
-        );
-        expect(a, isNot(equals(b)));
-      });
-    });
   });
 
   group('ActionPlan', () {
@@ -214,11 +178,20 @@ void main() {
       expect(a == a, isTrue);
       expect(a, isNot(equals(const ActionPlan(steps: <ActionStep>[]))));
     });
+
+    test('implicitContinueConversationPlan mirrors @ToAssistant(...) plan', () {
+      final implicit = implicitContinueConversationPlan('Hello');
+      final parsed = actionPlanFromAst(
+        _rhs('a = [@ToAssistant("Hello")]'),
+      );
+      expect(parsed, isNotNull);
+      expect(implicit, equals(parsed));
+    });
   });
 
   group('actionPlanFromAst', () {
     test('@Set produces a one-step plan with target and valueAst', () {
-      final plan = _planFor(r'a = @Set($count, $count + 1)');
+      final plan = _planFor(r'a = [@Set($count, $count + 1)]');
       expect(plan.steps, hasLength(1));
       final step = plan.steps.single as SetStep;
       expect(step.target, r'$count');
@@ -227,33 +200,35 @@ void main() {
 
     test('@Set with fewer than 2 args returns null', () {
       expect(actionPlanFromAst(_rhs(r'a = @Set($count)')), isNull);
+      expect(actionPlanFromAst(_rhs(r'a = [@Set($count)]')), isNull);
     });
 
     test('@Set whose first arg is not a StateRef returns null', () {
       expect(actionPlanFromAst(_rhs('a = @Set(plain, 1)')), isNull);
+      expect(actionPlanFromAst(_rhs('a = [@Set(plain, 1)]')), isNull);
     });
 
     test('@Reset gathers every StateRef target', () {
-      final plan = _planFor(r'a = @Reset($a, $b, $c)');
+      final plan = _planFor(r'a = [@Reset($a, $b, $c)]');
       final step = plan.steps.single as ResetStep;
       expect(step.targets, [r'$a', r'$b', r'$c']);
     });
 
     test('@Reset drops non-StateRef args', () {
-      final plan = _planFor(r'a = @Reset($a, plain, $c)');
+      final plan = _planFor(r'a = [@Reset($a, plain, $c)]');
       final step = plan.steps.single as ResetStep;
       expect(step.targets, [r'$a', r'$c']);
     });
 
     test('@Run with a Reference produces a RunStep', () {
-      final plan = _planFor('a = @Run(refresh)');
+      final plan = _planFor('a = [@Run(refresh)]');
       final step = plan.steps.single as RunStep;
       expect(step.statementId, 'refresh');
       expect(step.argsAst, isEmpty);
     });
 
     test('@Run parses trailing named args into RunStep.argsAst', () {
-      final plan = _planFor('a = @Run(snackbar, message: "Hello")');
+      final plan = _planFor('a = [@Run(snackbar, message: "Hello")]');
       final step = plan.steps.single as RunStep;
       expect(step.statementId, 'snackbar');
       expect(step.argsAst.keys, contains('message'));
@@ -262,21 +237,23 @@ void main() {
 
     test('@Run with no args returns null', () {
       expect(actionPlanFromAst(_rhs('a = @Run()')), isNull);
+      expect(actionPlanFromAst(_rhs('a = [@Run()]')), isNull);
     });
 
     test('@Run with a non-Reference arg returns null', () {
       expect(actionPlanFromAst(_rhs('a = @Run("x")')), isNull);
+      expect(actionPlanFromAst(_rhs('a = [@Run("x")]')), isNull);
     });
 
     test('@ToAssistant with one arg leaves contextAst null', () {
-      final plan = _planFor('a = @ToAssistant("hello")');
+      final plan = _planFor('a = [@ToAssistant("hello")]');
       final step = plan.steps.single as ContinueConversationStep;
       expect(step.messageAst, isA<Literal>());
       expect(step.contextAst, isNull);
     });
 
     test('@ToAssistant with two args sets both ASTs', () {
-      final plan = _planFor('a = @ToAssistant("hello", "extra")');
+      final plan = _planFor('a = [@ToAssistant("hello", "extra")]');
       final step = plan.steps.single as ContinueConversationStep;
       expect(step.messageAst, isA<Literal>());
       expect(step.contextAst, isA<Literal>());
@@ -284,14 +261,24 @@ void main() {
 
     test('@ToAssistant with no args returns null', () {
       expect(actionPlanFromAst(_rhs('a = @ToAssistant()')), isNull);
+      expect(actionPlanFromAst(_rhs('a = [@ToAssistant()]')), isNull);
     });
 
     test('an unrecognized builtin name returns null', () {
       expect(actionPlanFromAst(_rhs('a = @Unknown()')), isNull);
+      expect(actionPlanFromAst(_rhs('a = [@Unknown()]')), isNull);
     });
 
     test('a non-builtin AST node returns null', () {
       expect(actionPlanFromAst(const Literal(1, offset: 0)), isNull);
+    });
+
+    test('bare action builtin is not an action plan', () {
+      expect(actionPlanFromAst(_rhs(r'a = @Set($count, 1)')), isNull);
+    });
+
+    test('empty array is not an action plan', () {
+      expect(actionPlanFromAst(_rhs('a = []')), isNull);
     });
 
     test('ArrayLit of action builtins yields a multi-step plan', () {
@@ -301,23 +288,22 @@ void main() {
       expect(plan.steps[1], isA<RunStep>());
     });
 
-    test('Action wrapper around array yields a multi-step plan', () {
-      final plan = _planFor(r'a = Action([@Set($a, 1), @Run(load)])');
-      expect(plan.steps, hasLength(2));
-      expect(plan.steps[0], isA<SetStep>());
-      expect(plan.steps[1], isA<RunStep>());
+    test('Action(...) is not accepted as an action plan', () {
+      expect(
+        actionPlanFromAst(_rhs(r'a = Action([@Set($a, 1), @Run(load)])')),
+        isNull,
+      );
+      expect(
+        actionPlanFromAst(_rhs('a = Action(@ToAssistant("hello"))')),
+        isNull,
+      );
     });
 
-    test('Action wrapper around one builtin yields a one-step plan', () {
-      final plan = _planFor('a = Action(@ToAssistant("hello"))');
-      expect(plan.steps, hasLength(1));
-      expect(plan.steps.single, isA<ContinueConversationStep>());
-    });
-
-    test('ArrayLit with mixed action / non-action drops non-actions', () {
-      final plan = _planFor(r'a = [@Set($a, 1), 42, "noise"]');
-      expect(plan.steps, hasLength(1));
-      expect(plan.steps.single, isA<SetStep>());
+    test('ArrayLit with a non-action element returns null', () {
+      expect(
+        actionPlanFromAst(_rhs(r'a = [@Set($a, 1), 42, "noise"]')),
+        isNull,
+      );
     });
   });
 
@@ -330,14 +316,14 @@ void main() {
 
     test('SetStep evaluates valueAst and writes to the store', () async {
       final ctx = fresh();
-      final plan = _planFor(r'a = @Set($count, 1 + 1)');
+      final plan = _planFor(r'a = [@Set($count, 1 + 1)]');
       await _run(plan, ctx);
       expect(ctx.store.get(r'$count'), 2);
     });
 
     test('SetStep emits an ActionEvent after writing the store', () async {
       final ctx = fresh();
-      final plan = _planFor(r'a = @Set($count, 1 + 1)');
+      final plan = _planFor(r'a = [@Set($count, 1 + 1)]');
       final events = <ActionEvent>[];
       await _run(plan, ctx, onHostStep: events.add);
       expect(events, hasLength(1));
@@ -357,7 +343,7 @@ void main() {
 
     test('ResetStep evaluates the declared default and writes', () async {
       final ctx = fresh(state: {r'$count': 99});
-      final plan = _planFor(r'a = @Reset($count)');
+      final plan = _planFor(r'a = [@Reset($count)]');
       final defaults = <String, AstNode>{
         r'$count': const Literal(0, offset: 0),
       };
@@ -369,7 +355,7 @@ void main() {
       'ResetStep with a missing default emits an error and continues',
       () async {
         final ctx = fresh(state: {r'$a': 5, r'$b': 10});
-        final plan = _planFor(r'a = @Reset($a, $missing, $b)');
+        final plan = _planFor(r'a = [@Reset($a, $missing, $b)]');
         final defaults = <String, AstNode>{
           r'$a': const Literal(0, offset: 0),
           r'$b': const Literal(1, offset: 0),
@@ -390,7 +376,7 @@ void main() {
       'targets without a default',
       () async {
         final ctx = fresh(state: {r'$a': 5, r'$b': 10});
-        final plan = _planFor(r'a = @Reset($a, $missing, $b)');
+        final plan = _planFor(r'a = [@Reset($a, $missing, $b)]');
         final defaults = <String, AstNode>{
           r'$a': const Literal(0, offset: 0),
           r'$b': const Literal(1, offset: 0),
@@ -410,7 +396,7 @@ void main() {
 
     test('RunStep invokes onRun with the step', () async {
       final ctx = fresh();
-      final plan = _planFor('a = @Run(refresh)');
+      final plan = _planFor('a = [@Run(refresh)]');
       RunStep? seen;
       await _run(
         plan,
@@ -424,7 +410,7 @@ void main() {
 
     test('RunStep evaluates named args and passes them to onRun', () async {
       final ctx = fresh(state: const <String, Object?>{r'$name': 'Hello'});
-      final plan = _planFor(r'a = @Run(snackbar, message: $name)');
+      final plan = _planFor(r'a = [@Run(snackbar, message: $name)]');
       Map<String, Object?>? seenArgs;
       await _run(
         plan,
@@ -439,7 +425,7 @@ void main() {
 
     test('RunStep emits a success ActionEvent after onRun succeeds', () async {
       final ctx = fresh();
-      final plan = _planFor('a = @Run(snackbar, message: "hi")');
+      final plan = _planFor('a = [@Run(snackbar, message: "hi")]');
       final events = <ActionEvent>[];
       await _run(
         plan,
@@ -457,7 +443,7 @@ void main() {
 
     test('RunStep emits a failed ActionEvent when onRun throws', () async {
       final ctx = fresh();
-      final plan = _planFor('a = @Run(x)');
+      final plan = _planFor('a = [@Run(x)]');
       final events = <ActionEvent>[];
       await _run(
         plan,
@@ -475,7 +461,7 @@ void main() {
       'RunStep maps thrown OpenUIError with message to error string',
       () async {
         final ctx = fresh();
-        final plan = _planFor('a = @Run(x)');
+        final plan = _planFor('a = [@Run(x)]');
         final events = <ActionEvent>[];
         await _run(
           plan,
@@ -492,7 +478,7 @@ void main() {
       'RunStep maps thrown OpenUIError without message using toString',
       () async {
         final ctx = fresh();
-        final plan = _planFor('a = @Run(x)');
+        final plan = _planFor('a = [@Run(x)]');
         final events = <ActionEvent>[];
         await _run(
           plan,
@@ -531,7 +517,7 @@ void main() {
       'params populated',
       () async {
         final ctx = fresh();
-        final plan = _planFor('a = @ToAssistant("hello", "extra")');
+        final plan = _planFor('a = [@ToAssistant("hello", "extra")]');
         final events = <ActionEvent>[];
         await _run(plan, ctx, onHostStep: events.add);
         expect(events, hasLength(1));
@@ -548,7 +534,7 @@ void main() {
       'empty of "context"',
       () async {
         final ctx = fresh();
-        final plan = _planFor('a = @ToAssistant("hello")');
+        final plan = _planFor('a = [@ToAssistant("hello")]');
         final events = <ActionEvent>[];
         await _run(plan, ctx, onHostStep: events.add);
         expect(events.single.params['success'], isTrue);
@@ -595,24 +581,5 @@ void main() {
         expect(events.single.params.containsKey('context'), isFalse);
       },
     );
-
-    test('CustomActionStep emits its type and params verbatim', () async {
-      final ctx = fresh();
-      const plan = ActionPlan(
-        steps: [
-          CustomActionStep(
-            type: 'submit',
-            params: <String, Object?>{'a': 1, 'b': 'two'},
-            humanFriendlyMessage: 'doing it',
-          ),
-        ],
-      );
-      final events = <ActionEvent>[];
-      await _run(plan, ctx, onHostStep: events.add);
-      final event = events.single;
-      expect(event.type, 'submit');
-      expect(event.humanFriendlyMessage, 'doing it');
-      expect(event.params, <String, Object?>{'a': 1, 'b': 'two'});
-    });
   });
 }

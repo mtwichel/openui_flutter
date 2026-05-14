@@ -61,8 +61,9 @@ Component<Widget> buttonComponent() {
       final variant = props['variant'] as String? ?? 'primary';
       final hasOnClickProp = props.containsKey('onClick');
       final rawOnClick = props['onClick'];
-      final action = rawOnClick is ActionPlan ? rawOnClick : null;
-      final disabled = hasOnClickProp && action == null;
+      final explicit = rawOnClick is ActionPlan ? rawOnClick : null;
+      final disabled = hasOnClickProp && explicit == null;
+      final plan = explicit ?? implicitContinueConversationPlan(label);
       return Builder(
         builder: (context) {
           final scope = RendererScope.maybeFind(context);
@@ -70,7 +71,7 @@ Component<Widget> buttonComponent() {
               ? null
               : () => scope.triggerAction(
                   label,
-                  action: action,
+                  action: plan,
                 );
           return ButtonWidget(
             label: label,

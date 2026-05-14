@@ -238,18 +238,8 @@ class _RendererState extends State<Renderer> {
 
   Future<void> _triggerAction(
     String userMessage, {
-    ActionPlan? action,
+    required ActionPlan action,
   }) async {
-    if (action == null) {
-      widget.onAction?.call(
-        ActionEvent(
-          type: BuiltinActionType.continueConversation,
-          humanFriendlyMessage: userMessage,
-        ),
-      );
-      widget.onContinueConversation?.call(userMessage);
-      return;
-    }
     final result = _lastResult;
     final ctx = _buildEvalContext(result);
     final stateDefaults = <String, AstNode>{

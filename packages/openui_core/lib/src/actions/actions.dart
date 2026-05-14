@@ -131,51 +131,6 @@ final class ContinueConversationStep extends ActionStep {
       Object.hash(ContinueConversationStep, messageAst, contextAst);
 }
 
-/// Component-emitted action step with a host-visible custom [type].
-///
-/// Constructed by component Dart code (not the parser): [params] are
-/// plain Dart values that pass straight through to the emitted
-/// [ActionEvent.params].
-///
-/// Marked `@experimental` per D12.
-@experimental
-final class CustomActionStep extends ActionStep {
-  /// Creates a [CustomActionStep].
-  const CustomActionStep({
-    required this.type,
-    this.params = const <String, Object?>{},
-    this.humanFriendlyMessage,
-  });
-
-  /// The host-visible action type. Surfaces as [ActionEvent.type].
-  final String type;
-
-  /// Type-specific payload. Surfaces as [ActionEvent.params].
-  final Map<String, Object?> params;
-
-  /// Optional user-facing message. Surfaces as
-  /// [ActionEvent.humanFriendlyMessage].
-  final String? humanFriendlyMessage;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CustomActionStep &&
-          other.type == type &&
-          other.humanFriendlyMessage == humanFriendlyMessage &&
-          _mapEquals(other.params, params);
-
-  @override
-  int get hashCode => Object.hash(
-    CustomActionStep,
-    type,
-    humanFriendlyMessage,
-    Object.hashAllUnordered(
-      params.entries.map((e) => Object.hash(e.key, e.value)),
-    ),
-  );
-}
-
 /// An ordered list of [ActionStep]s. Steps execute sequentially;
 /// [RunStep] failures halt the plan, every other step type runs to
 /// completion. Equality is structural over the steps list.
@@ -202,9 +157,8 @@ class ActionPlan {
 /// One host-visible action emission.
 ///
 /// Hosts receive these from [dispatchAction] for every built-in step
-/// (`@Set`, `@Reset`, `@Run`, `@ToAssistant`) and for each
-/// [CustomActionStep]. `@Set` always succeeds once reached. `@Reset` /
-/// `@Run` / `@ToAssistant` include `params['success']` when the outcome
+/// (`@Set`, `@Reset`, `@Run`, `@ToAssistant`). `@Set` always succeeds once
+/// reached. `@Reset` / `@Run` / `@ToAssistant` include `params['success']` when the outcome
 /// is not a straightforward success (`false` for skipped reset targets,
 /// failed `onRun`, or a non-string `@ToAssistant` message).
 ///
@@ -219,8 +173,7 @@ class ActionEvent {
     this.params = const <String, Object?>{},
   });
 
-  /// Open string. Built-in values live on [BuiltinActionType]. Custom
-  /// types come from component code constructing a [CustomActionStep].
+  /// Open string. Built-in values live on [BuiltinActionType].
   final String type;
 
   /// User-facing summary when present. For `@ToAssistant`, the evaluated
@@ -269,38 +222,40 @@ abstract final class BuiltinActionType {
 
 /// Converts an [AstNode] into an [ActionPlan].
 ///
-/// Recognized shapes:
-///
-/// - A single action-builtin call (e.g. `@Set(...)`) yields a
-///   one-step plan.
-/// - An [ArrayLit] of action-builtin calls yields a multi-step plan;
-///   non-action elements are dropped.
-///
-/// Returns `null` when [node] is neither shape — the renderer treats
-/// that as "this prop isn't an action handler".
-///
-/// The parser is closed to the built-in action steps it recognizes.
-/// Custom
-/// action types reach the host through component code constructing a
-/// [CustomActionStep] directly.
+/// Only a non-empty [ArrayLit] of action builtins is accepted — each
+/// element must be `@Set`, `@Reset`, `@Run`, or `@ToAssistant` with valid
+/// arguments. A single-step handler must still be written as a
+/// one-element array (for example `[@Set($count, 1)]`). Bare builtins,
+/// `Action(...)`, empty arrays, and arrays containing any non-action
+/// element yield `null` (the renderer treats that as no action handler).
 ///
 /// Marked `@experimental` per D12.
 @experimental
 ActionPlan? actionPlanFromAst(AstNode node) {
-  if (node is ArrayLit) {
-    final steps = <ActionStep>[];
-    for (final e in node.elements) {
-      final s = _stepFromAst(e);
-      if (s != null) steps.add(s);
-    }
-    return ActionPlan(steps: steps);
+  if (node is! ArrayLit) return null;
+  if (node.elements.isEmpty) return null;
+  final steps = <ActionStep>[];
+  for (final e in node.elements) {
+    final s = _stepFromAst(e);
+    if (s == null) return null;
+    steps.add(s);
   }
-  if (node is CompCall && node.type == 'Action' && node.args.isNotEmpty) {
-    return actionPlanFromAst(node.args.first.value);
-  }
-  final s = _stepFromAst(node);
-  if (s == null) return null;
-  return ActionPlan(steps: [s]);
+  return ActionPlan(steps: steps);
+}
+
+/// A one-step [ActionPlan] that sends [message] to the assistant, same
+/// outcome as `[@ToAssistant("...")]` after evaluation.
+///
+/// Use when a component (for example `Button` without `onClick`) must call
+/// `RendererScope.triggerAction` with a non-null plan per the renderer API.
+ActionPlan implicitContinueConversationPlan(String message) {
+  return ActionPlan(
+    steps: [
+      ContinueConversationStep(
+        messageAst: Literal(message, offset: 0),
+      ),
+    ],
+  );
 }
 
 ActionStep? _stepFromAst(AstNode node) {
@@ -351,7 +306,7 @@ ActionStep? _stepFromAst(AstNode node) {
 /// After each step (including failed or skipped outcomes), an
 /// [ActionEvent] is emitted through [onHostStep] (`BuiltinActionType.set`,
 /// `reset`, `run`, `continueConversation`, or the custom type).
-/// `ContinueConversationStep` and [CustomActionStep] only perform host
+/// `ContinueConversationStep` only performs host
 /// emission (no store or `onRun` side effects inside [dispatchAction]).
 ///
 /// **Rethrow contract**: [dispatchAction] never throws to callers.
@@ -485,14 +440,6 @@ Future<void> dispatchAction({
             type: BuiltinActionType.continueConversation,
             humanFriendlyMessage: msg,
             params: params,
-          ),
-        );
-      case CustomActionStep():
-        onHostStep(
-          ActionEvent(
-            type: step.type,
-            humanFriendlyMessage: step.humanFriendlyMessage,
-            params: step.params,
           ),
         );
     }

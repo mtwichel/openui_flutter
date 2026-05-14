@@ -15,12 +15,12 @@ export 'src/actions/actions.dart'
         ActionStep,
         BuiltinActionType,
         ContinueConversationStep,
-        CustomActionStep,
         ResetStep,
         RunStep,
         SetStep,
         actionPlanFromAst,
-        dispatchAction;
+        dispatchAction,
+        implicitContinueConversationPlan;
 export 'src/errors/errors.dart'
     show
         AdapterMismatchError,

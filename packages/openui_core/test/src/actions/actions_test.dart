@@ -105,6 +105,30 @@ void main() {
       );
     });
 
+    test('RunStep argsAst equality walks map entries (missing key)', () {
+      const a = RunStep(
+        statementId: 'r',
+        argsAst: {'k': Literal(1, offset: 0)},
+      );
+      const b = RunStep(
+        statementId: 'r',
+        argsAst: {'other': Literal(1, offset: 0)},
+      );
+      expect(a, isNot(equals(b)));
+    });
+
+    test('RunStep argsAst equality walks map entries (different value)', () {
+      const a = RunStep(
+        statementId: 'r',
+        argsAst: {'k': Literal(1, offset: 0)},
+      );
+      const b = RunStep(
+        statementId: 'r',
+        argsAst: {'k': Literal(2, offset: 0)},
+      );
+      expect(a, isNot(equals(b)));
+    });
+
     test('ContinueConversationStep compares both ASTs', () {
       const a = ContinueConversationStep(
         messageAst: Literal('hi', offset: 0),

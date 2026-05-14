@@ -4,8 +4,6 @@
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `BarChart(series, labels?)` — multi-series bar chart. `series` is a
@@ -123,23 +121,21 @@ int _max(int a, int b) => a > b ? a : b;
 
 /// Registration for `BarChart`.
 Component<Widget> barChartComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'BarChart',
     description: 'multi-series bar chart',
-    schema: objectSchema(
-      const <String, Object?>{
-        'series': <String, Object?>{
-          'type': 'array',
-          'description':
+    schema: Schema.object(
+      properties: {
+        'series': Schema.list(
+          description:
               'array of {name: string, values: array of numbers} objects. '
               '`data` is accepted as an alias for `values`.',
-        },
-        'labels': <String, Object?>{
-          'type': 'array',
-          'description': 'array of x-axis label strings, one per data point',
-        },
+        ),
+        'labels': Schema.list(
+          description: 'array of x-axis label strings, one per data point',
+        ),
       },
-      required: const ['series'],
+      required: ['series'],
     ),
     render: (ctx, props, renderNode, id) {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];

@@ -3,8 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `Tabs(children)` — `DefaultTabController` + `TabBar` + `TabBarView`.
@@ -66,14 +64,14 @@ class TabItemDescription {
 /// Registration for `Tabs`. Child slots come from inline `TabItem(...)`
 /// values that the renderer pre-renders.
 Component<Widget> tabsComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Tabs',
     description: 'tabbed content switcher',
-    schema: objectSchema(
-      const <String, Object?>{
-        'children': <String, Object?>{'type': 'array'},
+    schema: Schema.object(
+      properties: {
+        'children': Schema.list(items: Schema.any()),
       },
-      required: const ['children'],
+      required: ['children'],
     ),
     render: (ctx, props, renderNode, id) {
       // The renderer wraps `TabItem(...)` into a Widget that carries
@@ -122,13 +120,13 @@ Component<Widget> tabsComponent() {
 /// reads the inline TabItem args. If a TabItem somehow surfaces on its
 /// own (e.g. orphan statement), render the content prop alone.
 Component<Widget> tabItemComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'TabItem',
     internal: true,
-    schema: objectSchema(
-      const <String, Object?>{
-        'label': <String, Object?>{'type': 'string'},
-        'content': <String, Object?>{},
+    schema: Schema.object(
+      properties: {
+        'label': Schema.string(),
+        'content': Schema.any(),
       },
       required: const ['label', 'content'],
     ),

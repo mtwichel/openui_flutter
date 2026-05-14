@@ -17,7 +17,6 @@ RendererScope _scope({
   Set<String> incomplete = const <String>{},
   Future<void> Function(
     String userMessage, {
-    String? formName,
     ActionPlan? action,
   })?
   triggerAction,
@@ -27,7 +26,7 @@ RendererScope _scope({
     formStateCache: cache ?? FormStateCache(),
     isStreaming: isStreaming,
     incomplete: incomplete,
-    triggerAction: triggerAction ?? (_, {formName, action}) async {},
+    triggerAction: triggerAction ?? (_, {action}) async {},
     child: child,
   );
 }
@@ -78,7 +77,7 @@ void main() {
           Directionality(
             textDirection: TextDirection.ltr,
             child: _scope(
-              triggerAction: (msg, {formName, action}) async {
+              triggerAction: (msg, {action}) async {
                 fired = true;
               },
               child: Builder(
@@ -106,7 +105,7 @@ void main() {
           Directionality(
             textDirection: TextDirection.ltr,
             child: _scope(
-              triggerAction: (msg, {formName, action}) async {
+              triggerAction: (msg, {action}) async {
                 seen = msg;
               },
               child: Builder(
@@ -190,7 +189,7 @@ void main() {
           formStateCache: cache,
           isStreaming: isStreaming,
           incomplete: incomplete,
-          triggerAction: (_, {formName, action}) async {},
+          triggerAction: (_, {action}) async {},
           child: const SizedBox.shrink(),
         );
       }

@@ -3,8 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `Image(src, alt?)` — wraps `Image.network` with an error placeholder
@@ -40,13 +38,13 @@ class ImageWidget extends StatelessWidget {
 
 /// Registration for the `Image` component.
 Component<Widget> imageComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Image',
     description: 'network image with fallback',
-    schema: objectSchema(
-      const <String, Object?>{
-        'src': <String, Object?>{'type': 'string'},
-        'alt': <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'src': Schema.string(),
+        'alt': Schema.string(),
       },
       required: const ['src'],
     ),

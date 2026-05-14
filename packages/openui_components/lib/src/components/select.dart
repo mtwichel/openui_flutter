@@ -3,7 +3,6 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
 import 'package:openui/openui.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
@@ -45,13 +44,13 @@ class SelectWidget extends StatelessWidget {
 
 /// Registration for `Select`. `value` is reactive.
 Component<Widget> selectComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Select',
     description: 'dropdown bound to state variable',
-    schema: objectSchema(
-      <String, Object?>{
-        'options': const <String, Object?>{'type': 'array'},
-        'value': reactiveProp('string'),
+    schema: Schema.object(
+      properties: {
+        'options': Schema.list(items: Schema.string()),
+        'value': Schema.string().xReactive(),
       },
       required: const ['options', 'value'],
     ),

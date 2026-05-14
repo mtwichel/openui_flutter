@@ -4,24 +4,9 @@
 
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 import 'package:openui_core/openui_core.dart';
-
-/// Test-friendly alternative to a [ToolProvider].
-///
-/// Receives the statement id and the raw arg list from the
-/// `Query`/`Mutation` call and returns the resolved value. The
-/// production path uses a [ToolProvider]; [QueryLoader] is the seam
-/// tests and the example app use to inject canned results without a
-/// running tool transport.
-///
-/// Marked `@experimental` per D12.
-@experimental
-typedef QueryLoader =
-    Future<Object?> Function(
-      String statementId,
-      List<Argument> args,
-    );
 
 /// One entry in the query cache. The renderer reads [value] when it
 /// builds an [EvalContext] and [loading] / [error] when it decides how
@@ -65,20 +50,10 @@ class QueryEntry {
 @experimental
 class QueryManager {
   /// Creates a [QueryManager].
-  QueryManager({this.toolProvider, this.loader})
-    : assert(
-        toolProvider != null || loader != null,
-        'A QueryManager needs at least one of toolProvider or loader to '
-        'execute queries; both are null.',
-      );
+  QueryManager({required this.library});
 
-  /// Tool transport for production. The manager extracts the `name`
-  /// and `args` from the query's [Argument] list and calls
-  /// [ToolProvider.callTool].
-  final ToolProvider? toolProvider;
-
-  /// Test seam — bypasses [toolProvider] and resolves directly.
-  final QueryLoader? loader;
+  /// The library of components and tools to use for dispatching queries.
+  final Library<Widget> library;
 
   final Map<String, QueryEntry> _entries = <String, QueryEntry>{};
   bool _disposed = false;
@@ -185,8 +160,6 @@ class QueryManager {
   }
 
   Future<Object?> _invoke(String statementId, List<Argument> args) {
-    final loader = this.loader;
-    if (loader != null) return loader(statementId, args);
     final toolName = _stringArg(args, 'name');
     if (toolName == null) {
       return Future<Object?>.error(
@@ -197,7 +170,8 @@ class QueryManager {
       );
     }
     final toolArgs = _mapArg(args, 'args') ?? const <String, Object?>{};
-    return toolProvider!.callTool(toolName, toolArgs);
+    final tool = library.tool(toolName);
+    return tool!.callTool(toolArgs);
   }
 }
 

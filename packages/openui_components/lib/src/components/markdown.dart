@@ -6,9 +6,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-
 import 'package:openui/openui.dart';
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// Renders Markdown with a streaming-friendly debounce.
@@ -77,14 +75,14 @@ class _MarkDownRendererState extends State<MarkDownRendererWidget> {
 
 /// Registration for the `MarkDownRenderer` component.
 Component<Widget> markdownComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'MarkDownRenderer',
     description: 'renders Markdown source text',
-    schema: objectSchema(
-      const <String, Object?>{
-        'source': <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'source': Schema.string(),
       },
-      required: const ['source'],
+      required: ['source'],
     ),
     render: (ctx, props, renderNode, id) {
       return Builder(

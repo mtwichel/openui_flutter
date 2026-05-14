@@ -10,115 +10,121 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_core/openui_core.dart';
 
-Library<Widget> _testLibrary() {
-  return Library<Widget>(<Component<Widget>>[
-    defineComponent<Widget>(
-      name: 'Text',
-      schema: Schema.fromMap(const <String, Object?>{
-        'type': 'object',
-        'properties': <String, Object?>{
-          'text': <String, Object?>{'type': 'string'},
-        },
-      }),
-      render: (ctx, props, renderNode, id) {
-        return Text(props['text'] as String? ?? '');
-      },
-    ),
-    defineComponent<Widget>(
-      name: 'Column',
-      schema: Schema.fromMap(const <String, Object?>{
-        'type': 'object',
-        'properties': <String, Object?>{
-          'children': <String, Object?>{'type': 'array'},
-        },
-      }),
-      render: (ctx, props, renderNode, id) {
-        final children =
-            (props['children'] as List<Object?>?)?.cast<Widget>() ??
-            const <Widget>[];
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        );
-      },
-    ),
-    defineComponent<Widget>(
-      name: 'Counter',
-      schema: Schema.fromMap(const <String, Object?>{
-        'type': 'object',
-        'properties': <String, Object?>{
-          'value': <String, Object?>{'type': 'integer'},
-          'onIncrement': <String, Object?>{'type': 'object'},
-        },
-      }),
-      render: (ctx, props, renderNode, id) {
-        final value = props['value'] as int? ?? 0;
-        final hasAction = props.containsKey('onIncrement');
-        final action = props['onIncrement'] as ActionPlan?;
-        // Disabled when the prop was supplied but resolved to null
-        // (streaming-incomplete AST); inert when the prop is absent.
-        final disabled = hasAction && action == null;
-        return Builder(
-          builder: (context) {
-            final scope = RendererScope.maybeFind(context);
-            final onTap = (scope == null || disabled || action == null)
-                ? null
-                : () => scope.triggerAction('', action: action);
-            return GestureDetector(
-              onTap: onTap,
-              child: Text('count=$value'),
-            );
+Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
+  return Library<Widget>(
+    tools: tools,
+    components: <Component<Widget>>[
+      Component<Widget>(
+        name: 'Text',
+        schema: Schema.fromMap(const <String, Object?>{
+          'type': 'object',
+          'properties': <String, Object?>{
+            'text': <String, Object?>{'type': 'string'},
           },
-        );
-      },
-    ),
-    defineComponent<Widget>(
-      name: 'Input',
-      schema: Schema.fromMap(<String, Object?>{
-        'type': 'object',
-        'properties': <String, Object?>{
-          'name': const <String, Object?>{'type': 'string'},
-          'value': <String, Object?>{
-            'type': 'string',
-            'x-reactive': true,
-          },
+        }),
+        render: (ctx, props, renderNode, id) {
+          return Text(props['text'] as String? ?? '');
         },
-      }),
-      render: (ctx, props, renderNode, id) {
-        return Builder(
-          builder: (context) {
-            final binding = props['value'];
-            final field = props['name'] as String? ?? id;
-            final cache = RendererScope.of(context).formStateCache;
-            final controller = cache.controllerFor(
-              formName: 'form',
-              fieldName: field,
-              initialValue: binding is ReactiveAssign
-                  ? (binding.value as String? ?? '')
-                  : '',
-            );
-            return TextField(
-              key: ValueKey<String>('input-$field'),
-              controller: controller,
-              onChanged: (text) {
-                if (binding is ReactiveAssign) {
-                  ctx.store.set(binding.target, text);
-                }
-              },
-            );
+      ),
+      Component<Widget>(
+        name: 'Column',
+        schema: Schema.fromMap(const <String, Object?>{
+          'type': 'object',
+          'properties': <String, Object?>{
+            'children': <String, Object?>{'type': 'array'},
           },
-        );
-      },
-    ),
-    defineComponent<Widget>(
-      name: 'Throwing',
-      schema: Schema.fromMap(const <String, Object?>{'type': 'object'}),
-      render: (ctx, props, renderNode, id) {
-        throw StateError('boom from $id');
-      },
-    ),
-  ]);
+        }),
+        render: (ctx, props, renderNode, id) {
+          final children =
+              (props['children'] as List<Object?>?)?.cast<Widget>() ??
+              const <Widget>[];
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          );
+        },
+      ),
+      Component<Widget>(
+        name: 'Counter',
+        schema: Schema.fromMap(const <String, Object?>{
+          'type': 'object',
+          'properties': <String, Object?>{
+            'value': <String, Object?>{'type': 'integer'},
+            'onIncrement': <String, Object?>{
+              'type': 'object',
+              'x-action': true,
+            },
+          },
+        }),
+        render: (ctx, props, renderNode, id) {
+          final value = props['value'] as int? ?? 0;
+          final hasAction = props.containsKey('onIncrement');
+          final action = props['onIncrement'] as ActionPlan?;
+          // Disabled when the prop was supplied but resolved to null
+          // (streaming-incomplete AST); inert when the prop is absent.
+          final disabled = hasAction && action == null;
+          return Builder(
+            builder: (context) {
+              final scope = RendererScope.maybeFind(context);
+              final onTap = (scope == null || disabled || action == null)
+                  ? null
+                  : () => scope.triggerAction('', action: action);
+              return GestureDetector(
+                onTap: onTap,
+                child: Text('count=$value'),
+              );
+            },
+          );
+        },
+      ),
+      Component<Widget>(
+        name: 'Input',
+        schema: Schema.fromMap(<String, Object?>{
+          'type': 'object',
+          'properties': <String, Object?>{
+            'name': const <String, Object?>{'type': 'string'},
+            'value': <String, Object?>{
+              'type': 'string',
+              'x-reactive': true,
+            },
+          },
+        }),
+        render: (ctx, props, renderNode, id) {
+          return Builder(
+            builder: (context) {
+              final binding = props['value'];
+              final field = props['name'] as String? ?? id;
+              final cache = RendererScope.of(context).formStateCache;
+              final controller = cache.controllerFor(
+                formName: 'form',
+                fieldName: field,
+                initialValue: binding is ReactiveAssign
+                    ? (binding.value as String? ?? '')
+                    : '',
+              );
+              return TextField(
+                key: ValueKey<String>('input-$field'),
+                controller: controller,
+                onChanged: (text) {
+                  if (binding is ReactiveAssign) {
+                    ctx.store.set(binding.target, text);
+                  }
+                },
+              );
+            },
+          );
+        },
+      ),
+      Component<Widget>(
+        name: 'Throwing',
+        schema: Schema.fromMap(const <String, Object?>{'type': 'object'}),
+        render: (ctx, props, renderNode, id) {
+          throw StateError('boom from $id');
+        },
+      ),
+    ],
+  );
 }
 
 class _TestRoot extends StatelessWidget {
@@ -263,8 +269,8 @@ root = Column(children: [Input(name: "field", value: \$name), Input(name: "secon
     );
 
     testWidgets(
-      'action prop dispatches Set step against the store and emits zero '
-      'ActionEvents (host-internal step)',
+      'action prop dispatches Set step against the store and emits a set '
+      'ActionEvent',
       (tester) async {
         final events = <ActionEvent>[];
         const program = '''\$count = 0
@@ -284,7 +290,9 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
         expect(find.text('count=1'), findsOneWidget);
-        expect(events, isEmpty);
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.set);
+        expect(events.single.params['target'], r'$count');
       },
     );
 
@@ -310,7 +318,8 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
         expect(find.text('count=1'), findsOneWidget);
-        expect(events, isEmpty);
+        expect(events, hasLength(1));
+        expect(events.single.type, BuiltinActionType.set);
       },
     );
 
@@ -348,6 +357,24 @@ root = Column(children: [
       tester,
     ) async {
       var calls = 0;
+      final tools = <Tool>[
+        _StubTool(
+          name: 'lookup',
+          description: 'query tool',
+          handler: (args) async {
+            calls++;
+            return const ToolResult('query');
+          },
+        ),
+        _StubTool(
+          name: 'refresh',
+          description: 'mutation tool',
+          handler: (args) async {
+            calls++;
+            return const ToolResult('mutation');
+          },
+        ),
+      ];
       const program = '''data = Query(name: "lookup")
 refresh = Mutation(name: "refresh")
 root = Counter(value: \$tick, onIncrement: @Run(refresh))
@@ -356,8 +383,7 @@ root = Counter(value: \$tick, onIncrement: @Run(refresh))
         _TestRoot(
           child: Renderer(
             response: program,
-            library: _testLibrary(),
-            queryLoader: (id, args) async => ++calls,
+            library: _testLibrary(tools: tools),
           ),
         ),
       );
@@ -373,6 +399,39 @@ root = Counter(value: \$tick, onIncrement: @Run(refresh))
       await tester.pumpAndSettle();
       // `refresh` invalidated and fired.
       expect(calls, 2);
+    });
+
+    testWidgets('Run step can invoke a tool directly by name', (tester) async {
+      var calls = 0;
+      Map<String, Object?>? lastArgs;
+      final tools = <Tool>[
+        _StubTool(
+          name: 'snackbar',
+          description: 'snackbar tool',
+          handler: (args) async {
+            calls++;
+            lastArgs = args;
+            return const ToolResult(null);
+          },
+        ),
+      ];
+      const program =
+          'root = Counter(value: 0, onIncrement: @Run(snackbar, message: "Hello"))';
+      await tester.pumpWidget(
+        _TestRoot(
+          child: Renderer(
+            response: program,
+            library: _testLibrary(tools: tools),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(GestureDetector));
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(calls, 1);
+      expect(lastArgs, isNotNull);
+      expect(lastArgs!['message'], 'Hello');
     });
 
     testWidgets('error boundary captures component throws', (tester) async {
@@ -490,10 +549,10 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
     );
 
     testWidgets(
-      '@ToAssistant emits a continueConversation ActionEvent with the '
+      '@ToAssistant emits a continue-conversation callback with the '
       'evaluated message',
       (tester) async {
-        final events = <ActionEvent>[];
+        final messages = <String>[];
         const program =
             '''root = Counter(value: 0, onIncrement: @ToAssistant("retry"))
 ''';
@@ -502,7 +561,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
             child: Renderer(
               response: program,
               library: _testLibrary(),
-              onAction: events.add,
+              onContinueConversation: messages.add,
             ),
           ),
         );
@@ -510,35 +569,7 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         await tester.tap(find.byType(GestureDetector));
         await tester.pump();
 
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.continueConversation);
-        expect(events.single.humanFriendlyMessage, 'retry');
-      },
-    );
-
-    testWidgets(
-      '@OpenUrl emits an openUrl ActionEvent with url in params',
-      (tester) async {
-        final events = <ActionEvent>[];
-        const program =
-            '''root = Counter(value: 0, onIncrement: @OpenUrl("https://example.com"))
-''';
-        await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-              onAction: events.add,
-            ),
-          ),
-        );
-
-        await tester.tap(find.byType(GestureDetector));
-        await tester.pump();
-
-        expect(events, hasLength(1));
-        expect(events.single.type, BuiltinActionType.openUrl);
-        expect(events.single.params['url'], 'https://example.com');
+        expect(messages, ['retry']);
       },
     );
 
@@ -548,6 +579,13 @@ root = Counter(value: \$count, onIncrement: @Set(\$count, \$count + 1))
         // $flag defaults to 0; @Set targets 999. A halted plan leaves
         // $flag at 0; a passing-by-coincidence value cannot arise —
         // @Set is the only writer.
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fail',
+            description: 'failing mutation tool',
+            handler: (args) async => throw StateError('mut-fail'),
+          ),
+        ];
         const program = '''refresh = Mutation(name: "fail")
 \$flag = 0
 root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
@@ -557,12 +595,8 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
           _TestRoot(
             child: Renderer(
               response: program,
-              library: _testLibrary(),
+              library: _testLibrary(tools: tools),
               onStateUpdate: stateUpdates.add,
-              queryLoader: (id, args) async {
-                if (id == 'refresh') throw StateError('mut-fail');
-                return null;
-              },
             ),
           ),
         );
@@ -581,6 +615,13 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
       '@Run on a failing mutation surfaces a single OpenUIError through '
       'onError',
       (tester) async {
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fail',
+            description: 'failing mutation tool',
+            handler: (args) async => throw StateError('boom'),
+          ),
+        ];
         const program = '''refresh = Mutation(name: "fail")
 root = Counter(value: 0, onIncrement: @Run(refresh))
 ''';
@@ -589,13 +630,9 @@ root = Counter(value: 0, onIncrement: @Run(refresh))
           _TestRoot(
             child: Renderer(
               response: program,
-              library: _testLibrary(),
+              library: _testLibrary(tools: tools),
               onError: (errors) {
                 lastSnapshot = errors;
-              },
-              queryLoader: (id, args) async {
-                if (id == 'refresh') throw StateError('boom');
-                return null;
               },
             ),
           ),
@@ -674,4 +711,17 @@ root = Counter(value: 0, onIncrement: @Run(refresh))
       },
     );
   });
+}
+
+class _StubTool extends Tool {
+  _StubTool({
+    required super.name,
+    required super.description,
+    required this.handler,
+  });
+
+  final Future<ToolResult> Function(Map<String, Object?> args) handler;
+
+  @override
+  Future<ToolResult> callTool(Map<String, Object?> args) => handler(args);
 }

@@ -3,9 +3,7 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
 import 'package:openui/openui.dart';
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// Renders text with a semantic-size token (`large-heavy`, `medium`,
@@ -61,15 +59,15 @@ class TextContentWidget extends StatelessWidget {
 
 /// Registration for the `TextContent` component.
 Component<Widget> textContentComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'TextContent',
     description: 'styled paragraph text',
-    schema: objectSchema(
-      const <String, Object?>{
-        'text': <String, Object?>{'type': 'string'},
-        'size': <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'text': Schema.string(),
+        'size': Schema.string(),
       },
-      required: const ['text'],
+      required: ['text'],
     ),
     render: (ctx, props, renderNode, id) {
       return Builder(

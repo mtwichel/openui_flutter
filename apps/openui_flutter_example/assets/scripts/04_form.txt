@@ -7,7 +7,7 @@ root = Card(children: [
     FormControl(label: "Role", children: [Select(options: ["engineer", "designer", "pm"], value: $role)])
   ]),
   TextContent(text: "Hello, " + $name + " (" + $role + ")"),
-  Buttons(children: [
+  Stack(direction: "row", children: [
     Button(label: "Reset", variant: "secondary", onClick: @Reset($name, $role))
   ])
 ])

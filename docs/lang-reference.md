@@ -95,7 +95,6 @@ Action-step builtins (only valid inside an `actions: ActionPlan(steps: [...])` a
 | `@Reset` | `@Reset(target1, target2, ...)` | Reset each target to its declared default |
 | `@Run` | `@Run(statementId)` | Re-fire a query or mutation by statement id |
 | `@ToAssistant` | `@ToAssistant(message, context?)` | Enqueue a user message in the chat controller |
-| `@OpenUrl` | `@OpenUrl(url)` | Call `url_launcher` (provided as a callback) |
 
 The action plan dispatcher executes steps sequentially. `@Run` returning an error halts the plan unless a `catch` field is provided (deferred to v0.2).
 
@@ -138,11 +137,6 @@ for (final step in plan.steps) {
         humanFriendlyMessage: evaluate(messageAst),
         params: contextAst == null ? {} : {'context': evaluate(contextAst)},
       ));
-    case OpenUrlStep(:final urlAst):
-      onHostStep(ActionEvent(
-        type: BuiltinActionType.openUrl,
-        params: {'url': evaluate(urlAst)},
-      ));
   }
 }
 ```
@@ -174,7 +168,7 @@ Forward references are allowed: `root = Stack([chart])` may appear before `chart
 
 `autoClose(text)` is the partial-recovery pass. It scans for unmatched `"` / `[` / `(` / `{` and inserts the missing closer. The pass runs only on the pending tail (after the last bracket-depth-zero newline), so completed statements are unaffected.
 
-**Dart note.** The JS reference uses Web `ReadableStream` for input. The Dart port is transport-agnostic: `push(String)` works in any context. The `OpenUiChatController`'s adapters bridge SSE bytes to chunked strings via `Utf8Decoder(allowMalformed: true)`.
+**Dart note.** The JS reference uses Web `ReadableStream` for input. The Dart port is transport-agnostic: `push(String)` works in any context. If you consume SSE, decode bytes with `Utf8Decoder(allowMalformed: true)` before chunk framing so malformed code units do not tear down the stream.
 
 ## Cyclic state
 

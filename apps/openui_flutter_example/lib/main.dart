@@ -1,7 +1,6 @@
 import 'package:dartantic_ai/dartantic_ai.dart';
 import 'package:flutter/material.dart';
-import 'package:openui_flutter_example/src/llm_chat/dartantic_chat_service.dart';
-import 'package:openui_flutter_example/src/shell/app_shell.dart';
+import 'package:openui_flutter_example/chat/chat.dart';
 
 const _kGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 
@@ -29,7 +28,7 @@ class OpenUIExampleApp extends StatelessWidget {
     return MaterialApp(
       title: 'OpenUI Flutter',
       theme: ThemeData(useMaterial3: true),
-      home: const AppShell(),
+      home: const ChatPage(),
     );
   }
 }

@@ -27,3 +27,5 @@ Thumbs.db
 tools/spikes/*/.dart_tool/
 tools/spikes/*/build/
 tools/spikes/*/pubspec.lock
+
+.cursor/

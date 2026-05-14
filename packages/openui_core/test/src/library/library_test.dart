@@ -9,58 +9,9 @@ import 'package:openui_core/openui_core.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('reactive(Schema)', () {
-    test('adds the x-reactive: true extension keyword', () {
-      final inner = Schema.string();
-      final wrapped = reactive(inner);
-      expect(wrapped.value['x-reactive'], isTrue);
-    });
-
-    test('preserves the inner schema fields', () {
-      final inner = Schema.string(minLength: 3);
-      final wrapped = reactive(inner);
-      expect(wrapped.value['type'], inner.value['type']);
-      expect(wrapped.value['minLength'], 3);
-    });
-
-    test('does not mutate the inner schema', () {
-      final inner = Schema.string();
-      reactive(inner);
-      expect(inner.value.containsKey('x-reactive'), isFalse);
-    });
-
-    test('round-trips through toJson()', () {
-      final wrapped = reactive(Schema.string());
-      // Spike S0.1 verified extension keywords survive `toJson()`; we
-      // re-confirm here as a regression guard against an upstream
-      // bump that strips them.
-      expect(wrapped.toJson(), contains('"x-reactive":true'));
-    });
-  });
-
-  group('Component and defineComponent', () {
-    test('exposes name, schema, and render', () {
-      final c = defineComponent<String>(
-        name: 'Stack',
-        schema: Schema.object(),
-        render: (context, props, renderNode, statementId) => 'rendered',
-      );
-      expect(c.name, 'Stack');
-      expect(c.schema.value['type'], 'object');
-      expect(c.render, isA<ComponentRender<String>>());
-    });
-
-    test('description defaults to null', () {
-      final c = defineComponent<String>(
-        name: 'X',
-        schema: Schema.object(),
-        render: (c, p, r, id) => '',
-      );
-      expect(c.description, isNull);
-    });
-
+  group('Component', () {
     test('defineComponent with description sets the field', () {
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         description: 'a test component',
         schema: Schema.object(),
@@ -70,7 +21,7 @@ void main() {
     });
 
     test('internal defaults to false', () {
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         schema: Schema.object(),
         render: (c, p, r, id) => '',
@@ -79,7 +30,7 @@ void main() {
     });
 
     test('defineComponent with internal: true sets the field', () {
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         internal: true,
         schema: Schema.object(),
@@ -90,7 +41,7 @@ void main() {
 
     test('the render callback can be invoked', () {
       var capturedId = '';
-      final c = defineComponent<String>(
+      final c = Component<String>(
         name: 'X',
         schema: Schema.object(),
         render: (context, props, renderNode, statementId) {
@@ -112,83 +63,119 @@ void main() {
   });
 
   group('Library', () {
-    Component<String> comp(String name) => defineComponent<String>(
+    Component<String> comp(String name) => Component<String>(
       name: name,
       schema: Schema.object(),
       render: (c, p, r, id) => name,
     );
 
     test('lookup returns the registered component', () {
-      final lib = Library<String>([comp('Stack'), comp('Card')]);
-      expect(lib['Stack'], isNotNull);
-      expect(lib['Stack']!.name, 'Stack');
-      expect(lib['Card']!.name, 'Card');
+      final lib = Library<String>(
+        components: [comp('Stack'), comp('Card')],
+        tools: const [],
+      );
+      expect(lib.component('Stack'), isNotNull);
+      expect(lib.component('Stack')!.name, 'Stack');
+      expect(lib.component('Card')!.name, 'Card');
     });
 
     test('lookup returns null for unknown names', () {
-      final lib = Library<String>([comp('Stack')]);
-      expect(lib['Missing'], isNull);
+      final lib = Library<String>(
+        components: [comp('Stack')],
+        tools: const [],
+      );
+      expect(lib.component('Missing'), isNull);
     });
 
     test('names enumerates registrations in insertion order', () {
-      final lib = Library<String>([
-        comp('Stack'),
-        comp('Card'),
-        comp('Button'),
+      final lib = Library<String>(
+        components: [
+          comp('Stack'),
+          comp('Card'),
+          comp('Button'),
+        ],
+        tools: const [],
+      );
+      expect(lib.components.map((c) => c.name).toList(), [
+        'Stack',
+        'Card',
+        'Button',
       ]);
-      expect(lib.names.toList(), ['Stack', 'Card', 'Button']);
     });
 
     test('duplicate names collapse to last-write-wins', () {
-      final first = defineComponent<String>(
+      final first = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'first',
       );
-      final second = defineComponent<String>(
+      final second = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'second',
       );
-      final lib = Library<String>([first, second]);
-      expect(lib.names, ['Stack']);
+      final lib = Library<String>(
+        components: [first, second],
+        tools: const [],
+      );
+      expect(lib.components.map((c) => c.name).toSet(), {'Stack'});
       // The second registration wins.
       expect(
-        lib['Stack']!.render(
-          EvalContext(statements: const [], store: Store()),
-          const {},
-          (n, c) => 'stub',
-          'r',
-        ),
+        lib
+            .component('Stack')!
+            .render(
+              EvalContext(statements: const [], store: Store()),
+              const {},
+              (n, c) => 'stub',
+              'r',
+            ),
         'second',
       );
     });
 
     test('extend layers extra components on top of the base', () {
-      final base = Library<String>([comp('Stack')]);
-      final extended = base.extend([comp('Card')]);
-      expect(extended.names.toSet(), {'Stack', 'Card'});
+      final base = Library<String>(
+        components: [comp('Stack')],
+        tools: const [],
+      );
+      final extended = base.extend(components: [comp('Card')], tools: const []);
+      expect(extended.components.map((c) => c.name).toSet(), {'Stack', 'Card'});
       // Original library is untouched.
-      expect(base['Card'], isNull);
+      expect(base.component('Card'), isNull);
     });
 
     test('extend supports overriding a base component', () {
-      final base = Library<String>([comp('Stack')]);
-      final replacement = defineComponent<String>(
+      final base = Library<String>(
+        components: [comp('Stack')],
+        tools: const [],
+      );
+      final replacement = Component<String>(
         name: 'Stack',
         schema: Schema.object(),
         render: (c, p, r, id) => 'overridden',
       );
-      final extended = base.extend([replacement]);
+      final extended = base.extend(components: [replacement], tools: const []);
       expect(
-        extended['Stack']!.render(
-          EvalContext(statements: const [], store: Store()),
-          const {},
-          (n, c) => 'stub',
-          'r',
-        ),
+        extended
+            .component('Stack')!
+            .render(
+              EvalContext(statements: const [], store: Store()),
+              const {},
+              (n, c) => 'stub',
+              'r',
+            ),
         'overridden',
       );
+    });
+
+    test('duplicate tool names collapse to last-write-wins', () {
+      final first = _StubTool(name: 'search', description: 'first');
+      final second = _StubTool(name: 'search', description: 'second');
+      final lib = Library<String>(
+        components: const [],
+        tools: [first, second],
+      );
+      expect(lib.tool('search')!.description, 'second');
     });
   });
 
@@ -258,9 +245,12 @@ void main() {
     });
 
     test('a reactive prop bound to a StateRef emits a ReactiveAssign', () {
-      final schema = Schema.object(
-        properties: {'value': reactive(Schema.string())},
-      );
+      final schema = Schema.fromMap(const {
+        'type': 'object',
+        'properties': {
+          'value': {'type': 'string', 'x-reactive': true},
+        },
+      });
       final store = Store()..set(r'$name', 'alice');
       final ctx = EvalContext(statements: const [], store: store);
       final props = evaluateElementProps(
@@ -282,7 +272,7 @@ void main() {
         // expression is a bare $state ref. A literal or computed
         // expression resolves to a value (one-way).
         final schema = Schema.object(
-          properties: {'value': reactive(Schema.string())},
+          properties: {'value': Schema.string()},
         );
         final ctx = EvalContext(statements: const [], store: Store());
         final props = evaluateElementProps(
@@ -365,9 +355,12 @@ void main() {
     });
 
     test('ReactiveAssign carries the live store value at call time', () {
-      final schema = Schema.object(
-        properties: {'value': reactive(Schema.string())},
-      );
+      final schema = Schema.fromMap(const {
+        'type': 'object',
+        'properties': {
+          'value': {'type': 'string', 'x-reactive': true},
+        },
+      });
       final store = Store()..set(r'$name', 'before');
       final ctx = EvalContext(statements: const [], store: store);
       final first = evaluateElementProps(
@@ -385,4 +378,12 @@ void main() {
       expect((second['value']! as ReactiveAssign).value, 'after');
     });
   });
+}
+
+final class _StubTool extends Tool {
+  _StubTool({required super.name, required super.description});
+
+  @override
+  Future<ToolResult> callTool(Map<String, Object?> args) async =>
+      ToolResult(args);
 }

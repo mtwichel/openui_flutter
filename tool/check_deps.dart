@@ -14,15 +14,11 @@ import 'dart:io';
 const _rules = <String, _PackageRule>{
   'openui_core': _PackageRule(
     type: _PackageType.dart,
-    allowed: {'meta', 'json_schema_builder'},
+    allowed: {'collection', 'json_schema_builder', 'meta'},
   ),
   'openui': _PackageRule(
     type: _PackageType.flutter,
     allowed: {'flutter', 'meta', 'openui_core'},
-  ),
-  'openui_chat': _PackageRule(
-    type: _PackageType.dart,
-    allowed: {'http', 'meta', 'openui_core', 'uuid'},
   ),
   'openui_components': _PackageRule(
     type: _PackageType.flutter,

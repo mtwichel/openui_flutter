@@ -5,4 +5,4 @@
 /// may change between v0.1 and v0.2.
 library;
 
-export 'src/mcp_tool_provider.dart' show McpCallToolFn, McpToolProvider;
+export 'src/mcp_tool.dart' show McpTool, McpToolExtension;

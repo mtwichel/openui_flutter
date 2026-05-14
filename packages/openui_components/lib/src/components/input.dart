@@ -3,9 +3,7 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
 import 'package:openui/openui.dart';
-import 'package:openui_components/src/components/form.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
@@ -34,14 +32,13 @@ class InputWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = RendererScope.of(context);
-    final form = FormScope.maybeFind(context);
     final controller = scope.formStateCache.controllerFor(
-      formName: form?.name ?? 'default',
+      formName: 'default',
       fieldName: name,
       initialValue: binding?.value as String? ?? '',
     );
     return TextField(
-      key: ValueKey<String>('input-${form?.name ?? 'default'}-$name'),
+      key: ValueKey<String>('input-default-$name'),
       controller: controller,
       decoration: InputDecoration(
         border: const OutlineInputBorder(),
@@ -59,14 +56,14 @@ class InputWidget extends StatelessWidget {
 /// the renderer surfaces a `ReactiveAssign` marker when bound to a
 /// `$state` var.
 Component<Widget> inputComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Input',
     description: 'text field bound to state variable',
-    schema: objectSchema(
-      <String, Object?>{
-        'name': const <String, Object?>{'type': 'string'},
-        'value': reactiveProp('string'),
-        'placeholder': const <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'name': Schema.string(),
+        'value': Schema.string().xReactive(),
+        'placeholder': Schema.string(),
       },
       required: const ['name', 'value'],
     ),

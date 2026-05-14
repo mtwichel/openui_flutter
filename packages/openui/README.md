@@ -116,8 +116,8 @@ The renderer pre-resolves prop values for you:
   `context.store.set(target, ...)`.
 - **Child components / arrays of components** — pre-rendered to `Widget`
   / `List<Widget>` so you can drop them straight into your tree.
-- **Action props** (`@Set`, `@Reset`, `@Run`, `@ToAssistant`,
-  `@OpenUrl`) — arrive as `void Function()` callbacks that the renderer
+- **Action props** (`@Set`, `@Reset`, `@Run`, `@ToAssistant`) — arrive as
+  `void Function()` callbacks that the renderer
   ties to its action dispatcher.
 
 Need access to the form-state cache or the store from a component?

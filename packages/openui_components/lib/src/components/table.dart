@@ -3,9 +3,7 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:flutter/material.dart';
-
 import 'package:openui_components/src/components/callout.dart';
-import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// `Table(columns, rows)` — a paginated `DataTable`. Each row is a
@@ -96,25 +94,29 @@ class _TableWidgetState extends State<TableWidget> {
 /// Registration for `Table`. Accepts either `{name, label?}` column
 /// objects or bare strings, and either map-keyed or positional rows.
 Component<Widget> tableComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Table',
     description: 'paginated data table',
-    schema: objectSchema(
-      const <String, Object?>{
-        'columns': <String, Object?>{
-          'type': 'array',
-          'description':
-              'array of {name: string, label?: string} objects. '
-              'A bare string entry is treated as both name and label.',
-        },
-        'rows': <String, Object?>{
-          'type': 'array',
-          'description':
-              'array of {<columnName>: value} maps, or positional '
-              'arrays aligned with the columns order',
-        },
+    schema: Schema.object(
+      properties: {
+        'columns': Schema.list(
+          items: Schema.object(
+            properties: {
+              'name': Schema.string(),
+              'label': Schema.string(),
+            },
+          ),
+        ),
+        'rows': Schema.list(
+          items: Schema.object(
+            properties: {
+              'name': Schema.string(),
+              'value': Schema.any(),
+            },
+          ),
+        ),
       },
-      required: const ['columns', 'rows'],
+      required: ['columns', 'rows'],
     ),
     render: (ctx, props, renderNode, id) {
       final rawCols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
@@ -174,15 +176,15 @@ Map<String, Object?>? _coerceStringKeyMap(Object? value) {
 /// component just defines the schema so the parser recognises the
 /// shape.
 Component<Widget> colComponent() {
-  return defineComponent<Widget>(
+  return Component<Widget>(
     name: 'Col',
     internal: true,
-    schema: objectSchema(
-      const <String, Object?>{
-        'name': <String, Object?>{'type': 'string'},
-        'label': <String, Object?>{'type': 'string'},
+    schema: Schema.object(
+      properties: {
+        'name': Schema.string(),
+        'label': Schema.string(),
       },
-      required: const ['name'],
+      required: ['name'],
     ),
     render: (ctx, props, renderNode, id) {
       // Col is a definitional helper; in practice consumers build the

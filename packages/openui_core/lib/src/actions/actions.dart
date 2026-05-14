@@ -6,8 +6,8 @@ import 'package:openui_core/src/parser/parser.dart';
 /// Sealed action-step variants. An [ActionPlan] is a list of these,
 /// and [dispatchAction] executes them sequentially.
 ///
-/// All non-trivial values (Set values, ToAssistant message + context,
-/// OpenUrl url) are carried as unevaluated [AstNode]s and re-evaluated
+/// All non-trivial values (Set values, ToAssistant message + context)
+/// are carried as unevaluated [AstNode]s and re-evaluated
 /// against the live store at the moment the dispatcher reaches the
 /// step (Decision D3). Reset targets and Run statement ids are
 /// resolved at parse time because they're identifiers, not values.
@@ -75,18 +75,29 @@ final class ResetStep extends ActionStep {
 @experimental
 final class RunStep extends ActionStep {
   /// Creates a [RunStep] for the named query / mutation statement.
-  const RunStep({required this.statementId});
+  const RunStep({required this.statementId, this.argsAst = const {}});
 
   /// The id of the statement to re-fire.
   final String statementId;
 
+  /// Optional named args to pass to tool-like Run targets.
+  final Map<String, AstNode> argsAst;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RunStep && other.statementId == statementId;
+      other is RunStep &&
+          other.statementId == statementId &&
+          _mapEquals(other.argsAst, argsAst);
 
   @override
-  int get hashCode => Object.hash(RunStep, statementId);
+  int get hashCode => Object.hash(
+    RunStep,
+    statementId,
+    Object.hashAllUnordered(
+      argsAst.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
+  );
 }
 
 /// `@ToAssistant(message, context?)`. The dispatcher evaluates the
@@ -118,27 +129,6 @@ final class ContinueConversationStep extends ActionStep {
   @override
   int get hashCode =>
       Object.hash(ContinueConversationStep, messageAst, contextAst);
-}
-
-/// `@OpenUrl(url)`. The dispatcher evaluates [urlAst] and emits an
-/// [ActionEvent] with [BuiltinActionType.openUrl] and the URL in
-/// `params['url']`.
-///
-/// Marked `@experimental` per D12.
-@experimental
-final class OpenUrlStep extends ActionStep {
-  /// Creates an [OpenUrlStep].
-  const OpenUrlStep({required this.urlAst});
-
-  /// The URL expression evaluated at dispatch.
-  final AstNode urlAst;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) || other is OpenUrlStep && other.urlAst == urlAst;
-
-  @override
-  int get hashCode => Object.hash(OpenUrlStep, urlAst);
 }
 
 /// Component-emitted action step with a host-visible custom [type].
@@ -211,9 +201,12 @@ class ActionPlan {
 
 /// One host-visible action emission.
 ///
-/// The renderer's `onAction` callback fires once per host-routed step:
-/// `@ToAssistant`, `@OpenUrl`, and any [CustomActionStep]. `@Set`,
-/// `@Reset`, and `@Run` are runtime-internal and never surface here.
+/// Hosts receive these from [dispatchAction] for every built-in step
+/// (`@Set`, `@Reset`, `@Run`, `@ToAssistant`) and for each
+/// [CustomActionStep]. `@Set` always succeeds once reached. `@Reset` /
+/// `@Run` / `@ToAssistant` include `params['success']` when the outcome
+/// is not a straightforward success (`false` for skipped reset targets,
+/// failed `onRun`, or a non-string `@ToAssistant` message).
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -224,31 +217,26 @@ class ActionEvent {
     required this.type,
     this.humanFriendlyMessage,
     this.params = const <String, Object?>{},
-    this.formState,
-    this.formName,
   });
 
   /// Open string. Built-in values live on [BuiltinActionType]. Custom
   /// types come from component code constructing a [CustomActionStep].
   final String type;
 
-  /// User-facing message. For `@ToAssistant`, the evaluated message.
-  /// For implicit Button activation, the Button's `label`. For
-  /// `@OpenUrl` and custom types, the component supplies whatever is
-  /// meaningful (may be `null` or empty).
+  /// User-facing summary when present. For `@ToAssistant`, the evaluated
+  /// message. For implicit Button activation, the Button's `label`. For
+  /// `@Set` / `@Reset` / `@Run`, a short description of the step. For custom
+  /// types, whatever the component supplies (may be `null` or empty).
   final String? humanFriendlyMessage;
 
-  /// Type-specific payload. For `@OpenUrl`: `{'url': String}`. For
-  /// `@ToAssistant`: `{'context': String}` when the second arg is
-  /// present. For custom types: whatever the component passes.
+  /// Type-specific payload. For `@ToAssistant`: `success` is `false`
+  /// when the message did not evaluate to a string; otherwise `success`
+  /// is `true` and `context` may be present. For `@Set`: `target`, `value`.
+  /// For `@Reset`: `target`, `value`, and `success: true`, or `target`,
+  /// `success: false`, and `reason` when skipped. For `@Run`:
+  /// `statementId`, `args`, and `success` plus `error` when `onRun`
+  /// fails. For custom types: whatever the component passes.
   final Map<String, Object?> params;
-
-  /// Form values at the moment the action fires, or `null` when not
-  /// inside a Form. The map is unmodifiable.
-  final Map<String, Object?>? formState;
-
-  /// Form name, or `null` when not inside a Form.
-  final String? formName;
 }
 
 /// Canonical [ActionEvent.type] strings for built-in action steps.
@@ -268,13 +256,20 @@ abstract final class BuiltinActionType {
   /// `@ToAssistant` and implicit-Button activations.
   static const String continueConversation = 'continueConversation';
 
-  /// `@OpenUrl`.
-  static const String openUrl = 'openUrl';
+  /// `@Set(...)` — store write.
+  static const String set = 'set';
+
+  /// `@Reset(...)` — store restore to declared defaults.
+  static const String reset = 'reset';
+
+  /// `@Run(...)` — tool / mutation / query invocation (after `onRun`
+  /// succeeds).
+  static const String run = 'run';
 }
 
 /// Converts an [AstNode] into an [ActionPlan].
 ///
-/// Recognised shapes:
+/// Recognized shapes:
 ///
 /// - A single action-builtin call (e.g. `@Set(...)`) yields a
 ///   one-step plan.
@@ -284,7 +279,8 @@ abstract final class BuiltinActionType {
 /// Returns `null` when [node] is neither shape — the renderer treats
 /// that as "this prop isn't an action handler".
 ///
-/// The parser is closed to the five JS-defined builtins. Custom
+/// The parser is closed to the built-in action steps it recognizes.
+/// Custom
 /// action types reach the host through component code constructing a
 /// [CustomActionStep] directly.
 ///
@@ -298,6 +294,9 @@ ActionPlan? actionPlanFromAst(AstNode node) {
       if (s != null) steps.add(s);
     }
     return ActionPlan(steps: steps);
+  }
+  if (node is CompCall && node.type == 'Action' && node.args.isNotEmpty) {
+    return actionPlanFromAst(node.args.first.value);
   }
   final s = _stepFromAst(node);
   if (s == null) return null;
@@ -326,16 +325,19 @@ ActionStep? _stepFromAst(AstNode node) {
       if (node.args.isEmpty) return null;
       final v = node.args.first.value;
       if (v is! Reference) return null;
-      return RunStep(statementId: v.name);
+      final named = <String, AstNode>{};
+      for (final arg in node.args.skip(1)) {
+        final name = arg.name;
+        if (name == null) continue;
+        named[name] = arg.value;
+      }
+      return RunStep(statementId: v.name, argsAst: named);
     case '@ToAssistant':
       if (node.args.isEmpty) return null;
       return ContinueConversationStep(
         messageAst: node.args[0].value,
         contextAst: node.args.length > 1 ? node.args[1].value : null,
       );
-    case '@OpenUrl':
-      if (node.args.isEmpty) return null;
-      return OpenUrlStep(urlAst: node.args.first.value);
   }
   return null;
 }
@@ -346,30 +348,31 @@ ActionStep? _stepFromAst(AstNode node) {
 /// declared default in [stateDefaults] (typically built from
 /// `meta.stateDecls`) and writes that. `RunStep` is dispatched
 /// through [onRun] (the renderer routes it to its `QueryManager`).
-/// `ContinueConversationStep`, `OpenUrlStep`, and any
-/// [CustomActionStep] are emitted as [ActionEvent]s through
-/// [onHostStep].
+/// After each step (including failed or skipped outcomes), an
+/// [ActionEvent] is emitted through [onHostStep] (`BuiltinActionType.set`,
+/// `reset`, `run`, `continueConversation`, or the custom type).
+/// `ContinueConversationStep` and [CustomActionStep] only perform host
+/// emission (no store or `onRun` side effects inside [dispatchAction]).
 ///
 /// **Rethrow contract**: [dispatchAction] never throws to callers.
-/// `onRun` failures are caught internally and halt the rest of the
-/// plan. Eval failures on `@ToAssistant` / `@OpenUrl` for non-string
-/// results cause skip-emission and the plan continues. Other step
-/// kinds do not throw.
-///
-/// [formState] arrives already wrapped in `Map.unmodifiable` by the
-/// caller (the renderer wraps once at snapshot time). The dispatcher
-/// passes it through verbatim to every emitted [ActionEvent].
+/// `onRun` failures are caught internally, an event is emitted with
+/// `params['success'] == false`, and the rest of the plan is skipped.
+/// A non-string `@ToAssistant` message still emits once with
+/// `success: false` and the plan continues. Other step kinds do not
+/// throw.
 ///
 /// Marked `@experimental` per D12.
 @experimental
 Future<void> dispatchAction({
   required ActionPlan plan,
   required EvalContext context,
-  required Future<void> Function(RunStep step) onRun,
+  required Future<void> Function(
+    RunStep step,
+    Map<String, Object?> args,
+  )
+  onRun,
   required void Function(ActionEvent event) onHostStep,
   Map<String, AstNode> stateDefaults = const <String, AstNode>{},
-  Map<String, Object?>? formState,
-  String? formName,
   String? humanFriendlyMessage,
 }) async {
   for (final step in plan.steps) {
@@ -377,6 +380,16 @@ Future<void> dispatchAction({
       case SetStep():
         final v = evaluate(step.valueAst, context);
         context.store.set(step.target, v);
+        onHostStep(
+          ActionEvent(
+            type: BuiltinActionType.set,
+            humanFriendlyMessage: 'Set ${step.target}',
+            params: <String, Object?>{
+              'target': step.target,
+              'value': v,
+            },
+          ),
+        );
       case ResetStep():
         for (final t in step.targets) {
           final defAst = stateDefaults[t];
@@ -386,21 +399,82 @@ Future<void> dispatchAction({
                 message: '@Reset target $t has no declared default',
               ),
             );
+            onHostStep(
+              ActionEvent(
+                type: BuiltinActionType.reset,
+                humanFriendlyMessage: 'Reset $t (skipped)',
+                params: <String, Object?>{
+                  'target': t,
+                  'success': false,
+                  'reason': 'no declared default',
+                },
+              ),
+            );
           } else {
             final v = evaluate(defAst, context);
             context.store.set(t, v);
+            onHostStep(
+              ActionEvent(
+                type: BuiltinActionType.reset,
+                humanFriendlyMessage: 'Reset $t',
+                params: <String, Object?>{
+                  'target': t,
+                  'value': v,
+                  'success': true,
+                },
+              ),
+            );
           }
         }
       case RunStep():
+        final runArgs = <String, Object?>{
+          for (final entry in step.argsAst.entries)
+            entry.key: evaluate(entry.value, context),
+        };
         try {
-          await onRun(step);
-        } on Object {
+          await onRun(step, runArgs);
+          onHostStep(
+            ActionEvent(
+              type: BuiltinActionType.run,
+              humanFriendlyMessage: 'Run ${step.statementId}',
+              params: <String, Object?>{
+                'statementId': step.statementId,
+                'args': runArgs,
+                'success': true,
+              },
+            ),
+          );
+        } on Object catch (e) {
+          onHostStep(
+            ActionEvent(
+              type: BuiltinActionType.run,
+              humanFriendlyMessage: 'Run ${step.statementId} (failed)',
+              params: <String, Object?>{
+                'statementId': step.statementId,
+                'args': runArgs,
+                'success': false,
+                'error': _dispatchErrorMessage(e),
+              },
+            ),
+          );
           return;
         }
       case ContinueConversationStep():
         final msg = evaluate(step.messageAst, context);
-        if (msg is! String) continue;
-        final params = <String, Object?>{};
+        if (msg is! String) {
+          onHostStep(
+            ActionEvent(
+              type: BuiltinActionType.continueConversation,
+              params: <String, Object?>{
+                'success': false,
+                'reason': '@ToAssistant message did not evaluate to String',
+                'evaluated': msg,
+              },
+            ),
+          );
+          continue;
+        }
+        final params = <String, Object?>{'success': true};
         final cAst = step.contextAst;
         if (cAst != null) {
           final c = evaluate(cAst, context);
@@ -411,20 +485,6 @@ Future<void> dispatchAction({
             type: BuiltinActionType.continueConversation,
             humanFriendlyMessage: msg,
             params: params,
-            formState: formState,
-            formName: formName,
-          ),
-        );
-      case OpenUrlStep():
-        final u = evaluate(step.urlAst, context);
-        if (u is! String) continue;
-        onHostStep(
-          ActionEvent(
-            type: BuiltinActionType.openUrl,
-            humanFriendlyMessage: humanFriendlyMessage,
-            params: <String, Object?>{'url': u},
-            formState: formState,
-            formName: formName,
           ),
         );
       case CustomActionStep():
@@ -433,12 +493,17 @@ Future<void> dispatchAction({
             type: step.type,
             humanFriendlyMessage: step.humanFriendlyMessage,
             params: step.params,
-            formState: formState,
-            formName: formName,
           ),
         );
     }
   }
+}
+
+String _dispatchErrorMessage(Object error) {
+  if (error is OpenUIError) {
+    return error.message ?? error.toString();
+  }
+  return error.toString();
 }
 
 bool _listEquals<T>(List<T> a, List<T> b) {

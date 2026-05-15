@@ -8,7 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 import 'package:openui_flutter_example/chat/chat.dart';
-import 'package:openui_flutter_example/chat/snackbar_tool.dart';
+import 'package:openui_flutter_example/chat/tools.dart';
 
 class _MockChatBloc extends MockBloc<ChatEvent, ChatState>
     implements ChatBloc {}

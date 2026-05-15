@@ -4,12 +4,14 @@ import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 import 'package:openui_flutter_example/chat/bloc/chat_bloc.dart';
 import 'package:openui_flutter_example/chat/dartantic_chat_service.dart';
-import 'package:openui_flutter_example/chat/snackbar_tool.dart';
+import 'package:openui_flutter_example/chat/tools.dart';
 import 'package:openui_flutter_example/chat/view/chat_view.dart';
 
 final Library<Widget> _chatOpenUiLibrary = standardLibrary().extend(
   tools: [
     SnackbarTool(),
+    FetchProductsTool(),
+    FetchProductTool(),
   ],
 );
 final String _chatSystemPrompt = _chatOpenUiLibrary.prompt();

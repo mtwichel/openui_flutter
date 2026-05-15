@@ -251,6 +251,25 @@ void main() {
       );
     });
 
+    test('+ concatenates two lists', () {
+      final ctx = _ctxFor('');
+      expect(
+        evaluate(_rhsOf('a = [1] + [2, 3]', 'a'), ctx),
+        orderedEquals(<Object?>[1, 2, 3]),
+      );
+    });
+
+    test('+ treats null lhs as empty list when rhs is a list', () {
+      final ctx = _ctxFor(
+        '',
+        store: Store()..set(r'$inputText', 'hi'),
+      );
+      expect(
+        evaluate(_rhsOf(r'a = $history + [$inputText]', 'a'), ctx),
+        orderedEquals(<Object?>['hi']),
+      );
+    });
+
     test('- on numbers', () {
       final ctx = _ctxFor('');
       expect(evaluate(_rhsOf('a = 5 - 2', 'a'), ctx), 3);

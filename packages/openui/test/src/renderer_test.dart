@@ -96,13 +96,22 @@ Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
               final binding = props['value'];
               final field = props['name'] as String? ?? id;
               final cache = RendererScope.of(context).formStateCache;
+              final storeText = binding is ReactiveAssign
+                  ? (binding.value as String? ?? '')
+                  : '';
               final controller = cache.controllerFor(
                 formName: 'form',
                 fieldName: field,
-                initialValue: binding is ReactiveAssign
-                    ? (binding.value as String? ?? '')
-                    : '',
+                initialValue: storeText,
               );
+              final store = RendererScope.of(context).store;
+              if (store.lastNotifyOrigin == StoreChangeOrigin.mutation &&
+                  controller.text != storeText) {
+                controller.value = TextEditingValue(
+                  text: storeText,
+                  selection: TextSelection.collapsed(offset: storeText.length),
+                );
+              }
               return TextField(
                 key: ValueKey<String>('input-$field'),
                 controller: controller,
@@ -684,6 +693,60 @@ root = Counter(value: 0, onIncrement: [@Run(refresh)])
         );
         await tester.pumpAndSettle();
         expect(find.text('kept'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'ternary in children array renders chosen CompCall branch',
+      (tester) async {
+        const program = '''\$saved = ""
+root = Column(children: [
+  Counter(value: 0, onIncrement: [@Set(\$saved, "hi")]),
+  \$saved == "" ? Text(text: "empty") : Text(text: \$saved)
+])
+''';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('empty'), findsOneWidget);
+        expect(find.text('hi'), findsNothing);
+
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
+
+        expect(find.text('empty'), findsNothing);
+        expect(find.text('hi'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'ternary as sole child still uses widget expansion (hasComp detects '
+      'Ternary)',
+      (tester) async {
+        const program = '''\$saved = "x"
+root = Column(children: [
+  \$saved == "" ? Text(text: "empty") : Text(text: "filled")
+])
+''';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('filled'), findsOneWidget);
+        expect(find.text('empty'), findsNothing);
       },
     );
 

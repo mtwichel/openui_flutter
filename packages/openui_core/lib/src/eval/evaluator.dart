@@ -132,7 +132,7 @@ Object? evaluate(AstNode node, EvalContext context) {
     case UnaryOp(:final op, :final operand):
       return _evalUnary(op, evaluate(operand, context));
     case Ternary(:final condition, :final then, :final otherwise):
-      return _isTruthy(evaluate(condition, context))
+      return isTruthyValue(evaluate(condition, context))
           ? evaluate(then, context)
           : evaluate(otherwise, context);
     case MemberAccess(:final target, :final name):
@@ -233,12 +233,12 @@ Object? _evalBinary(
   // && and || short-circuit on the left operand.
   if (op == '&&') {
     final l = evaluate(left, context);
-    if (!_isTruthy(l)) return l;
+    if (!isTruthyValue(l)) return l;
     return evaluate(right, context);
   }
   if (op == '||') {
     final l = evaluate(left, context);
-    if (_isTruthy(l)) return l;
+    if (isTruthyValue(l)) return l;
     return evaluate(right, context);
   }
   final l = evaluate(left, context);
@@ -251,6 +251,17 @@ Object? _evalBinary(
       // common `"Count: " + $count` template idiom.
       if (l is String) return '$l${r ?? ''}';
       if (r is String) return '${l ?? ''}$r';
+      // List concatenation for idioms like `$history + [$inputText]`.
+      // Treat a null lhs as `[]` so an unset `$history` still appends.
+      if (l is List && r is List) {
+        return <Object?>[...l, ...r];
+      }
+      if (l == null && r is List) {
+        return <Object?>[...r];
+      }
+      if (l is List && r == null) {
+        return <Object?>[...l];
+      }
       return null;
     case '-':
       return (l is num && r is num) ? l - r : null;
@@ -283,7 +294,7 @@ Object? _evalBinary(
 Object? _evalUnary(String op, Object? operand) {
   switch (op) {
     case '!':
-      return !_isTruthy(operand);
+      return !isTruthyValue(operand);
     case '-':
       return operand is num ? -operand : null;
   }
@@ -309,7 +320,11 @@ Object? _evalIndex(Object? target, Object? index) {
   return null;
 }
 
-bool _isTruthy(Object? v) {
+/// Truthiness for OpenUI Lang conditionals (`?:`, `&&`, `||`, `!`).
+///
+/// Marked `@experimental` per D12.
+@experimental
+bool isTruthyValue(Object? v) {
   if (v == null) return false;
   if (v is bool) return v;
   if (v is num) return v != 0;

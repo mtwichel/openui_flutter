@@ -109,6 +109,7 @@ class _RendererState extends State<Renderer> {
   // (lang-core/src/parser/parser.ts, completedStmtMap).
   ElementNode? _lastGoodRoot;
   String _previousResponse = '';
+  bool _wasStreaming = false;
 
   @override
   void initState() {
@@ -136,6 +137,7 @@ class _RendererState extends State<Renderer> {
     }
     if (widget.response != oldWidget.response ||
         widget.rootName != oldWidget.rootName ||
+        widget.isStreaming != oldWidget.isStreaming ||
         libraryChanged) {
       _runPipeline();
     }
@@ -156,7 +158,7 @@ class _RendererState extends State<Renderer> {
     );
   }
 
-  void _handleStoreChange() {
+  void _handleStoreChange(StoreChangeOrigin _) {
     if (!mounted) return;
     widget.onStateUpdate?.call(_store.getSnapshot());
     setState(() {});
@@ -168,6 +170,7 @@ class _RendererState extends State<Renderer> {
   }
 
   void _runPipeline() {
+    final refreshDeclarativeDefaults = widget.isStreaming || _wasStreaming;
     final response = widget.response ?? '';
     // Reset the last-good cache when the new buffer can't be a
     // continuation of the previous one (shorter, or starts differently).
@@ -197,7 +200,12 @@ class _RendererState extends State<Renderer> {
         decl.name: evaluate(decl.defaultValue, seedCtx),
     };
     seedStore.dispose();
-    _store.initialize(defaults, widget.initialState);
+    _store.initialize(
+      defaults,
+      persisted: widget.initialState,
+      refreshDeclarativeDefaults: refreshDeclarativeDefaults,
+    );
+    _wasStreaming = widget.isStreaming;
 
     final manager = _queryManager;
     if (manager != null) {
@@ -398,7 +406,6 @@ class _RendererState extends State<Renderer> {
       case StateAssign():
       case BinaryOp():
       case UnaryOp():
-      case Ternary():
       case MemberAccess():
       case IndexAccess():
       case ObjectLit():
@@ -406,6 +413,14 @@ class _RendererState extends State<Renderer> {
       case MutationCall():
         final value = evaluate(node, ctx);
         return _wrapPrimitive(value);
+      case Ternary(:final condition, :final then, :final otherwise):
+        final condVal = evaluate(condition, ctx);
+        final takeThen = isTruthyValue(condVal);
+        return _renderAst(
+          takeThen ? then : otherwise,
+          ctx,
+          statementHint: statementHint,
+        );
     }
   }
 
@@ -561,6 +576,7 @@ class _RendererState extends State<Renderer> {
         (e) =>
             e is CompCall ||
             e is Reference ||
+            e is Ternary ||
             (e is BuiltinCall && _isIterating(e)),
       );
       if (hasComp) {

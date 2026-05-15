@@ -223,13 +223,11 @@ void main() {
       expect(result.root!.props['text'], 'hi');
     });
 
-    test('reports an inline Query call as a category error', () {
-      final result = _parse('root = Stack([Query(name: "x")])');
-      // Stack(...) materializes, but its children array contains the
-      // inline Query — which surfaces as a top-level error.
+    test('reports nested @Query as a parse violation', () {
+      final program = parseProgram('root = Stack([@Query(x)])');
       expect(
-        result.meta.errors.whereType<EvaluationError>().any(
-          (e) => e.message?.contains('Query()') ?? false,
+        program.errors.any(
+          (e) => e.message.contains(r'@Query must be the entire RHS of a $var'),
         ),
         isTrue,
       );
@@ -391,7 +389,7 @@ void main() {
       () {
         final result = parse(
           'root = Title("anchor")\n'
-          r'$q = Query(name: $name)'
+          r'$q = @Query(list, name: $name)'
           '\n'
           r'$m = Mutation(name: $other)'
           '\n',
@@ -402,17 +400,21 @@ void main() {
       },
     );
 
-    test('a Reference to a Query statement resolves to null at parse time', () {
-      // Query refs resolve at runtime in the JS reference; here they
-      // materialize as null (or a runtime marker in a future
-      // iteration).
-      final result = _parse(
-        'root = Title(q)\nq = Query(name: "x")\n',
-      );
-      // The result is `Title(null)` — null fails the required check
-      // for `text`, so root becomes null with a missing-required err.
-      expect(result.root, isNull);
-    });
+    test(
+      r'query-backed $var passes through Title as a StateRef at parse time',
+      () {
+        final result = _parse(
+          r'$q = @Query(x)'
+          '\n'
+          r'root = Title(text: $q)'
+          '\n',
+        );
+        expect(result.root, isNotNull);
+        final text = result.root!.props['text'];
+        expect(text, isA<StateRef>());
+        expect((text! as StateRef).name, 'q');
+      },
+    );
   });
 
   group('ResolvedElement', () {

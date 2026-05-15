@@ -1,7 +1,7 @@
 // Functional-builtin contract tests.
 //
-// Each builtin (@Count, @Filter, @Each, @Map) is exercised through a
-// realistic AST built via parseProgram, with EvalContext.builtins
+// Each builtin (@Count, @Filter, @Each, @Map, @Query noop) is exercised
+// through a realistic AST built via parseProgram, with EvalContext.builtins
 // pointing at `functionalBuiltins`. Tests cover:
 // - Happy path with literal arguments.
 // - $item / $index substitution inside the iteration scope.
@@ -32,10 +32,10 @@ AstNode _rhsOf(String source, String name) {
 
 void main() {
   group('functionalBuiltins registry', () {
-    test('exports exactly the four functional builtins', () {
+    test('exports the functional builtins including @Query noop', () {
       expect(
         functionalBuiltins.keys.toSet(),
-        {'@Count', '@Filter', '@Each', '@Map'},
+        {'@Count', '@Filter', '@Each', '@Map', '@Query'},
       );
     });
 
@@ -44,6 +44,12 @@ void main() {
         () => functionalBuiltins['@New'] = (call, ctx) => null,
         throwsUnsupportedError,
       );
+    });
+
+    test('@Query handler is a no-op that returns null', () {
+      final ctx = _ctx(r'$p = @Query(fetch)');
+      expect(evaluate(_rhsOf(r'$p = @Query(fetch)', r'$p'), ctx), isNull);
+      expect(ctx.errors, isEmpty);
     });
   });
 

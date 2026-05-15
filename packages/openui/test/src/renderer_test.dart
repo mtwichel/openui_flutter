@@ -523,13 +523,14 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
         ];
         const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
         final notifier = ValueNotifier<String>(program);
+        final library = _testLibrary(tools: tools);
         await tester.pumpWidget(
           _TestRoot(
             child: ValueListenableBuilder<String>(
               valueListenable: notifier,
               builder: (context, value, _) => Renderer(
                 response: value,
-                library: _testLibrary(tools: tools),
+                library: library,
               ),
             ),
           ),

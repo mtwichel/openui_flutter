@@ -85,10 +85,11 @@ void main() {
         'root = "hi"\n'
             r'$count = 0'
             '\n'
-            'users = Query(name: "list")\n',
+            r'$users = @Query(list)'
+            '\n',
         '',
       );
-      expect(_idsInOrder(merged).toSet(), {'root', r'$count', 'users'});
+      expect(_idsInOrder(merged).toSet(), {'root', r'$count', r'$users'});
     });
 
     test('reachable transitive references are preserved through the merge', () {

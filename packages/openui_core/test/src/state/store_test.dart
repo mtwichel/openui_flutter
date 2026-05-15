@@ -17,8 +17,10 @@ void main() {
         ..subscribe((origin) => seen = origin)
         ..initialize({r'$a': 1});
       expect(seen, StoreChangeOrigin.declarativeSeed);
+      expect(store.lastNotifyOrigin, StoreChangeOrigin.declarativeSeed);
       store.set(r'$a', 2);
       expect(seen, StoreChangeOrigin.mutation);
+      expect(store.lastNotifyOrigin, StoreChangeOrigin.mutation);
     });
 
     test('initial state: get returns null and snapshot is empty', () {

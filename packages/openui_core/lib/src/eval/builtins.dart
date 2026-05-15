@@ -30,7 +30,15 @@ final Map<String, BuiltinHandler> functionalBuiltins =
       '@Filter': _evalFilter,
       '@Each': _evalEach,
       '@Map': _evalMap,
+      '@Query': _evalQueryNoop,
     });
+
+// `@Query` is fired by the renderer's `QueryManager`, not by the
+// evaluator. Registering a no-op here keeps an accidental render-time
+// traversal of an unfired `@Query` AST from raising
+// `no handler registered for builtin @Query`. The result slot lives in
+// the store under the statement id (e.g. `$products`).
+Object? _evalQueryNoop(BuiltinCall call, EvalContext context) => null;
 
 Object? _evalCount(BuiltinCall call, EvalContext context) {
   if (call.args.isEmpty) {

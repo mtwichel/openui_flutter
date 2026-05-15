@@ -93,7 +93,9 @@ Program parseProgram(
   }
   if (validateBuiltinShapes) {
     for (final s in statements) {
-      errors.addAll(validateEachShape(s));
+      errors
+        ..addAll(validateEachShape(s))
+        ..addAll(validateQueryShape(s));
     }
   }
   return Program(statements: statements, errors: errors);
@@ -139,10 +141,6 @@ void _collectEachShapeErrors(AstNode node, List<ParseException> out) {
       for (final arg in args) {
         _collectEachShapeErrors(arg.value, out);
       }
-    case QueryCall(:final args):
-      for (final arg in args) {
-        _collectEachShapeErrors(arg.value, out);
-      }
     case MutationCall(:final args):
       for (final arg in args) {
         _collectEachShapeErrors(arg.value, out);
@@ -177,6 +175,129 @@ void _collectEachShapeErrors(AstNode node, List<ParseException> out) {
     case StateRef():
       break;
   }
+}
+
+/// Walks [statement] for `@Query` builtin calls and returns a
+/// `ParseException` for every call that does not match the spec shape
+/// `$var = @Query(toolName, namedArg: value, ...)`.
+///
+/// Rules:
+/// - `@Query` may only appear as the entire RHS of an assignment whose
+///   LHS is a `$STATEVAR` (statement kind `query`). Any other occurrence
+///   — nested in an `ArrayLit`, on a value-LHS, etc. — is rejected.
+/// - `args.length >= 1` and the first arg is positional and is a
+///   [Reference] (the tool name).
+/// - All other args are named.
+///
+/// When [committedOffsetBoundary] is non-null, statements whose offset
+/// is at or beyond the boundary are skipped. The streaming parser uses
+/// that gate to suppress shape errors from the autoClose-patched
+/// pending tail.
+///
+/// Internal: re-used by the streaming parser. Not part of the public
+/// API.
+@internal
+List<ParseException> validateQueryShape(
+  Statement statement, {
+  int? committedOffsetBoundary,
+}) {
+  if (committedOffsetBoundary != null &&
+      statement.offset >= committedOffsetBoundary) {
+    return const <ParseException>[];
+  }
+  final errors = <ParseException>[];
+  final rhs = statement.expression;
+  // A well-shaped `$var = @Query(...)` lives in exactly one position
+  // — the top-level RHS of a state-var statement. Validate the call
+  // args there; anywhere else, treat the call as a positional
+  // violation and walk the rest of the tree looking for more.
+  // `classifyStatement` already keys `query` off the @Query RHS shape,
+  // so we additionally guard on the LHS to reject `data = @Query(...)`.
+  if (rhs is BuiltinCall &&
+      rhs.name == '@Query' &&
+      statement.name.startsWith(r'$')) {
+    final problem = _validateQueryCall(rhs);
+    if (problem != null) errors.add(problem);
+    return errors;
+  }
+  _collectNestedQueryCalls(rhs, errors);
+  return errors;
+}
+
+void _collectNestedQueryCalls(AstNode node, List<ParseException> out) {
+  if (node is BuiltinCall && node.name == '@Query') {
+    out.add(
+      ParseException(
+        r'@Query must be the entire RHS of a $var assignment',
+        node.offset,
+      ),
+    );
+    return;
+  }
+  switch (node) {
+    case BuiltinCall(:final args):
+    case CompCall(:final args):
+    case MutationCall(:final args):
+      for (final arg in args) {
+        _collectNestedQueryCalls(arg.value, out);
+      }
+    case ArrayLit(:final elements):
+      for (final e in elements) {
+        _collectNestedQueryCalls(e, out);
+      }
+    case ObjectLit(:final entries):
+      for (final e in entries) {
+        _collectNestedQueryCalls(e.value, out);
+      }
+    case BinaryOp(:final left, :final right):
+      _collectNestedQueryCalls(left, out);
+      _collectNestedQueryCalls(right, out);
+    case UnaryOp(:final operand):
+      _collectNestedQueryCalls(operand, out);
+    case Ternary(:final condition, :final then, :final otherwise):
+      _collectNestedQueryCalls(condition, out);
+      _collectNestedQueryCalls(then, out);
+      _collectNestedQueryCalls(otherwise, out);
+    case MemberAccess(:final target):
+      _collectNestedQueryCalls(target, out);
+    case IndexAccess(:final target, :final index):
+      _collectNestedQueryCalls(target, out);
+      _collectNestedQueryCalls(index, out);
+    case StateAssign(:final value):
+      _collectNestedQueryCalls(value, out);
+    case Literal():
+    case NullLiteral():
+    case Reference():
+    case StateRef():
+      break;
+  }
+}
+
+ParseException? _validateQueryCall(BuiltinCall call) {
+  if (call.args.isEmpty) {
+    return ParseException(
+      '@Query requires a tool-name identifier as the first positional '
+      'argument',
+      call.offset,
+    );
+  }
+  final first = call.args.first;
+  if (first.name != null || first.value is! Reference) {
+    return ParseException(
+      '@Query requires a tool-name identifier as the first positional '
+      'argument',
+      first.offset,
+    );
+  }
+  for (final arg in call.args.skip(1)) {
+    if (arg.name == null) {
+      return ParseException(
+        '@Query only accepts named arguments after the tool name',
+        arg.offset,
+      );
+    }
+  }
+  return null;
 }
 
 ParseException? _validateEachCall(BuiltinCall call) {

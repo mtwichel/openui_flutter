@@ -72,11 +72,11 @@ Every statement is classified at parse time as one of:
 | Kind | Trigger | Example |
 |---|---|---|
 | `value` | RHS is a literal, reference, member access, or comp call without state semantics | `greeting = "Hello"` |
-| `state` | LHS is a `$IDENT` and RHS is not a `Query` / `Mutation` builtin | `$count = 0` |
-| `query` | RHS is `Query(...)` or LHS is a `$IDENT` whose RHS is `Query(...)` | `users = Query(name: "list_users")` |
+| `state` | LHS is a `$IDENT` and RHS is not `@Query(...)` or a `Mutation(...)` call | `$count = 0` |
+| `query` | LHS is a `$IDENT` and RHS is `@Query(...)` | `$users = @Query(list_users)` |
 | `mutation` | RHS is `Mutation(...)` | `delete_user = Mutation(name: "delete", args: { id: 1 })` |
 
-**Order of checks matters.** `query` is checked before `state`, because `$foo = Query(...)` must classify as a query. `mutation` is checked before `query` only when the RHS shape is unambiguous.
+**Order of checks matters.** `mutation` is checked before `query`, and `query` is checked before `state` so that `$users = @Query(...)` classifies as a query rather than a plain state binding.
 
 ## Builtins
 
@@ -86,6 +86,7 @@ Every statement is classified at parse time as one of:
 | `@Filter` | `@Filter(list, predicateRef)` | Filters `list` by calling the predicate (a comp ref) on each item |
 | `@Each` | `@Each(list, "name", template)` | Materializes `template` once per item with the named loop var (`name.field`) and `$index` bound. The loop name must be a string literal matching the IDENT rule (`[a-z_][a-zA-Z0-9_]*`), not `true`/`false`/`null`, and may not start with `$`. Lazy: not evaluated until needed |
 | `@Map` | `@Map(list, transformRef)` | Maps each element through a comp ref |
+| `@Query` | `@Query(toolName, named: value, ...)` | Only valid as the entire RHS of `$var = @Query(...)`. Runs the named tool exactly once per `(statementId, evaluated-args)` tuple after streaming completes; writes the result through the store. `null` while loading. Errors surface via `Renderer.onError`. Re-fire with `@Run($var)` |
 
 Action-step builtins (only as elements of a **non-empty array literal** on props marked `x-action: true` in the component schema, for example `onClick: [@Set($count, $count + 1)]` or `onClick: [@Run(refresh), @Set($flag, 1)]`. Bare `@Step(...)`, empty `[]`, `Action(...)`, and arrays containing non-action expressions are rejected.)
 
@@ -159,7 +160,7 @@ The streaming parser exposes:
 - `meta.orphaned: List<String>` — statements not reachable from `root`
 - `meta.errors: List<OpenUIError>` — parse and evaluation errors
 - `meta.stateDecls: List<StateDecl>` — `$state` declarations with their default values
-- `meta.queries: List<QueryDecl>` — query declarations with name and args
+- `meta.queries: List<QueryDecl>` — query declarations with statement id (`$`-prefixed), tool name, and named args
 - `meta.mutations: List<MutationDecl>` — mutation declarations
 
 Forward references are allowed: `root = Stack([chart])` may appear before `chart = ...`. Unresolved references at the end of input land in `meta.unresolved` and the rendered tree shows nothing for them.

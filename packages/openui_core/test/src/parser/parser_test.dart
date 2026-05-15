@@ -170,7 +170,7 @@ void main() {
       );
     });
 
-    test('CompCall / BuiltinCall / QueryCall / MutationCall equality', () {
+    test('CompCall / BuiltinCall / MutationCall equality', () {
       final args = [
         const Argument(value: Literal(1, offset: 0), offset: 0),
       ];
@@ -191,20 +191,12 @@ void main() {
         isNot(equals(BuiltinCall('@Set', args, offset: 0))),
       );
       expect(
-        QueryCall(args, offset: 0),
-        equals(QueryCall(args, offset: 9)),
-      );
-      expect(
-        QueryCall(args, offset: 0),
-        isNot(equals(QueryCall(const [], offset: 0))),
-      );
-      expect(
         MutationCall(args, offset: 0),
         equals(MutationCall(args, offset: 9)),
       );
       expect(
         MutationCall(args, offset: 0),
-        isNot(equals(MutationCall(const [], offset: 0))),
+        isNot(equals(MutationCall(const <Argument>[], offset: 0))),
       );
     });
 
@@ -263,25 +255,30 @@ void main() {
     });
 
     test(
-      'classifyStatement uses order-of-checks: Mutation > Query > '
+      'classifyStatement uses order-of-checks: Mutation > @Query > '
       'STATEVAR > value',
       () {
         // Mutation regardless of LHS shape.
         expect(
-          classifyStatement('x', MutationCall(const [], offset: 0)),
+          classifyStatement(
+            'x',
+            MutationCall(const <Argument>[], offset: 0),
+          ),
           StatementKind.mutation,
         );
         expect(
-          classifyStatement(r'$x', MutationCall(const [], offset: 0)),
+          classifyStatement(
+            r'$x',
+            MutationCall(const <Argument>[], offset: 0),
+          ),
           StatementKind.mutation,
         );
-        // Query before state, so $x = Query(...) is query.
+        // @Query builtin classifies as query.
         expect(
-          classifyStatement(r'$x', QueryCall(const [], offset: 0)),
-          StatementKind.query,
-        );
-        expect(
-          classifyStatement('x', QueryCall(const [], offset: 0)),
+          classifyStatement(
+            r'$x',
+            BuiltinCall('@Query', const <Argument>[], offset: 0),
+          ),
           StatementKind.query,
         );
         // STATEVAR LHS with non-call RHS → state.
@@ -394,10 +391,9 @@ void main() {
             BuiltinCall('@Each', const [], offset: 0),
             BuiltinCall('@Each', const [], offset: 9),
           ],
-          [QueryCall(const [], offset: 0), QueryCall(const [], offset: 9)],
           [
-            MutationCall(const [], offset: 0),
-            MutationCall(const [], offset: 9),
+            MutationCall(const <Argument>[], offset: 0),
+            MutationCall(const <Argument>[], offset: 9),
           ],
         ];
         for (final pair in pairs) {
@@ -626,14 +622,23 @@ void main() {
       expect(tmpl.name, 'name');
     });
 
-    test('Query and Mutation become QueryCall / MutationCall', () {
-      expect(
-        parseExpression('Query(name: "x")'),
-        isA<QueryCall>(),
-      );
+    test('Mutation parses as a MutationCall', () {
       expect(
         parseExpression('Mutation(name: "x")'),
         isA<MutationCall>(),
+      );
+    });
+
+    test('legacy Query(...) raises a migration ParseException', () {
+      expect(
+        () => parseExpression('Query(name: "x")'),
+        throwsA(
+          isA<ParseException>().having(
+            (e) => e.message,
+            'message',
+            contains('@Query'),
+          ),
+        ),
       );
     });
 
@@ -832,9 +837,74 @@ void main() {
       expect(program.statements.single.name, r'$count');
     });
 
-    test('classifies Query RHS as query (overrides STATEVAR LHS)', () {
-      final program = parseProgram(r'$users = Query(name: "list")');
+    test(r'classifies $var = @Query(tool) RHS as query', () {
+      final program = parseProgram(r'$users = @Query(list_users)');
+      expect(program.errors, isEmpty);
       expect(program.statements.single.kind, StatementKind.query);
+      final expr = program.statements.single.expression as BuiltinCall;
+      expect(expr.name, '@Query');
+      expect(expr.args.single.value, isA<Reference>());
+    });
+
+    test('legacy users = Query(name: "list") emits a migration error', () {
+      final program = parseProgram('users = Query(name: "list")');
+      expect(program.errors, hasLength(1));
+      expect(program.errors.single.message, contains('@Query'));
+    });
+
+    test('@Query with named args yields a QueryDecl-shaped BuiltinCall', () {
+      final program = parseProgram(
+        r'$products = @Query(fetch_products, category: "shoes")',
+      );
+      expect(program.errors, isEmpty);
+      final expr = program.statements.single.expression as BuiltinCall;
+      expect(expr.args.first.value, isA<Reference>());
+      expect(expr.args[1].name, 'category');
+    });
+
+    test('@Query without a tool name records a ParseException', () {
+      final program = parseProgram(r'$x = @Query()');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('tool-name identifier'),
+      );
+    });
+
+    test('@Query with a string-literal first arg records an error', () {
+      final program = parseProgram(r'$x = @Query("not_a_ref")');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('tool-name identifier'),
+      );
+    });
+
+    test('@Query with extra positional args records an error', () {
+      final program = parseProgram(r'$x = @Query(tool, "positional")');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('only accepts named arguments'),
+      );
+    });
+
+    test('@Query on a value LHS records an error', () {
+      final program = parseProgram('data = @Query(tool)');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('must be the entire RHS'),
+      );
+    });
+
+    test('@Query nested inside an array records an error', () {
+      final program = parseProgram('root = Stack([@Query(tool)])');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('must be the entire RHS'),
+      );
     });
 
     test('classifies Mutation RHS as mutation', () {

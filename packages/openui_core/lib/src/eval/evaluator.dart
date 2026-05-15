@@ -13,12 +13,12 @@ typedef BuiltinHandler =
     Object? Function(BuiltinCall call, EvalContext context);
 
 /// Inputs the evaluator needs to resolve every kind of [AstNode]:
-/// the parsed statement map, the reactive store, cached query
-/// results, an optional iteration scope (for `$item` / `$index`
-/// inside `@Each`-like builtins), and a registry of builtin
-/// handlers. The [errors] list is mutable — the evaluator pushes
-/// [OpenUIError] entries for cycles and category errors instead of
-/// throwing, per Decision D15 ("surface as data, not exception").
+/// the parsed statement map, the reactive store, an optional
+/// iteration scope (for `$item` / `$index` inside `@Each`-like
+/// builtins), and a registry of builtin handlers. The [errors] list
+/// is mutable — the evaluator pushes [OpenUIError] entries for cycles
+/// and category errors instead of throwing, per Decision D15
+/// ("surface as data, not exception").
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -30,12 +30,10 @@ class EvalContext {
   EvalContext({
     required List<Statement> statements,
     required this.store,
-    Map<String, Object?>? queryResults,
     Map<String, Object?>? iterationVars,
     Map<String, BuiltinHandler>? builtins,
     List<OpenUIError>? errors,
   }) : statements = _buildMap(statements),
-       queryResults = queryResults ?? const <String, Object?>{},
        iterationVars = iterationVars ?? const <String, Object?>{},
        builtins = builtins ?? const <String, BuiltinHandler>{},
        errors = errors ?? <OpenUIError>[],
@@ -44,7 +42,6 @@ class EvalContext {
   EvalContext._inherit(EvalContext parent, Map<String, Object?> additional)
     : statements = parent.statements,
       store = parent.store,
-      queryResults = parent.queryResults,
       iterationVars = <String, Object?>{
         ...parent.iterationVars,
         ...additional,
@@ -56,12 +53,9 @@ class EvalContext {
   /// Statement map keyed by name. Last-write-wins on duplicates.
   final Map<String, Statement> statements;
 
-  /// The reactive store that backs `$state` lookups.
+  /// The reactive store that backs `$state` lookups. `@Query`-backed
+  /// state vars also resolve here once their tool call completes.
   final Store store;
-
-  /// Cached results for `Query` and `Mutation` statements, keyed by
-  /// the statement id. Empty by default.
-  final Map<String, Object?> queryResults;
 
   /// Iteration scope. `$item` and `$index` inside an `@Each` body are
   /// served from here, taking precedence over the [store].
@@ -77,13 +71,12 @@ class EvalContext {
   /// produced by [withIteration] so iteration handlers participate in
   /// the same dedup pass.
   final List<OpenUIError> errors;
-
   final Set<String> _resolving;
 
   /// Returns a child context with [additionalVars] layered on top of
   /// [iterationVars]. The child shares the same [statements], [store],
-  /// [queryResults], [builtins], [errors], and cycle-detection state
-  /// as this context — only [iterationVars] is rebuilt.
+  /// [builtins], [errors], and cycle-detection state as this context —
+  /// only [iterationVars] is rebuilt.
   EvalContext withIteration(Map<String, Object?> additionalVars) =>
       EvalContext._inherit(this, additionalVars);
 
@@ -158,13 +151,6 @@ Object? evaluate(AstNode node, EvalContext context) {
         ),
       );
       return null;
-    case QueryCall():
-      context.errors.add(
-        const EvaluationError(
-          message: 'cannot evaluate Query call as a value',
-        ),
-      );
-      return null;
     case MutationCall():
       context.errors.add(
         const EvaluationError(
@@ -193,7 +179,11 @@ Object? _evalReference(String name, EvalContext context) {
   final stmt = context.statements[name];
   if (stmt == null) return null;
   if (stmt.kind == StatementKind.query || stmt.kind == StatementKind.mutation) {
-    return context.queryResults[name];
+    // `@Query`-backed values live in the store under their `$`-prefixed
+    // statement id. Mutation calls have no value semantics — the
+    // dispatcher reaches them through their declaration, not a bare
+    // identifier reference.
+    return null;
   }
   context._resolving.add(name);
   final result = evaluate(stmt.expression, context);

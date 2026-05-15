@@ -40,8 +40,8 @@ final closed = autoClose(partialSource);
 
 Sealed `AstNode` hierarchy (`Literal`, `Reference`, `StateRef`, `StateAssign`,
 `ArrayLit`, `ObjectLit`, `BinaryOp`, `UnaryOp`, `Ternary`, `MemberAccess`,
-`IndexAccess`, `CompCall`, `BuiltinCall`, `QueryCall`, `MutationCall`,
-`NullLiteral`) plus `Statement` / `StatementKind` and `classifyStatement`.
+`IndexAccess`, `CompCall`, `BuiltinCall`, `MutationCall`, `NullLiteral`)
+plus `Statement` / `StatementKind` and `classifyStatement`.
 
 ### Streaming parser
 

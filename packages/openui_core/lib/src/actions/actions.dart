@@ -279,14 +279,24 @@ ActionStep? _stepFromAst(AstNode node) {
     case '@Run':
       if (node.args.isEmpty) return null;
       final v = node.args.first.value;
-      if (v is! Reference) return null;
+      final String statementId;
+      if (v is StateRef) {
+        // `@Run($products)` re-fires a `$var = @Query(...)` declaration.
+        // The leading `$` is preserved so the renderer's lookup against
+        // `QueryDecl.statementId` lines up.
+        statementId = '\$${v.name}';
+      } else if (v is Reference) {
+        statementId = v.name;
+      } else {
+        return null;
+      }
       final named = <String, AstNode>{};
       for (final arg in node.args.skip(1)) {
         final name = arg.name;
         if (name == null) continue;
         named[name] = arg.value;
       }
-      return RunStep(statementId: v.name, argsAst: named);
+      return RunStep(statementId: statementId, argsAst: named);
     case '@ToAssistant':
       if (node.args.isEmpty) return null;
       return ContinueConversationStep(

@@ -86,6 +86,16 @@ void main() {
         result,
         contains('`@ToAssistant("message", "context?")` emits'),
       );
+      // `@Query` shape and the canonical loading idiom must be pinned
+      // in the primer so the LLM learns the new syntax.
+      expect(
+        result,
+        contains(r'$var = @Query(toolName, namedArg: value, ...)'),
+      );
+      expect(
+        result,
+        contains(r'$var == null ? Spinner() : Table(rows: $var)'),
+      );
     });
 
     test('component with description renders Name(props) — description', () {

@@ -229,25 +229,34 @@ void main() {
       );
     });
 
-    test('query declaration on a value LHS', () {
-      final parser = createStreamingParser();
-      final result = parser.push('users = Query(name: "list")\n');
-      expect(result.meta.queries, hasLength(1));
-      expect(result.meta.queries.single.statementId, 'users');
-      expect(result.meta.queries.single.args, hasLength(1));
-      expect(result.meta.queries.single.args.single.name, 'name');
-      // No state decl — Query takes precedence even when LHS is a $.
-      expect(result.meta.stateDecls, isEmpty);
-    });
-
-    test(r'query bound to a $-prefixed LHS still classifies as query', () {
+    test(r'@Query bound to a $-prefixed LHS classifies as query', () {
       final parser = createStreamingParser();
       final result = parser.push(
-        r'$users = Query(name: "list")'
+        r'$users = @Query(list_users)'
         '\n',
       );
       expect(result.meta.queries, hasLength(1));
+      final decl = result.meta.queries.single;
+      expect(decl.statementId, r'$users');
+      expect(decl.toolName, 'list_users');
+      expect(decl.namedArgs, isEmpty);
       expect(result.meta.stateDecls, isEmpty);
+    });
+
+    test('@Query carries named args verbatim', () {
+      final parser = createStreamingParser();
+      final result = parser.push(
+        r'$products = @Query(fetch_products, category: "shoes")'
+        '\n',
+      );
+      expect(result.meta.errors, isEmpty);
+      final decl = result.meta.queries.single;
+      expect(decl.toolName, 'fetch_products');
+      expect(decl.namedArgs.single.name, 'category');
+      expect(
+        decl.namedArgs.single.value,
+        equals(const Literal('shoes', offset: 41)),
+      );
     });
 
     test('mutation declaration', () {
@@ -279,7 +288,8 @@ void main() {
         final result = parser.push(
           r'$count = 0'
           '\n'
-          'users = Query(name: "list")\n'
+          r'$users = @Query(list_users, q: "active")'
+          '\n'
           'del = Mutation(name: "delete")\n',
         );
         // Spot-check that the meta types preserve the raw ASTs.
@@ -291,8 +301,10 @@ void main() {
         expect(decl.defaultValue, isA<Literal>());
 
         final qDecl = result.meta.queries.single;
-        expect(qDecl.statementId, 'users');
-        expect(qDecl.args.single.value, isA<Literal>());
+        expect(qDecl.statementId, r'$users');
+        expect(qDecl.toolName, 'list_users');
+        expect(qDecl.namedArgs.single.name, 'q');
+        expect(qDecl.namedArgs.single.value, isA<Literal>());
 
         final mDecl = result.meta.mutations.single;
         expect(mDecl.statementId, 'del');
@@ -319,6 +331,31 @@ void main() {
       final parser = createStreamingParser();
       final result = parser.push('root = @Each(rows, "t", Tag(t.name))\n');
       expect(result.meta.errors, isEmpty);
+    });
+
+    test('mid-stream partial @Query does not surface a shape error', () {
+      // Tool name has not been completed; autoClose patches the tail
+      // but the validator must skip the in-flight statement.
+      final parser = createStreamingParser();
+      final result = parser.push(r'$products = @Query(fetch_produc');
+      expect(
+        result.meta.errors.where((e) => e.message.contains('@Query')),
+        isEmpty,
+      );
+      expect(result.meta.incomplete, [r'$products']);
+    });
+
+    test('committed invalid @Query surfaces a shape error', () {
+      final parser = createStreamingParser();
+      final result = parser.push(
+        'data = @Query(tool)\ntail = 1\n',
+      );
+      expect(
+        result.meta.errors.where(
+          (e) => e.message.contains('must be the entire RHS'),
+        ),
+        hasLength(1),
+      );
     });
 
     test('committed invalid @Each surfaces a shape error', () {
@@ -368,7 +405,11 @@ void main() {
       );
       expect(
         () => result.meta.queries.add(
-          const QueryDecl(statementId: 'x', args: []),
+          const QueryDecl(
+            statementId: r'$x',
+            toolName: 'tool',
+            namedArgs: <Argument>[],
+          ),
         ),
         throwsUnsupportedError,
       );

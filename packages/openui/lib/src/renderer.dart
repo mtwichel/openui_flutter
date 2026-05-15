@@ -119,7 +119,6 @@ class _RendererState extends State<Renderer> {
     _formStateCache = FormStateCache();
     _storeUnsubscribe = _store.subscribe(_handleStoreChange);
     _queryManager = _buildQueryManager();
-    _queryManager?.onChange = _handleQueryChange;
     _runPipeline();
   }
 
@@ -130,7 +129,6 @@ class _RendererState extends State<Renderer> {
     if (libraryChanged) {
       _queryManager?.dispose();
       _queryManager = _buildQueryManager();
-      _queryManager?.onChange = _handleQueryChange;
     }
     if (widget.rootName != oldWidget.rootName) {
       _parser = createStreamingParser(rootName: widget.rootName);
@@ -155,17 +153,14 @@ class _RendererState extends State<Renderer> {
   QueryManager _buildQueryManager() {
     return QueryManager(
       library: widget.library,
+      store: _store,
+      onError: _reportError,
     );
   }
 
   void _handleStoreChange(StoreChangeOrigin _) {
     if (!mounted) return;
     widget.onStateUpdate?.call(_store.getSnapshot());
-    setState(() {});
-  }
-
-  void _handleQueryChange() {
-    if (!mounted) return;
     setState(() {});
   }
 
@@ -208,9 +203,12 @@ class _RendererState extends State<Renderer> {
     _wasStreaming = widget.isStreaming;
 
     final manager = _queryManager;
-    if (manager != null) {
+    if (manager != null &&
+        !widget.isStreaming &&
+        result.meta.incomplete.isEmpty) {
+      final fireCtx = _buildEvalContext(result);
       for (final query in result.meta.queries) {
-        manager.ensureFired(query.statementId, query.args);
+        manager.ensureFired(query, fireCtx);
       }
     }
 
@@ -228,14 +226,11 @@ class _RendererState extends State<Renderer> {
           offset: parseError.offset,
         ),
     ];
-    final queryErrors = _queryManager?.errors() ?? const <OpenUIError>[];
-    errors.addAll(queryErrors);
     // Preserve other error categories (eval, cycle, unknown-component,
-    // boundary throws) added via _reportError so they survive a
-    // post-dispatch rebuild of the parse / query slice.
+    // boundary throws, query failures) added via _reportError so they
+    // survive a post-dispatch rebuild of the parse slice.
     for (final e in _lastReportedErrors) {
       if (e is ParseError) continue;
-      if (queryErrors.contains(e)) continue;
       errors.add(e);
     }
     if (!_errorListsEqual(errors, _lastReportedErrors)) {
@@ -297,7 +292,7 @@ class _RendererState extends State<Renderer> {
       }
       for (final q in result.meta.queries) {
         if (q.statementId != id) continue;
-        manager.invalidate(id, q.args);
+        manager.invalidate(q, _buildEvalContext(result));
         return;
       }
     }
@@ -317,8 +312,6 @@ class _RendererState extends State<Renderer> {
     return EvalContext(
       statements: statements,
       store: _store,
-      queryResults:
-          _queryManager?.snapshotValues() ?? const <String, Object?>{},
       builtins: functionalBuiltins,
     );
   }
@@ -409,7 +402,6 @@ class _RendererState extends State<Renderer> {
       case MemberAccess():
       case IndexAccess():
       case ObjectLit():
-      case QueryCall():
       case MutationCall():
         final value = evaluate(node, ctx);
         return _wrapPrimitive(value);

@@ -80,20 +80,25 @@ void main() {
       expect(stale.toString(), contains('partial'));
     });
 
-    test('typeName resolves CompCall, BuiltinCall, Query, Mutation', () {
+    test('typeName resolves CompCall, BuiltinCall, Mutation', () {
       ElementNode wrap(AstNode expr) => ElementNode(
         expression: expr,
         statementId: 'x',
         partial: false,
       );
 
-      expect(wrap(CompCall('Stack', const [], offset: 0)).typeName, 'Stack');
       expect(
-        wrap(BuiltinCall('@Each', const [], offset: 0)).typeName,
+        wrap(CompCall('Stack', const <Argument>[], offset: 0)).typeName,
+        'Stack',
+      );
+      expect(
+        wrap(BuiltinCall('@Each', const <Argument>[], offset: 0)).typeName,
         '@Each',
       );
-      expect(wrap(QueryCall(const [], offset: 0)).typeName, 'Query');
-      expect(wrap(MutationCall(const [], offset: 0)).typeName, 'Mutation');
+      expect(
+        wrap(MutationCall(const <Argument>[], offset: 0)).typeName,
+        'Mutation',
+      );
       expect(wrap(const Literal('hi', offset: 0)).typeName, isNull);
       expect(wrap(const Reference('foo', offset: 0)).typeName, isNull);
     });
@@ -184,7 +189,8 @@ void main() {
         'root = "hi"\n'
         r'$count = 0'
         '\n'
-        'users = Query(name: "list")\n'
+        r'$users = @Query(list_users)'
+        '\n'
         'del = Mutation(name: "delete")\n',
       );
       final result = materialize(
@@ -278,10 +284,6 @@ void main() {
     test(
       'BuiltinCall args',
       () => expectTargetReachable('@Each(target, "r", row)'),
-    );
-    test(
-      'QueryCall args',
-      () => expectTargetReachable('Query(args: target)'),
     );
     test(
       'MutationCall args',

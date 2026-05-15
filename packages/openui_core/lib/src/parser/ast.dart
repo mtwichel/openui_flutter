@@ -410,7 +410,7 @@ final class CompCall extends AstNode {
   String toString() => 'CompCall($type, $args)';
 }
 
-/// A builtin call: `@Each(list, template)`, `@Set(target, value)`, ...
+/// A builtin call: `@Each(list, "name", template)`, `@Set(target, value)`, ...
 @experimental
 @immutable
 final class BuiltinCall extends AstNode {

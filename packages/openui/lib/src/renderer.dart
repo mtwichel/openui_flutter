@@ -109,6 +109,7 @@ class _RendererState extends State<Renderer> {
   // (lang-core/src/parser/parser.ts, completedStmtMap).
   ElementNode? _lastGoodRoot;
   String _previousResponse = '';
+  bool _wasStreaming = false;
 
   @override
   void initState() {
@@ -136,6 +137,7 @@ class _RendererState extends State<Renderer> {
     }
     if (widget.response != oldWidget.response ||
         widget.rootName != oldWidget.rootName ||
+        widget.isStreaming != oldWidget.isStreaming ||
         libraryChanged) {
       _runPipeline();
     }
@@ -156,7 +158,7 @@ class _RendererState extends State<Renderer> {
     );
   }
 
-  void _handleStoreChange() {
+  void _handleStoreChange(StoreChangeOrigin _) {
     if (!mounted) return;
     widget.onStateUpdate?.call(_store.getSnapshot());
     setState(() {});
@@ -168,6 +170,7 @@ class _RendererState extends State<Renderer> {
   }
 
   void _runPipeline() {
+    final refreshDeclarativeDefaults = widget.isStreaming || _wasStreaming;
     final response = widget.response ?? '';
     // Reset the last-good cache when the new buffer can't be a
     // continuation of the previous one (shorter, or starts differently).
@@ -197,7 +200,12 @@ class _RendererState extends State<Renderer> {
         decl.name: evaluate(decl.defaultValue, seedCtx),
     };
     seedStore.dispose();
-    _store.initialize(defaults, widget.initialState);
+    _store.initialize(
+      defaults,
+      persisted: widget.initialState,
+      refreshDeclarativeDefaults: refreshDeclarativeDefaults,
+    );
+    _wasStreaming = widget.isStreaming;
 
     final manager = _queryManager;
     if (manager != null) {
@@ -398,7 +406,6 @@ class _RendererState extends State<Renderer> {
       case StateAssign():
       case BinaryOp():
       case UnaryOp():
-      case Ternary():
       case MemberAccess():
       case IndexAccess():
       case ObjectLit():
@@ -406,6 +413,14 @@ class _RendererState extends State<Renderer> {
       case MutationCall():
         final value = evaluate(node, ctx);
         return _wrapPrimitive(value);
+      case Ternary(:final condition, :final then, :final otherwise):
+        final condVal = evaluate(condition, ctx);
+        final takeThen = isTruthyValue(condVal);
+        return _renderAst(
+          takeThen ? then : otherwise,
+          ctx,
+          statementHint: statementHint,
+        );
     }
   }
 
@@ -452,13 +467,35 @@ class _RendererState extends State<Renderer> {
   }
 
   /// Evaluates an `@Each`/`@Map` call and renders its template once per
-  /// item with `$item`/`$index` in scope. Returns `null` when the call
-  /// isn't shaped right (missing args, non-list list).
+  /// item with the iteration vars in scope. `@Each` binds a named loop
+  /// var (`args[1]` is a string literal) and `$index`; `@Map` keeps
+  /// `$item` / `$index`. Returns `null` when the call isn't shaped
+  /// right (missing args, non-list list, invalid name literal).
   List<Widget>? _renderIteration(
     BuiltinCall call,
     EvalContext ctx, {
     String? statementHint,
   }) {
+    if (call.name == '@Each') {
+      if (call.args.length != 3) return null;
+      final nameArg = call.args[1].value;
+      if (nameArg is! Literal || nameArg.value is! String) return null;
+      final loopVar = nameArg.value! as String;
+      final listVal = evaluate(call.args[0].value, ctx);
+      if (listVal is! List<Object?>) return null;
+      final template = call.args[2].value;
+      return [
+        for (var i = 0; i < listVal.length; i++)
+          _renderAst(
+            template,
+            ctx.withIteration(<String, Object?>{
+              loopVar: listVal[i],
+              r'$index': i,
+            }),
+            statementHint: statementHint,
+          ),
+      ];
+    }
     if (call.args.length < 2) return null;
     final listVal = evaluate(call.args[0].value, ctx);
     if (listVal is! List<Object?>) return null;
@@ -539,6 +576,7 @@ class _RendererState extends State<Renderer> {
         (e) =>
             e is CompCall ||
             e is Reference ||
+            e is Ternary ||
             (e is BuiltinCall && _isIterating(e)),
       );
       if (hasComp) {
@@ -551,8 +589,11 @@ class _RendererState extends State<Renderer> {
     }
     if (value is BuiltinCall && _isIterating(value)) {
       // @Each/@Map producing widgets — pre-render when the template is
-      // a component call.
-      if (value.args.length >= 2 && value.args[1].value is CompCall) {
+      // a component call. @Each's template lives at args[2] (the loop
+      // name occupies args[1]); @Map keeps args[1].
+      final templateIndex = value.name == '@Each' ? 2 : 1;
+      if (value.args.length > templateIndex &&
+          value.args[templateIndex].value is CompCall) {
         final widgets = _renderIteration(
           value,
           ctx,

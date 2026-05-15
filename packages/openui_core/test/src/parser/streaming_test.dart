@@ -301,6 +301,42 @@ void main() {
     );
   });
 
+  group('@Each shape validation is offset-gated', () {
+    test('mid-stream partial @Each does not surface a shape error', () {
+      // The third arg has not been typed yet. autoClose patches the
+      // tail into a parseable 2-arg call; the streaming parser must
+      // not surface the shape error for in-flight statements.
+      final parser = createStreamingParser();
+      final result = parser.push('root = @Each(rows, "t"');
+      expect(
+        result.meta.errors.where((e) => e.message.contains('@Each')),
+        isEmpty,
+      );
+      expect(result.meta.incomplete, ['root']);
+    });
+
+    test('a complete 3-arg @Each parses without an error', () {
+      final parser = createStreamingParser();
+      final result = parser.push('root = @Each(rows, "t", Tag(t.name))\n');
+      expect(result.meta.errors, isEmpty);
+    });
+
+    test('committed invalid @Each surfaces a shape error', () {
+      // The first statement is in the committed prefix (closed by
+      // newline). The 2-arg @Each must surface a shape error there.
+      final parser = createStreamingParser();
+      final result = parser.push(
+        r'root = @Each(rows, $item)'
+        '\n'
+        'tail = 1\n',
+      );
+      expect(
+        result.meta.errors.where((e) => e.message.contains('3 args')),
+        hasLength(1),
+      );
+    });
+  });
+
   group('ParseResult and ParseMeta immutability', () {
     test('statements list is unmodifiable', () {
       final result = createStreamingParser().push('a = 1\n');

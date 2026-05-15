@@ -32,7 +32,8 @@ export 'src/errors/errors.dart'
         ToolNotFoundError,
         UnknownComponentError;
 export 'src/eval/builtins.dart' show functionalBuiltins;
-export 'src/eval/evaluator.dart' show BuiltinHandler, EvalContext, evaluate;
+export 'src/eval/evaluator.dart'
+    show BuiltinHandler, EvalContext, evaluate, isTruthyValue;
 export 'src/library/library.dart'
     show
         Component,
@@ -92,5 +93,5 @@ export 'src/parser/streaming.dart'
         StreamParser,
         createStreamingParser;
 export 'src/prompt/prompt.dart' show generatePrompt;
-export 'src/state/store.dart' show Store;
+export 'src/state/store.dart' show Store, StoreChangeOrigin;
 export 'src/tools/tools.dart' show Tool, ToolResult;

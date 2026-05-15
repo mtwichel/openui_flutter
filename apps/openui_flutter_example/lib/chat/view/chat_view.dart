@@ -801,8 +801,11 @@ class _InputBarState extends State<_InputBar> {
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.enter &&
-            HardwareKeyboard.instance.isShiftPressed &&
             widget.enabled) {
+          if (HardwareKeyboard.instance.isShiftPressed) {
+            // Shift+Enter: newline (default multiline behavior).
+            return KeyEventResult.ignored;
+          }
           widget.onSend();
           return KeyEventResult.handled;
         }

@@ -211,6 +211,41 @@ root = Input(name: "field", value: \$name)
       expect(updates.last[r'$name'], 'hello');
     });
 
+    testWidgets('Input shows store value after @Set from elsewhere', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Renderer(
+              response: r'''
+$name = "before"
+root = Stack(children: [
+  Input(name: "field", value: $name),
+  Button(label: "Go", onClick: [@Set($name, "after")])
+])
+
+''',
+              library: standardLibrary(),
+            ),
+          ),
+        ),
+      );
+
+      final fieldBefore = tester.widget<TextField>(
+        find.byKey(const ValueKey('input-default-field')),
+      );
+      expect(fieldBefore.controller!.text, 'before');
+
+      await tester.tap(find.text('Go'));
+      await tester.pumpAndSettle();
+
+      final fieldAfter = tester.widget<TextField>(
+        find.byKey(const ValueKey('input-default-field')),
+      );
+      expect(fieldAfter.controller!.text, 'after');
+    });
+
     testWidgets('Tabs renders one Tab per inline TabItem', (tester) async {
       await tester.pumpWidget(
         _app('''

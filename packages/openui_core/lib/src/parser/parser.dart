@@ -70,7 +70,11 @@ class Program {
 /// token instead of throwing `LexException`. The grammar layer still
 /// records [ParseException]s for genuine syntax errors.
 @experimental
-Program parseProgram(String source, {bool recoverable = false}) {
+Program parseProgram(
+  String source, {
+  bool recoverable = false,
+  bool validateBuiltinShapes = true,
+}) {
   final tokens = tokenize(source, recoverable: recoverable).toList(
     growable: false,
   );
@@ -87,8 +91,136 @@ Program parseProgram(String source, {bool recoverable = false}) {
       pos = _skipToNextStatement(tokens, pos);
     }
   }
+  if (validateBuiltinShapes) {
+    for (final s in statements) {
+      errors.addAll(validateEachShape(s));
+    }
+  }
   return Program(statements: statements, errors: errors);
 }
+
+/// Walks [statement]'s expression for `@Each` builtin calls and returns
+/// a `ParseException` for every call that does not match the spec shape
+/// `@Each(list, "name", template)`.
+///
+/// When [committedOffsetBoundary] is non-null, calls whose statement's
+/// `offset` is at or beyond the boundary are skipped. The streaming
+/// parser uses that gate to suppress shape errors from the
+/// autoClose-patched pending tail, where the third arg may still be
+/// in flight.
+///
+/// Internal: re-used by the streaming parser to gate per-keystroke
+/// validation. Not part of the public API.
+@internal
+List<ParseException> validateEachShape(
+  Statement statement, {
+  int? committedOffsetBoundary,
+}) {
+  if (committedOffsetBoundary != null &&
+      statement.offset >= committedOffsetBoundary) {
+    return const <ParseException>[];
+  }
+  final errors = <ParseException>[];
+  _collectEachShapeErrors(statement.expression, errors);
+  return errors;
+}
+
+void _collectEachShapeErrors(AstNode node, List<ParseException> out) {
+  switch (node) {
+    case final BuiltinCall b:
+      if (b.name == '@Each') {
+        final problem = _validateEachCall(b);
+        if (problem != null) out.add(problem);
+      }
+      for (final arg in b.args) {
+        _collectEachShapeErrors(arg.value, out);
+      }
+    case CompCall(:final args):
+      for (final arg in args) {
+        _collectEachShapeErrors(arg.value, out);
+      }
+    case QueryCall(:final args):
+      for (final arg in args) {
+        _collectEachShapeErrors(arg.value, out);
+      }
+    case MutationCall(:final args):
+      for (final arg in args) {
+        _collectEachShapeErrors(arg.value, out);
+      }
+    case ArrayLit(:final elements):
+      for (final e in elements) {
+        _collectEachShapeErrors(e, out);
+      }
+    case ObjectLit(:final entries):
+      for (final e in entries) {
+        _collectEachShapeErrors(e.value, out);
+      }
+    case BinaryOp(:final left, :final right):
+      _collectEachShapeErrors(left, out);
+      _collectEachShapeErrors(right, out);
+    case UnaryOp(:final operand):
+      _collectEachShapeErrors(operand, out);
+    case Ternary(:final condition, :final then, :final otherwise):
+      _collectEachShapeErrors(condition, out);
+      _collectEachShapeErrors(then, out);
+      _collectEachShapeErrors(otherwise, out);
+    case MemberAccess(:final target):
+      _collectEachShapeErrors(target, out);
+    case IndexAccess(:final target, :final index):
+      _collectEachShapeErrors(target, out);
+      _collectEachShapeErrors(index, out);
+    case StateAssign(:final value):
+      _collectEachShapeErrors(value, out);
+    case Literal():
+    case NullLiteral():
+    case Reference():
+    case StateRef():
+      break;
+  }
+}
+
+ParseException? _validateEachCall(BuiltinCall call) {
+  if (call.args.length != 3) {
+    return ParseException(
+      '@Each requires 3 args (list, "name", template) — got '
+      '${call.args.length}',
+      call.offset,
+    );
+  }
+  final nameArg = call.args[1].value;
+  if (nameArg is! Literal || nameArg.value is! String) {
+    return ParseException(
+      '@Each requires a string identifier literal as the second arg',
+      call.args[1].offset,
+    );
+  }
+  final value = nameArg.value! as String;
+  if (!isValidLoopVarName(value)) {
+    return ParseException(
+      '@Each loop name "$value" is not a valid string identifier',
+      call.args[1].offset,
+    );
+  }
+  return null;
+}
+
+/// Whether [name] is a legal `@Each` loop variable: matches the IDENT
+/// rule (`[a-z_][a-zA-Z0-9_]*`), is non-empty, is not a reserved
+/// literal keyword (`true`, `false`, `null`), and does not begin with
+/// `$` (which would mask the STATEVAR convention and `$item`/`$index`).
+///
+/// Shared between the parser-level shape validator and the evaluator
+/// backstop in `builtins.dart` so the rule has a single source of
+/// truth.
+@internal
+bool isValidLoopVarName(String name) {
+  if (name.isEmpty) return false;
+  if (name.startsWith(r'$')) return false;
+  if (name == 'true' || name == 'false' || name == 'null') return false;
+  return _loopVarNamePattern.hasMatch(name);
+}
+
+final RegExp _loopVarNamePattern = RegExp(r'^[a-z_][a-zA-Z0-9_]*$');
 
 /// Parses [source] as a single expression (no `name = ` prefix).
 ///

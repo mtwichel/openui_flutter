@@ -10,7 +10,7 @@ import 'package:openui_core/openui_core.dart';
 /// `Input(name, value, placeholder?)` — a text field whose value is
 /// two-way bound to a `$state` variable. The controller lives in the
 /// renderer-owned `FormStateCache`, keyed by `(formName, name)`.
-class InputWidget extends StatelessWidget {
+class InputWidget extends StatefulWidget {
   /// Creates an [InputWidget].
   const InputWidget({
     required this.name,
@@ -30,22 +30,50 @@ class InputWidget extends StatelessWidget {
   final String? placeholder;
 
   @override
+  State<InputWidget> createState() => _InputWidgetState();
+}
+
+class _InputWidgetState extends State<InputWidget> {
+  /// Keeps the cached [TextEditingController] aligned with the store after a
+  /// [StoreChangeOrigin.mutation] (`@Set`, `@Reset`, field edits).
+  ///
+  /// [FormStateCache.controllerFor] only seeds text when allocating a new
+  /// controller; reused controllers would otherwise stay stale. Skipping this
+  /// after [StoreChangeOrigin.declarativeSeed] keeps visible typing when
+  /// streaming parses refresh declarative defaults — see
+  /// [Store.lastNotifyOrigin].
+  void _syncControllerIfNeeded(
+    TextEditingController controller,
+    String storeText,
+  ) {
+    if (controller.text == storeText) return;
+    controller.value = TextEditingValue(
+      text: storeText,
+      selection: TextSelection.collapsed(offset: storeText.length),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scope = RendererScope.of(context);
+    final storeText = widget.binding?.value as String? ?? '';
     final controller = scope.formStateCache.controllerFor(
       formName: 'default',
-      fieldName: name,
-      initialValue: binding?.value as String? ?? '',
+      fieldName: widget.name,
+      initialValue: storeText,
     );
+    if (scope.store.lastNotifyOrigin == StoreChangeOrigin.mutation) {
+      _syncControllerIfNeeded(controller, storeText);
+    }
     return TextField(
-      key: ValueKey<String>('input-default-$name'),
+      key: ValueKey<String>('input-default-${widget.name}'),
       controller: controller,
       decoration: InputDecoration(
         border: const OutlineInputBorder(),
-        hintText: placeholder,
+        hintText: widget.placeholder,
       ),
       onChanged: (text) {
-        final b = binding;
+        final b = widget.binding;
         if (b != null) scope.store.set(b.target, text);
       },
     );

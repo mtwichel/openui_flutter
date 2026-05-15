@@ -1,5 +1,15 @@
 import 'package:meta/meta.dart';
 
+/// Why [Store] subscribers were notified — see [Store.lastNotifyOrigin].
+enum StoreChangeOrigin {
+  /// Bindings changed via [Store.initialize] (declarative defaults,
+  /// hydration, streaming refresh).
+  declarativeSeed,
+
+  /// A binding changed via [Store.set] (field edits, `@Set`, etc.).
+  mutation,
+}
+
 /// Reactive key/value bag backing OpenUI Lang's `$state` variables.
 ///
 /// `Store` notifies subscribers whenever a [set] actually changes a
@@ -14,11 +24,11 @@ import 'package:meta/meta.dart';
 /// called, every other method throws [StateError]; [dispose] itself is
 /// idempotent.
 ///
-/// [initialize] seeds bindings without overwriting existing ones:
-/// `persisted` (e.g. a hydrated session) is filled first, then any
-/// keys still absent are filled from `defaults`. This matches the JS
-/// reference's hydration semantics so that an LLM response which
-/// re-emits a `$state` declaration does not clobber the user's input.
+/// [initialize] seeds bindings: `persisted` is filled first for keys
+/// still absent, then `defaults`. By default existing keys are left
+/// untouched so an LLM re-emission does not clobber user edits; see
+/// [Store.initialize] `refreshDeclarativeDefaults` for progressive
+/// streaming.
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -27,8 +37,20 @@ class Store {
   Store();
 
   final Map<String, Object?> _state = <String, Object?>{};
-  final Set<void Function()> _listeners = <void Function()>{};
+  final Set<void Function(StoreChangeOrigin)> _listeners =
+      <void Function(StoreChangeOrigin)>{};
   bool _disposed = false;
+
+  StoreChangeOrigin _lastNotifyOrigin = StoreChangeOrigin.declarativeSeed;
+
+  /// The [StoreChangeOrigin] recorded for the last notification pass.
+  ///
+  /// UI such as text fields uses this to decide whether to reconcile a
+  /// cached text field controller with the store: after a declarative
+  /// seed the visible field may legitimately diverge until the user
+  /// edits again, whereas after a [StoreChangeOrigin.mutation] the
+  /// controller should follow [Store] (for example `@Set`).
+  StoreChangeOrigin get lastNotifyOrigin => _lastNotifyOrigin;
 
   /// Returns the current value at [key], or `null` if absent.
   ///
@@ -48,7 +70,7 @@ class Store {
     _checkNotDisposed();
     if (_state.containsKey(key) && _state[key] == value) return;
     _state[key] = value;
-    _notify();
+    _notify(StoreChangeOrigin.mutation);
   }
 
   /// Subscribes [listener] to change notifications.
@@ -57,7 +79,7 @@ class Store {
   /// while a notify pass is in flight does not fire on that pass; a
   /// listener removed during a notify pass is skipped if its turn has
   /// not yet come. Throws [StateError] if the store has been disposed.
-  void Function() subscribe(void Function() listener) {
+  void Function() subscribe(void Function(StoreChangeOrigin origin) listener) {
     _checkNotDisposed();
     _listeners.add(listener);
     return () => _listeners.remove(listener);
@@ -77,16 +99,25 @@ class Store {
   ///
   /// [persisted] is applied first; any keys still absent are then
   /// filled from [defaults]. Existing keys are interpreted as
-  /// user-modified and left untouched. A single notification fires
-  /// when at least one binding is added; nothing fires when every key
-  /// is already present. Throws [StateError] if the store has been
-  /// disposed.
+  /// user-modified and left untouched — unless [refreshDeclarativeDefaults]
+  /// is true (progressive streaming): then declarative defaults overwrite
+  /// existing values for keys **not** listed in [persisted], so partial
+  /// parses can grow arrays/objects until the buffer catches up.
+  ///
+  /// Keys present in [persisted] never receive updates from [defaults],
+  /// even when [refreshDeclarativeDefaults] is true.
+  ///
+  /// A single notification fires when at least one binding is added or
+  /// changed; nothing fires when every key is already present and
+  /// unchanged. Throws [StateError] if the store has been disposed.
   void initialize(
-    Map<String, Object?> defaults, [
+    Map<String, Object?> defaults, {
     Map<String, Object?>? persisted,
-  ]) {
+    bool refreshDeclarativeDefaults = false,
+  }) {
     _checkNotDisposed();
     var changed = false;
+    final hydratedKeys = persisted?.keys.toSet() ?? const <String>{};
     if (persisted != null) {
       for (final entry in persisted.entries) {
         if (_state.containsKey(entry.key)) continue;
@@ -95,11 +126,22 @@ class Store {
       }
     }
     for (final entry in defaults.entries) {
-      if (_state.containsKey(entry.key)) continue;
+      if (hydratedKeys.contains(entry.key)) {
+        continue;
+      }
+      if (!_state.containsKey(entry.key)) {
+        _state[entry.key] = entry.value;
+        changed = true;
+        continue;
+      }
+      if (!refreshDeclarativeDefaults) {
+        continue;
+      }
+      if (_state[entry.key] == entry.value) continue;
       _state[entry.key] = entry.value;
       changed = true;
     }
-    if (changed) _notify();
+    if (changed) _notify(StoreChangeOrigin.declarativeSeed);
   }
 
   /// Releases all listeners and marks the store unusable.
@@ -112,12 +154,13 @@ class Store {
     _disposed = true;
   }
 
-  void _notify() {
+  void _notify(StoreChangeOrigin origin) {
+    _lastNotifyOrigin = origin;
     for (final listener in _listeners.toList(growable: false)) {
       // A listener removed by an earlier listener in this same pass
       // must not fire; check membership before invoking.
       if (!_listeners.contains(listener)) continue;
-      listener();
+      listener(origin);
     }
   }
 

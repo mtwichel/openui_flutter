@@ -84,7 +84,7 @@ Every statement is classified at parse time as one of:
 |---|---|---|
 | `@Count` | `@Count(list)` | Returns `list.length` (or `0` if the input is null) |
 | `@Filter` | `@Filter(list, predicateRef)` | Filters `list` by calling the predicate (a comp ref) on each item |
-| `@Each` | `@Each(list, itemTemplate)` | Materializes `itemTemplate` once per item, substituting `$item` and `$index` references. Lazy: not evaluated until needed |
+| `@Each` | `@Each(list, "name", template)` | Materializes `template` once per item with the named loop var (`name.field`) and `$index` bound. The loop name must be a string literal matching the IDENT rule (`[a-z_][a-zA-Z0-9_]*`), not `true`/`false`/`null`, and may not start with `$`. Lazy: not evaluated until needed |
 | `@Map` | `@Map(list, transformRef)` | Maps each element through a comp ref |
 
 Action-step builtins (only as elements of a **non-empty array literal** on props marked `x-action: true` in the component schema, for example `onClick: [@Set($count, $count + 1)]` or `onClick: [@Run(refresh), @Set($flag, 1)]`. Bare `@Step(...)`, empty `[]`, `Action(...)`, and arrays containing non-action expressions are rejected.)

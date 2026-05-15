@@ -11,6 +11,18 @@ import 'package:test/test.dart';
 
 void main() {
   group('Store', () {
+    test('lastNotifyOrigin records declarativeSeed vs mutation', () {
+      StoreChangeOrigin? seen;
+      final store = Store()
+        ..subscribe((origin) => seen = origin)
+        ..initialize({r'$a': 1});
+      expect(seen, StoreChangeOrigin.declarativeSeed);
+      expect(store.lastNotifyOrigin, StoreChangeOrigin.declarativeSeed);
+      store.set(r'$a', 2);
+      expect(seen, StoreChangeOrigin.mutation);
+      expect(store.lastNotifyOrigin, StoreChangeOrigin.mutation);
+    });
+
     test('initial state: get returns null and snapshot is empty', () {
       final store = Store();
       expect(store.get('x'), isNull);
@@ -21,7 +33,7 @@ void main() {
       final store = Store();
       var notifications = 0;
       store
-        ..subscribe(() => notifications++)
+        ..subscribe((_) => notifications++)
         ..set(r'$count', 1);
       expect(notifications, 1);
       expect(store.get(r'$count'), 1);
@@ -31,7 +43,7 @@ void main() {
       final store = Store()..set(r'$count', 1);
       var notifications = 0;
       store
-        ..subscribe(() => notifications++)
+        ..subscribe((_) => notifications++)
         ..set(r'$count', 1);
       expect(notifications, 0);
     });
@@ -40,7 +52,7 @@ void main() {
       final store = Store()..set(r'$count', 1);
       var notifications = 0;
       store
-        ..subscribe(() => notifications++)
+        ..subscribe((_) => notifications++)
         ..set(r'$count', 2);
       expect(notifications, 1);
       expect(store.get(r'$count'), 2);
@@ -52,7 +64,7 @@ void main() {
         final store = Store();
         var notifications = 0;
         store
-          ..subscribe(() => notifications++)
+          ..subscribe((_) => notifications++)
           ..set('x', null);
         expect(notifications, 1);
         expect(store.getSnapshot().containsKey('x'), isTrue);
@@ -63,7 +75,7 @@ void main() {
       final store = Store()..set('x', null);
       var notifications = 0;
       store
-        ..subscribe(() => notifications++)
+        ..subscribe((_) => notifications++)
         ..set('x', null);
       expect(notifications, 0);
     });
@@ -73,8 +85,8 @@ void main() {
       var a = 0;
       var b = 0;
       store
-        ..subscribe(() => a++)
-        ..subscribe(() => b++)
+        ..subscribe((_) => a++)
+        ..subscribe((_) => b++)
         ..set('x', 1);
       expect(a, 1);
       expect(b, 1);
@@ -83,7 +95,7 @@ void main() {
     test('unsubscribe stops further notifications', () {
       final store = Store();
       var notifications = 0;
-      final unsub = store.subscribe(() => notifications++);
+      final unsub = store.subscribe((_) => notifications++);
       unsub();
       store.set('x', 1);
       expect(notifications, 0);
@@ -91,7 +103,7 @@ void main() {
 
     test('the unsubscribe callback is idempotent', () {
       final store = Store();
-      final unsub = store.subscribe(() {});
+      final unsub = store.subscribe((_) {});
       unsub();
       // A second call must not throw.
       expect(unsub, returnsNormally);
@@ -104,11 +116,11 @@ void main() {
         var aCount = 0;
         var bCount = 0;
         late void Function() unsubB;
-        store.subscribe(() {
+        store.subscribe((_) {
           aCount++;
           unsubB();
         });
-        unsubB = store.subscribe(() => bCount++);
+        unsubB = store.subscribe((_) => bCount++);
         store.set('x', 1);
         expect(aCount, 1);
         // b was unsubscribed by a's handler before its turn came up.
@@ -124,8 +136,8 @@ void main() {
       final store = Store();
       var newSubFires = 0;
       store
-        ..subscribe(() {
-          store.subscribe(() => newSubFires++);
+        ..subscribe((_) {
+          store.subscribe((_) => newSubFires++);
         })
         ..set('x', 1);
       expect(newSubFires, 0);
@@ -163,12 +175,14 @@ void main() {
       });
 
       test('persisted is applied before defaults', () {
-        final store = Store()..initialize({r'$count': 0}, {r'$count': 42});
+        final store = Store()
+          ..initialize({r'$count': 0}, persisted: {r'$count': 42});
         expect(store.get(r'$count'), 42);
       });
 
       test('defaults fill keys not present in persisted', () {
-        final store = Store()..initialize({r'$a': 1, r'$b': 2}, {r'$b': 99});
+        final store = Store()
+          ..initialize({r'$a': 1, r'$b': 2}, persisted: {r'$b': 99});
         expect(store.get(r'$a'), 1);
         expect(store.get(r'$b'), 99);
       });
@@ -176,7 +190,7 @@ void main() {
       test('persisted does not overwrite a user-modified binding', () {
         final store = Store()
           ..set(r'$count', 7)
-          ..initialize({r'$count': 0}, {r'$count': 42});
+          ..initialize({r'$count': 0}, persisted: {r'$count': 42});
         expect(store.get(r'$count'), 7);
       });
 
@@ -184,7 +198,7 @@ void main() {
         final store = Store();
         var notifications = 0;
         store
-          ..subscribe(() => notifications++)
+          ..subscribe((_) => notifications++)
           ..initialize({r'$a': 1, r'$b': 2});
         expect(notifications, 1);
       });
@@ -193,7 +207,7 @@ void main() {
         final store = Store()..set(r'$count', 7);
         var notifications = 0;
         store
-          ..subscribe(() => notifications++)
+          ..subscribe((_) => notifications++)
           ..initialize({r'$count': 0});
         expect(notifications, 0);
       });
@@ -202,6 +216,57 @@ void main() {
         final store = Store()..initialize({r'$x': 1});
         expect(store.get(r'$x'), 1);
       });
+
+      group('refreshDeclarativeDefaults', () {
+        test('overwrites existing declarative bindings when true', () {
+          final store = Store()
+            ..initialize({
+              r'$n': const [1, 2],
+            })
+            ..initialize(
+              {
+                r'$n': const [1, 2, 3, 4, 5],
+              },
+              refreshDeclarativeDefaults: true,
+            );
+          expect(store.get(r'$n'), const [1, 2, 3, 4, 5]);
+        });
+
+        test('preserves never-overwrite behavior when false', () {
+          final store = Store()
+            ..initialize({
+              r'$n': const [1, 2],
+            })
+            ..initialize({
+              r'$n': const [1, 2, 3, 4, 5],
+            });
+          expect(store.get(r'$n'), const [1, 2]);
+        });
+
+        test('persisted keys are never updated from defaults', () {
+          final store = Store()
+            ..initialize(
+              {
+                r'$n': const [1, 2],
+              },
+              persisted: {
+                r'$n': const [99],
+              },
+              refreshDeclarativeDefaults: true,
+            );
+          expect(store.get(r'$n'), const [99]);
+          store.initialize(
+            {
+              r'$n': const [1, 2, 3, 4, 5],
+            },
+            persisted: {
+              r'$n': const [99],
+            },
+            refreshDeclarativeDefaults: true,
+          );
+          expect(store.get(r'$n'), const [99]);
+        });
+      });
     });
 
     group('dispose', () {
@@ -209,7 +274,7 @@ void main() {
         final store = Store();
         var notifications = 0;
         store
-          ..subscribe(() => notifications++)
+          ..subscribe((_) => notifications++)
           ..dispose();
         // The store is now unusable for set, but the listener set is
         // empty — verified indirectly through the dispose-locks-out
@@ -224,7 +289,7 @@ void main() {
 
       test('subscribe throws StateError after dispose', () {
         final store = Store()..dispose();
-        expect(() => store.subscribe(() {}), throwsStateError);
+        expect(() => store.subscribe((_) {}), throwsStateError);
       });
 
       test('set throws StateError after dispose', () {

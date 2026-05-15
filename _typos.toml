@@ -22,4 +22,7 @@ extend-exclude = [
   "**/coverage/**",
   "tools/spikes/**",
   "**/firebase_options.dart",
+  # Xcode / Interface Builder output (UUID fragments look like typos to spellcheck).
+  "**/macos/**/*.pbxproj",
+  "**/macos/**/*.xib",
 ]

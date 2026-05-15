@@ -2,6 +2,14 @@
 
 ## 0.1.0 (unreleased)
 
+- **BREAKING**: `@Each` now takes three args — `@Each(list, "name", template)`.
+  The loop variable is named explicitly via a string literal and bound under
+  its bare key inside the template (e.g. `@Each(items, "row", Card(title:
+  row.name))`). `$index` is still bound. The 2-arg implicit-`$item` form is
+  removed. `@Map` and `@Filter` are unchanged. `parseProgram` records a
+  `ParseException` for shape-invalid `@Each` calls (wrong arity,
+  non-string-literal name, reserved name, empty name, leading `$`).
+
 ### Phase 1 — `openui_core` language and runtime
 
 The language core ships in 13 milestones built on top of the Phase 0

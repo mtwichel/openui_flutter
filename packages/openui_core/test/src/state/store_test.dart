@@ -12,10 +12,10 @@ import 'package:test/test.dart';
 void main() {
   group('Store', () {
     test('lastNotifyOrigin records declarativeSeed vs mutation', () {
-      final store = Store();
       StoreChangeOrigin? seen;
-      store.subscribe((origin) => seen = origin);
-      store.initialize({r'$a': 1});
+      final store = Store()
+        ..subscribe((origin) => seen = origin)
+        ..initialize({r'$a': 1});
       expect(seen, StoreChangeOrigin.declarativeSeed);
       store.set(r'$a', 2);
       expect(seen, StoreChangeOrigin.mutation);

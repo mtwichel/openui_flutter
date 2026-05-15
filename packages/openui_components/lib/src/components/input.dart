@@ -40,7 +40,8 @@ class _InputWidgetState extends State<InputWidget> {
   /// [FormStateCache.controllerFor] only seeds text when allocating a new
   /// controller; reused controllers would otherwise stay stale. Skipping this
   /// after [StoreChangeOrigin.declarativeSeed] keeps visible typing when
-  /// streaming parses refresh declarative defaults — see [Store.lastNotifyOrigin].
+  /// streaming parses refresh declarative defaults — see
+  /// [Store.lastNotifyOrigin].
   void _syncControllerIfNeeded(
     TextEditingController controller,
     String storeText,

@@ -46,7 +46,7 @@ class Store {
   /// The [StoreChangeOrigin] recorded for the last notification pass.
   ///
   /// UI such as text fields uses this to decide whether to reconcile a
-  /// cached [TextEditingController] with the store: after a declarative
+  /// cached text field controller with the store: after a declarative
   /// seed the visible field may legitimately diverge until the user
   /// edits again, whereas after a [StoreChangeOrigin.mutation] the
   /// controller should follow [Store] (for example `@Set`).

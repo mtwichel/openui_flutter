@@ -616,10 +616,14 @@ void main() {
       expect(ast.args.map((a) => a.name).toList(), [null, 'b', 'c']);
     });
 
-    test('builtin call: @Each(list, item)', () {
-      final ast = parseExpression('@Each(items, row)') as BuiltinCall;
+    test('builtin call: @Each(list, "name", template) parses with 3 args', () {
+      final ast = parseExpression('@Each(items, "t", t.name)') as BuiltinCall;
       expect(ast.name, '@Each');
-      expect(ast.args, hasLength(2));
+      expect(ast.args, hasLength(3));
+      expect(ast.args[1].value, equals(const Literal('t', offset: 13)));
+      final tmpl = ast.args[2].value as MemberAccess;
+      expect(tmpl.target, equals(const Reference('t', offset: 18)));
+      expect(tmpl.name, 'name');
     });
 
     test('Query and Mutation become QueryCall / MutationCall', () {
@@ -877,6 +881,80 @@ void main() {
       final program = parseProgram('Card = Stack()');
       expect(program.errors, isEmpty);
       expect(program.statements.single.name, 'Card');
+    });
+
+    test('@Each shape: 3-arg form parses cleanly', () {
+      final program = parseProgram('root = @Each(items, "t", t.name)');
+      expect(program.errors, isEmpty);
+      expect(program.statements, hasLength(1));
+    });
+
+    test('@Each shape: 2-arg form records ParseException', () {
+      final program = parseProgram(r'root = @Each(items, $item)');
+      expect(program.errors, hasLength(1));
+      final msg = program.errors.single.message;
+      expect(msg, contains('@Each'));
+      expect(msg, contains('3 args'));
+    });
+
+    test('@Each shape: 4-arg form records ParseException', () {
+      final program = parseProgram('root = @Each(items, "r", row, extra)');
+      expect(program.errors, hasLength(1));
+      expect(program.errors.single.message, contains('3 args'));
+    });
+
+    test('@Each shape: non-literal second arg records ParseException', () {
+      final program = parseProgram('root = @Each(items, name, t.x)');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('string identifier'),
+      );
+    });
+
+    test('@Each shape: reserved name "true" records ParseException', () {
+      final program = parseProgram('root = @Each(items, "true", t.x)');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('string identifier'),
+      );
+    });
+
+    test('@Each shape: empty-string name records ParseException', () {
+      final program = parseProgram('root = @Each(items, "", t.x)');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('string identifier'),
+      );
+    });
+
+    test(r'@Each shape: $-prefixed name records ParseException', () {
+      final program = parseProgram(r'root = @Each(items, "$bad", t.x)');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('string identifier'),
+      );
+    });
+
+    test('@Each shape: invalid IDENT (uppercase leading) records error', () {
+      final program = parseProgram('root = @Each(items, "Foo", t.x)');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('string identifier'),
+      );
+    });
+
+    test('@Each shape: nested invalid @Each inside outer is reported', () {
+      // Outer valid; inner has 2 args. Only the inner shape is wrong.
+      final program = parseProgram(
+        'root = @Each(items, "outer", @Each(outer, outer))',
+      );
+      expect(program.errors, hasLength(1));
+      expect(program.errors.single.message, contains('3 args'));
     });
   });
 

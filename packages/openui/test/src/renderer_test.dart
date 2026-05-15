@@ -688,6 +688,50 @@ root = Counter(value: 0, onIncrement: [@Run(refresh)])
     );
 
     testWidgets(
+      '@Each with the new 3-arg form renders one widget per item',
+      (tester) async {
+        const program = '''items = ["alpha", "beta", "gamma"]
+root = @Each(items, "row", Text(text: row))
+''';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.text('alpha'), findsOneWidget);
+        expect(find.text('beta'), findsOneWidget);
+        expect(find.text('gamma'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'component prop set to @Each resolves through the prop-iteration branch',
+      (tester) async {
+        // Column.children is an array prop; the @Each call's template
+        // is a CompCall (Text), so the prop-branch in _resolvePropValue
+        // must pre-render each item with the loop var in scope.
+        const program = '''items = ["one", "two"]
+root = Column(children: @Each(items, "row", Text(text: row)))
+''';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.text('one'), findsOneWidget);
+        expect(find.text('two'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'cache resets when a new response is unrelated to the previous',
       (tester) async {
         Widget tree(String response, {bool streaming = true}) => _TestRoot(

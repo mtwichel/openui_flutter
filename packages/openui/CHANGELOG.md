@@ -2,6 +2,9 @@
 
 ## 0.1.0 (unreleased)
 
+- **chore**: renderer iteration paths follow the new 3-arg `@Each`
+  shape — the template is read from `args[2]` and the named loop var
+  is bound from the string-literal at `args[1]`. `@Map` is unchanged.
 - **feat**: `Renderer` widget — streaming-aware Flutter renderer for
   OpenUI Lang. Owns the parser, reactive store, query cache,
   form-state cache, and a per-element error boundary.

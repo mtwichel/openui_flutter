@@ -192,7 +192,24 @@ class StreamParser {
     final split = _splitBuffer(_buffer);
     final closedTail = autoClose(split.tail);
     final effective = '${split.prefix}$closedTail';
-    final program = parseProgram(effective, recoverable: true);
+    // Suppress the strict builtin-shape pass in `parseProgram` — it
+    // would surface an `@Each` complaint on every keystroke as the
+    // LLM types the third arg. Run the same validator here with the
+    // prefix boundary so statements still in the autoClose tail are
+    // skipped.
+    final program = parseProgram(
+      effective,
+      recoverable: true,
+      validateBuiltinShapes: false,
+    );
+    final gatedErrors = <ParseException>[
+      ...program.errors,
+      for (final s in program.statements)
+        ...validateEachShape(
+          s,
+          committedOffsetBoundary: split.prefix.length,
+        ),
+    ];
 
     final incomplete = <String>[];
     final stateDecls = <StateDecl>[];
@@ -247,7 +264,7 @@ class StreamParser {
         incomplete: incomplete,
         unresolved: materialized.unresolved,
         orphaned: materialized.orphaned,
-        errors: program.errors,
+        errors: gatedErrors,
         stateDecls: stateDecls,
         queries: queries,
         mutations: mutations,

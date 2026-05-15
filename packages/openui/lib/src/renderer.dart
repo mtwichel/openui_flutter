@@ -452,13 +452,35 @@ class _RendererState extends State<Renderer> {
   }
 
   /// Evaluates an `@Each`/`@Map` call and renders its template once per
-  /// item with `$item`/`$index` in scope. Returns `null` when the call
-  /// isn't shaped right (missing args, non-list list).
+  /// item with the iteration vars in scope. `@Each` binds a named loop
+  /// var (`args[1]` is a string literal) and `$index`; `@Map` keeps
+  /// `$item` / `$index`. Returns `null` when the call isn't shaped
+  /// right (missing args, non-list list, invalid name literal).
   List<Widget>? _renderIteration(
     BuiltinCall call,
     EvalContext ctx, {
     String? statementHint,
   }) {
+    if (call.name == '@Each') {
+      if (call.args.length != 3) return null;
+      final nameArg = call.args[1].value;
+      if (nameArg is! Literal || nameArg.value is! String) return null;
+      final loopVar = nameArg.value! as String;
+      final listVal = evaluate(call.args[0].value, ctx);
+      if (listVal is! List<Object?>) return null;
+      final template = call.args[2].value;
+      return [
+        for (var i = 0; i < listVal.length; i++)
+          _renderAst(
+            template,
+            ctx.withIteration(<String, Object?>{
+              loopVar: listVal[i],
+              r'$index': i,
+            }),
+            statementHint: statementHint,
+          ),
+      ];
+    }
     if (call.args.length < 2) return null;
     final listVal = evaluate(call.args[0].value, ctx);
     if (listVal is! List<Object?>) return null;
@@ -551,8 +573,11 @@ class _RendererState extends State<Renderer> {
     }
     if (value is BuiltinCall && _isIterating(value)) {
       // @Each/@Map producing widgets — pre-render when the template is
-      // a component call.
-      if (value.args.length >= 2 && value.args[1].value is CompCall) {
+      // a component call. @Each's template lives at args[2] (the loop
+      // name occupies args[1]); @Map keeps args[1].
+      final templateIndex = value.name == '@Each' ? 2 : 1;
+      if (value.args.length > templateIndex &&
+          value.args[templateIndex].value is CompCall) {
         final widgets = _renderIteration(
           value,
           ctx,

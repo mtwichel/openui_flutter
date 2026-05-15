@@ -10,12 +10,13 @@ import 'package:openui_core/src/parser/parser.dart';
 ///   null. Anything else is a category error and yields `0`.
 /// - `@Filter(list, predicate)` — keeps each item for which
 ///   `predicate` evaluates truthy with `$item` and `$index` in scope.
-/// - `@Each(list, template)` — evaluates `template` once per item
-///   with `$item` and `$index` in scope; returns the list of
-///   results. The renderer's iteration source.
-/// - `@Map(list, transform)` — same shape as `@Each`. Spec calls the
-///   second arg a "transform ref", but at the evaluator layer the
-///   semantics are identical.
+/// - `@Each(list, "name", template)` — evaluates `template` once per
+///   item with the named loop var (bound under its bare key) and
+///   `$index` in scope; returns the list of results. The renderer's
+///   iteration source.
+/// - `@Map(list, transform)` — `@Filter`-shaped: `$item` / `$index`
+///   in scope. Spec calls the second arg a "transform ref", but at
+///   the evaluator layer the semantics match `@Filter`.
 ///
 /// Action-step builtins (`@Set`, `@Reset`, `@Run`, `@ToAssistant`)
 /// are in a separate dispatcher and not part of this
@@ -85,8 +86,54 @@ Object? _evalFilter(BuiltinCall call, EvalContext context) {
   return result;
 }
 
-Object? _evalEach(BuiltinCall call, EvalContext context) =>
-    _iterate(call, context, '@Each');
+Object? _evalEach(BuiltinCall call, EvalContext context) {
+  if (call.args.length != 3) {
+    context.errors.add(
+      EvaluationError(
+        message:
+            '@Each requires (list, "name", template) — 3 args, '
+            'got ${call.args.length}',
+      ),
+    );
+    return <Object?>[];
+  }
+  final nameArg = call.args[1].value;
+  if (nameArg is! Literal ||
+      nameArg.value is! String ||
+      !isValidLoopVarName(nameArg.value! as String)) {
+    context.errors.add(
+      const EvaluationError(
+        message:
+            '@Each requires (list, "name", template) — second arg must '
+            'be a string identifier literal',
+      ),
+    );
+    return <Object?>[];
+  }
+  final loopVar = nameArg.value! as String;
+  final listVal = evaluate(call.args[0].value, context);
+  if (listVal == null) return <Object?>[];
+  if (listVal is! List<Object?>) {
+    context.errors.add(
+      EvaluationError(
+        message:
+            '@Each expects a list as first arg, got ${listVal.runtimeType}',
+      ),
+    );
+    return <Object?>[];
+  }
+  final template = call.args[2].value;
+  return <Object?>[
+    for (var i = 0; i < listVal.length; i++)
+      evaluate(
+        template,
+        context.withIteration(<String, Object?>{
+          loopVar: listVal[i],
+          r'$index': i,
+        }),
+      ),
+  ];
+}
 
 Object? _evalMap(BuiltinCall call, EvalContext context) =>
     _iterate(call, context, '@Map');

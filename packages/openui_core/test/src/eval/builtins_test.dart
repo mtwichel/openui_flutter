@@ -180,74 +180,214 @@ void main() {
   });
 
   group('@Each', () {
-    test(r'substitutes $item into the template', () {
-      final ctx = _ctx(r'a = @Each([1, 2, 3], $item + 10)');
-      expect(
-        evaluate(_rhsOf(r'a = @Each([1, 2, 3], $item + 10)', 'a'), ctx),
-        [11, 12, 13],
-      );
+    test('binds the named loop var into the template', () {
+      const source = 'a = @Each([1, 2, 3], "n", n + 10)';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), [11, 12, 13]);
     });
 
-    test(r'substitutes $index alongside $item', () {
-      final ctx = _ctx(r'a = @Each(["a", "b"], $index)');
-      expect(
-        evaluate(_rhsOf(r'a = @Each(["a", "b"], $index)', 'a'), ctx),
-        [0, 1],
-      );
+    test(r'$index is bound alongside the named loop var', () {
+      const source = r'a = @Each(["a", "b"], "n", $index)';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), [0, 1]);
     });
 
     test('empty list yields an empty result', () {
-      final ctx = _ctx(r'a = @Each([], $item)');
-      expect(
-        evaluate(_rhsOf(r'a = @Each([], $item)', 'a'), ctx),
-        isEmpty,
-      );
+      const source = 'a = @Each([], "n", n)';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), isEmpty);
     });
 
     test('null list yields an empty result without an error', () {
-      final ctx = _ctx(r'a = @Each(missing, $item)');
-      expect(
-        evaluate(_rhsOf(r'a = @Each(missing, $item)', 'a'), ctx),
-        isEmpty,
-      );
+      const source = 'a = @Each(missing, "n", n)';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), isEmpty);
       expect(ctx.errors, isEmpty);
     });
 
     test('non-list input pushes an error', () {
-      final ctx = _ctx(r'a = @Each("hi", $item)');
-      expect(
-        evaluate(_rhsOf(r'a = @Each("hi", $item)', 'a'), ctx),
-        isEmpty,
-      );
+      const source = 'a = @Each("hi", "n", n)';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), isEmpty);
       expect(
         (ctx.errors.single as EvaluationError).message,
         contains('@Each expects a list'),
       );
     });
 
-    test('arity error on missing template', () {
-      final ctx = _ctx('a = @Each([1, 2])');
-      expect(evaluate(_rhsOf('a = @Each([1, 2])', 'a'), ctx), isEmpty);
+    test('2-arg call surfaces an arity error pointing at the new shape', () {
+      // Direct AST construction — the parser would reject this shape,
+      // but the evaluator backstop must still fire (programmatic
+      // callers, hand-built ASTs in tests).
+      final call = BuiltinCall(
+        '@Each',
+        [
+          Argument(value: ArrayLit(const [], offset: 0), offset: 0),
+          const Argument(value: Reference('item', offset: 0), offset: 0),
+        ],
+        offset: 0,
+      );
+      final ctx = EvalContext(
+        statements: const [],
+        store: Store(),
+        builtins: functionalBuiltins,
+      );
+      expect(evaluate(call, ctx), isEmpty);
+      final msg = (ctx.errors.single as EvaluationError).message;
+      expect(msg, contains('3 args'));
+      expect(msg, contains('(list, "name", template)'));
+    });
+
+    test('wrong-arity (4 args) surfaces an error', () {
+      final call = BuiltinCall(
+        '@Each',
+        [
+          Argument(value: ArrayLit(const [], offset: 0), offset: 0),
+          const Argument(value: Literal('n', offset: 0), offset: 0),
+          const Argument(value: Reference('n', offset: 0), offset: 0),
+          const Argument(value: Literal(1, offset: 0), offset: 0),
+        ],
+        offset: 0,
+      );
+      final ctx = EvalContext(
+        statements: const [],
+        store: Store(),
+        builtins: functionalBuiltins,
+      );
+      expect(evaluate(call, ctx), isEmpty);
       expect(
         (ctx.errors.single as EvaluationError).message,
-        contains('@Each requires (list, template)'),
+        contains('3 args'),
+      );
+    });
+
+    test('non-string-literal name surfaces an error', () {
+      // Built directly: second arg is a Reference, not a Literal.
+      final call = BuiltinCall(
+        '@Each',
+        [
+          Argument(value: ArrayLit(const [], offset: 0), offset: 0),
+          const Argument(value: Reference('name', offset: 0), offset: 0),
+          const Argument(value: Reference('name', offset: 0), offset: 0),
+        ],
+        offset: 0,
+      );
+      final ctx = EvalContext(
+        statements: const [],
+        store: Store(),
+        builtins: functionalBuiltins,
+      );
+      expect(evaluate(call, ctx), isEmpty);
+      expect(
+        (ctx.errors.single as EvaluationError).message,
+        contains('string identifier literal'),
+      );
+    });
+
+    test('empty-string name is rejected', () {
+      final call = BuiltinCall(
+        '@Each',
+        [
+          Argument(value: ArrayLit(const [], offset: 0), offset: 0),
+          const Argument(value: Literal('', offset: 0), offset: 0),
+          const Argument(value: Literal(1, offset: 0), offset: 0),
+        ],
+        offset: 0,
+      );
+      final ctx = EvalContext(
+        statements: const [],
+        store: Store(),
+        builtins: functionalBuiltins,
+      );
+      expect(evaluate(call, ctx), isEmpty);
+      expect(
+        (ctx.errors.single as EvaluationError).message,
+        contains('string identifier literal'),
+      );
+    });
+
+    test(r'$-prefixed name is rejected', () {
+      final call = BuiltinCall(
+        '@Each',
+        [
+          Argument(value: ArrayLit(const [], offset: 0), offset: 0),
+          const Argument(value: Literal(r'$item', offset: 0), offset: 0),
+          const Argument(value: Reference('x', offset: 0), offset: 0),
+        ],
+        offset: 0,
+      );
+      final ctx = EvalContext(
+        statements: const [],
+        store: Store(),
+        builtins: functionalBuiltins,
+      );
+      expect(evaluate(call, ctx), isEmpty);
+      expect(
+        (ctx.errors.single as EvaluationError).message,
+        contains('string identifier literal'),
+      );
+    });
+
+    test('reserved keyword name is rejected', () {
+      final call = BuiltinCall(
+        '@Each',
+        [
+          Argument(value: ArrayLit(const [], offset: 0), offset: 0),
+          const Argument(value: Literal('true', offset: 0), offset: 0),
+          const Argument(value: Reference('x', offset: 0), offset: 0),
+        ],
+        offset: 0,
+      );
+      final ctx = EvalContext(
+        statements: const [],
+        store: Store(),
+        builtins: functionalBuiltins,
+      );
+      expect(evaluate(call, ctx), isEmpty);
+      expect(
+        (ctx.errors.single as EvaluationError).message,
+        contains('string identifier literal'),
       );
     });
 
     test('template via Reference is re-evaluated per item', () {
-      // `tpl` references $item; @Each calls it once per element.
-      const source =
-          'result = @Each([1, 2, 3], tpl)\n'
-          r'tpl = $item * 10';
+      const source = 'result = @Each([1, 2, 3], "n", tpl)\ntpl = n * 10';
       final ctx = _ctx(source);
-      expect(
-        evaluate(_rhsOf(source, 'result'), ctx),
-        [10, 20, 30],
-      );
+      expect(evaluate(_rhsOf(source, 'result'), ctx), [10, 20, 30]);
+    });
+
+    test('nested @Each binds distinct names without leaking the outer', () {
+      const source =
+          'a = @Each([[1, 2], [3]], "outer", '
+          '@Each(outer, "inner", outer))';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), [
+        [
+          [1, 2],
+          [1, 2],
+        ],
+        [
+          [3],
+        ],
+      ]);
+    });
+
+    test('nested @Each member access on objects', () {
+      // Each row is {children: [...]}; iterate outer first, then inner.
+      const source =
+          'a = @Each([ '
+          '{id: 1, children: [{id: 10}, {id: 11}]}, '
+          '{id: 2, children: [{id: 20}]} '
+          '], "o", @Each(o.children, "c", c.id))';
+      final ctx = _ctx(source);
+      expect(evaluate(_rhsOf(source, 'a'), ctx), [
+        [10, 11],
+        [20],
+      ]);
     });
   });
 
-  group('@Map (currently identical to @Each)', () {
+  group('@Map', () {
     test('produces the transformed list', () {
       final ctx = _ctx(r'a = @Map([1, 2, 3], $item * 2)');
       expect(
@@ -283,26 +423,6 @@ void main() {
       expect(
         (ctx.errors.single as EvaluationError).message,
         contains('@Map requires (list, template)'),
-      );
-    });
-  });
-
-  group('iteration scope is layered, not flat', () {
-    test(r'nested @Each does not leak $item across the inner scope', () {
-      // Outer template invokes @Each inside; inside, $item is the
-      // inner element, not the outer.
-      final ctx = _ctx(
-        r'a = @Each([[1, 2], [3]], @Each($item, $item))',
-      );
-      expect(
-        evaluate(
-          _rhsOf(r'a = @Each([[1, 2], [3]], @Each($item, $item))', 'a'),
-          ctx,
-        ),
-        [
-          [1, 2],
-          [3],
-        ],
       );
     });
   });

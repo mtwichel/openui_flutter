@@ -176,6 +176,14 @@ Object? evaluate(AstNode node, EvalContext context) {
 }
 
 Object? _evalReference(String name, EvalContext context) {
+  // Named-loop binding from `@Each(list, "name", template)` lives in
+  // iterationVars under the unprefixed key, so a bare `name.field`
+  // reference inside the template resolves here before the statement
+  // map. `$item` / `$index` continue to flow through `_evalStateRef`
+  // since their keys are stored with the `$` prefix.
+  if (context.iterationVars.containsKey(name)) {
+    return context.iterationVars[name];
+  }
   if (context._resolving.contains(name)) {
     context.errors.add(
       CyclicStateError(cycle: [...context._resolving, name]),

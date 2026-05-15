@@ -277,7 +277,7 @@ void main() {
     test('CompCall args', () => expectTargetReachable('Stack([target])'));
     test(
       'BuiltinCall args',
-      () => expectTargetReachable('@Each(target, row)'),
+      () => expectTargetReachable('@Each(target, "r", row)'),
     );
     test(
       'QueryCall args',

@@ -71,7 +71,6 @@ export 'src/parser/parser.dart'
         ObjectLit,
         ParseException,
         Program,
-        QueryCall,
         Reference,
         StateAssign,
         StateRef,

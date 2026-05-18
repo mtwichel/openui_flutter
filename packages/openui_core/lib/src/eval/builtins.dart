@@ -3,7 +3,7 @@ import 'package:openui_core/src/errors/errors.dart';
 import 'package:openui_core/src/eval/evaluator.dart';
 import 'package:openui_core/src/parser/parser.dart';
 
-/// The four functional builtins from the OpenUI Lang spec, ready to
+/// The five functional builtins from the OpenUI Lang spec, ready to
 /// drop into [EvalContext.builtins]:
 ///
 /// - `@Count(list)` — returns `list.length`, or `0` if the input is
@@ -17,6 +17,8 @@ import 'package:openui_core/src/parser/parser.dart';
 /// - `@Map(list, transform)` — `@Filter`-shaped: `$item` / `$index`
 ///   in scope. Spec calls the second arg a "transform ref", but at
 ///   the evaluator layer the semantics match `@Filter`.
+/// - `@Query(...)` — registered as a no-op at evaluation time; the
+///   renderer's query manager performs the actual tool call.
 ///
 /// Action-step builtins (`@Set`, `@Reset`, `@Run`, `@ToAssistant`)
 /// are in a separate dispatcher and not part of this
@@ -30,7 +32,15 @@ final Map<String, BuiltinHandler> functionalBuiltins =
       '@Filter': _evalFilter,
       '@Each': _evalEach,
       '@Map': _evalMap,
+      '@Query': _evalQueryNoop,
     });
+
+// `@Query` is fired by the renderer's `QueryManager`, not by the
+// evaluator. Registering a no-op here keeps an accidental render-time
+// traversal of an unfired `@Query` AST from raising
+// `no handler registered for builtin @Query`. The result slot lives in
+// the store under the statement id (e.g. `$products`).
+Object? _evalQueryNoop(BuiltinCall call, EvalContext context) => null;
 
 Object? _evalCount(BuiltinCall call, EvalContext context) {
   if (call.args.isEmpty) {

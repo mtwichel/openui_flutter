@@ -87,11 +87,12 @@ class ParseMeta {
   final List<ParseException> errors;
 
   /// Reactive state declarations (`$name = expr` where the RHS is not a
-  /// `Query` / `Mutation` builtin). Used to seed the reactive store.
+  /// `@Query` builtin or a `Mutation(...)` call). Used to seed the
+  /// reactive store.
   final List<StateDecl> stateDecls;
 
-  /// Query declarations (`name = Query(...)` or `$name = Query(...)`).
-  /// Used to drive the query manager.
+  /// Query declarations (`$name = @Query(toolName, ...)`). Used to
+  /// drive the query manager.
   final List<QueryDecl> queries;
 
   /// Mutation declarations (`name = Mutation(...)`). Used to populate
@@ -117,21 +118,29 @@ class StateDecl {
   final AstNode defaultValue;
 }
 
-/// A `Query(...)` declaration extracted from a parse pass.
+/// A `$var = @Query(toolName, ...)` declaration extracted from a parse
+/// pass.
 ///
 /// Marked `@experimental` per D12.
 @experimental
 @immutable
 class QueryDecl {
   /// Creates a [QueryDecl].
-  const QueryDecl({required this.statementId, required this.args});
+  const QueryDecl({
+    required this.statementId,
+    required this.toolName,
+    required this.namedArgs,
+  });
 
-  /// The LHS identifier the query is bound to (the query's id).
+  /// The LHS identifier the query is bound to (the query's id),
+  /// including the leading `$`.
   final String statementId;
 
-  /// The `Query(...)` argument list verbatim. Most call sites use the
-  /// `name: "..."` and `args: { ... }` named arguments.
-  final List<Argument> args;
+  /// The tool name — the first positional argument of `@Query`.
+  final String toolName;
+
+  /// The named arguments after the tool name, in source order.
+  final List<Argument> namedArgs;
 }
 
 /// A `Mutation(...)` declaration extracted from a parse pass.
@@ -204,11 +213,16 @@ class StreamParser {
     );
     final gatedErrors = <ParseException>[
       ...program.errors,
-      for (final s in program.statements)
+      for (final s in program.statements) ...[
         ...validateEachShape(
           s,
           committedOffsetBoundary: split.prefix.length,
         ),
+        ...validateQueryShape(
+          s,
+          committedOffsetBoundary: split.prefix.length,
+        ),
+      ],
     ];
 
     final incomplete = <String>[];
@@ -229,11 +243,17 @@ class StreamParser {
             StateDecl(name: s.name, defaultValue: s.expression),
           );
         case StatementKind.query:
-          if (s.expression is QueryCall) {
+          final expr = s.expression;
+          if (expr is BuiltinCall && expr.name == '@Query') {
+            final toolName = _toolNameOf(expr);
+            // Skip malformed @Query calls. `validateQueryShape` will
+            // have surfaced the corresponding `ParseException` already.
+            if (toolName == null) break;
             queries.add(
               QueryDecl(
                 statementId: s.name,
-                args: (s.expression as QueryCall).args,
+                toolName: toolName,
+                namedArgs: _namedArgsOf(expr),
               ),
             );
           }
@@ -330,6 +350,29 @@ StreamParser createStreamingParser({String rootName = 'root'}) {
     prefix: buffer.substring(0, lastBalancedNewlineEnd),
     tail: buffer.substring(lastBalancedNewlineEnd),
   );
+}
+
+/// Extracts the tool-name identifier from a `@Query(toolName, ...)`
+/// call, or `null` when the call's first arg is not a positional
+/// [Reference]. The streaming `_compute` skips emitting a `QueryDecl`
+/// in that case so consumers don't see a half-formed declaration.
+String? _toolNameOf(BuiltinCall call) {
+  if (call.args.isEmpty) return null;
+  final firstArg = call.args.first;
+  if (firstArg.name != null) return null;
+  final firstValue = firstArg.value;
+  if (firstValue is Reference) return firstValue.name;
+  return null;
+}
+
+List<Argument> _namedArgsOf(BuiltinCall call) {
+  if (call.args.length <= 1) return const <Argument>[];
+  return call.args
+      .sublist(1)
+      .where((a) => a.name != null)
+      .toList(
+        growable: false,
+      );
 }
 
 const int _backslash = 0x5C;

@@ -245,6 +245,13 @@ void main() {
       expect(actionPlanFromAst(_rhs('a = [@Run("x")]')), isNull);
     });
 
+    test(r'@Run($var) produces a RunStep with $-prefixed statementId', () {
+      final plan = _planFor(r'a = [@Run($products)]');
+      final step = plan.steps.single as RunStep;
+      expect(step.statementId, r'$products');
+      expect(step.argsAst, isEmpty);
+    });
+
     test('@ToAssistant with one arg leaves contextAst null', () {
       final plan = _planFor('a = [@ToAssistant("hello")]');
       final step = plan.steps.single as ContinueConversationStep;

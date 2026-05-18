@@ -384,9 +384,9 @@ root = Column(children: [
           },
         ),
       ];
-      const program = '''data = Query(name: "lookup")
+      const program = '''\$data = @Query(lookup)
 refresh = Mutation(name: "refresh")
-root = Counter(value: \$tick, onIncrement: [@Run(refresh)])
+root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
 ''';
       await tester.pumpWidget(
         _TestRoot(
@@ -397,8 +397,8 @@ root = Counter(value: \$tick, onIncrement: [@Run(refresh)])
         ),
       );
 
-      // Only `data` (a Query) auto-fires; `refresh` (a Mutation) waits
-      // for its @Run.
+      // `$data` (a `@Query`) auto-fires once streaming completes; the
+      // mutation only fires on `@Run`.
       await tester.pump();
       await tester.pumpAndSettle();
       expect(calls, 1);
@@ -406,9 +406,261 @@ root = Counter(value: \$tick, onIncrement: [@Run(refresh)])
       await tester.tap(find.byType(GestureDetector));
       await tester.pump();
       await tester.pumpAndSettle();
-      // `refresh` invalidated and fired.
+      // `@Run($data)` invalidated and re-fired the query.
       expect(calls, 2);
     });
+
+    testWidgets(
+      '@Query does not fire while isStreaming is true',
+      (tester) async {
+        var calls = 0;
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async {
+              calls++;
+              return const ToolResult('value');
+            },
+          ),
+        ];
+        const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              isStreaming: true,
+              library: _testLibrary(tools: tools),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 0);
+      },
+    );
+
+    testWidgets(
+      '@Query fires once after streaming flips to false and writes to the store',
+      (tester) async {
+        var calls = 0;
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async {
+              calls++;
+              return const ToolResult(<Map<String, Object?>>[
+                {'title': 'A'},
+                {'title': 'B'},
+              ]);
+            },
+          ),
+        ];
+        const program = '''\$products = @Query(fetch)
+root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
+''';
+        var snapshot = const <String, Object?>{};
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(tools: tools),
+              onStateUpdate: (s) => snapshot = s,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        expect(find.text('loaded'), findsOneWidget);
+        expect(snapshot[r'$products'], isA<List<Object?>>());
+      },
+    );
+
+    testWidgets(
+      '@Query fires when root is incomplete (no trailing newline)',
+      (tester) async {
+        var calls = 0;
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async {
+              calls++;
+              return const ToolResult(<Map<String, Object?>>[
+                {'title': 'A'},
+              ]);
+            },
+          ),
+        ];
+        // No trailing newline: streaming parser marks `root` incomplete.
+        const program =
+            '\$products = @Query(fetch)\n'
+            'root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(tools: tools),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        expect(find.text('loaded'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      '@Query failure surfaces via onError and leaves the store untouched',
+      (tester) async {
+        final errors = <OpenUIError>[];
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async => throw const McpToolError(message: 'boom'),
+          ),
+        ];
+        const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
+        var snapshot = const <String, Object?>{};
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(tools: tools),
+              onError: errors.addAll,
+              onStateUpdate: (s) => snapshot = s,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(errors.whereType<McpToolError>(), isNotEmpty);
+        // Store slot stays at its prior value (null in this case — the
+        // tool failed before it could write anything).
+        expect(snapshot[r'$products'], isNull);
+      },
+    );
+
+    testWidgets(
+      'identical args across two parse passes fire the tool once',
+      (tester) async {
+        var calls = 0;
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async {
+              calls++;
+              return const ToolResult('value');
+            },
+          ),
+        ];
+        const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
+        final notifier = ValueNotifier<String>(program);
+        final library = _testLibrary(tools: tools);
+        await tester.pumpWidget(
+          _TestRoot(
+            child: ValueListenableBuilder<String>(
+              valueListenable: notifier,
+              builder: (context, value, _) => Renderer(
+                response: value,
+                library: library,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        // Same response, second pump — the firing gate must short-circuit.
+        notifier.value = '$program ';
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+      },
+    );
+
+    testWidgets(
+      r'@Run($var) re-evaluates args against the post-@Set store',
+      (tester) async {
+        final categories = <Object?>[];
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (args) async {
+              categories.add(args['category']);
+              return const ToolResult('value');
+            },
+          ),
+        ];
+        const program = '''\$category = "shoes"
+\$products = @Query(fetch, category: \$category)
+root = Counter(value: 0, onIncrement: [@Set(\$category, "hats"), @Run(\$products)])
+''';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(tools: tools),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(categories, ['shoes']);
+
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pumpAndSettle();
+        // The dispatcher evaluates `@Set` first, so `@Run($products)`
+        // re-fires the query with the post-set category.
+        expect(categories, ['shoes', 'hats']);
+      },
+    );
+
+    testWidgets(
+      r'@Reset on a query-backed $var skips and leaves the store unchanged',
+      (tester) async {
+        var calls = 0;
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async {
+              calls++;
+              return const ToolResult('value');
+            },
+          ),
+        ];
+        const program = '''\$products = @Query(fetch)
+root = Counter(value: 0, onIncrement: [@Reset(\$products)])
+''';
+        final events = <ActionEvent>[];
+        var snapshot = const <String, Object?>{};
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(tools: tools),
+              onAction: events.add,
+              onStateUpdate: (s) => snapshot = s,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        final beforeValue = snapshot[r'$products'];
+
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pumpAndSettle();
+        // `@Reset` falls through the "no declared default" branch — it
+        // does not call the tool and leaves the store value untouched.
+        expect(calls, 1);
+        expect(snapshot[r'$products'], beforeValue);
+        final resetEvent = events.singleWhere(
+          (e) => e.type == BuiltinActionType.reset,
+        );
+        expect(resetEvent.params['success'], isFalse);
+        expect(resetEvent.params['reason'], 'no declared default');
+      },
+    );
 
     testWidgets('Run step can invoke a tool directly by name', (tester) async {
       var calls = 0;

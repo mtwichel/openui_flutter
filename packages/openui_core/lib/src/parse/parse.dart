@@ -321,7 +321,6 @@ void _collectStateRefs(AstNode node, Set<String> out) {
       }
     case CompCall(:final args):
     case BuiltinCall(:final args):
-    case QueryCall(:final args):
     case MutationCall(:final args):
       for (final a in args) {
         _collectStateRefs(a.value, out);
@@ -382,14 +381,12 @@ Object? _materializeValue(AstNode node, _MatCtx ctx) {
     case BuiltinCall():
       // Runtime expression — preserve as AST for the evaluator.
       return node;
-    case QueryCall():
     case MutationCall():
-      // Inline Query/Mutation in expression position — surface as an
-      // error and drop. They must be top-level statements.
-      final kind = node is QueryCall ? 'Query' : 'Mutation';
+      // Inline Mutation in expression position — surface as an
+      // error and drop. Mutations must be top-level statements.
       ctx.errors.add(
         EvaluationError(
-          message: '$kind() must be a top-level statement',
+          message: 'Mutation() must be a top-level statement',
           statementId: ctx.currentStatementId,
         ),
       );
@@ -424,10 +421,11 @@ Object? _resolveRef(String name, _MatCtx ctx) {
 
 ResolvedElement? _materializeComp(CompCall node, _MatCtx ctx) {
   final name = node.type;
-  // `Query` and `Mutation` are surfaced by the lexer/parser as
-  // [QueryCall] / [MutationCall], not [CompCall], so the inline-call
-  // error for them is handled in [_materializeValue]'s
-  // `case QueryCall()` / `case MutationCall()` arm.
+  // `Mutation` is surfaced by the lexer/parser as a [MutationCall],
+  // not a [CompCall], so the inline-call error is handled in
+  // [_materializeValue]'s `case MutationCall()` arm. `@Query` is a
+  // [BuiltinCall] and only valid as the top-level RHS of a `$var =`
+  // assignment — the parser rejects every other position.
   final params = ctx.paramMap[name];
   if (params == null) {
     ctx.errors.add(

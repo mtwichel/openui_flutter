@@ -135,7 +135,13 @@ class _ExpressionParser {
         _advance();
         _expectPunct('(');
         final args = _parseArgList(')');
-        if (t.value == 'Query') return QueryCall(args, offset: t.offset);
+        if (t.value == 'Query') {
+          throw ParseException(
+            'Query(...) is no longer a statement form — use '
+            r'$var = @Query(toolName, namedArg: value, ...)',
+            t.offset,
+          );
+        }
         if (t.value == 'Mutation') return MutationCall(args, offset: t.offset);
         return CompCall(t.value, args, offset: t.offset);
 

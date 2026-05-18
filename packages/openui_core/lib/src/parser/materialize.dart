@@ -38,13 +38,11 @@ class ElementNode {
   /// The component, builtin, or pseudo-call type name, if any.
   ///
   /// Returns `null` for plain literals, references, and operators.
-  /// `Query` and `Mutation` calls — which are normally distinct AST
-  /// types — surface here under their canonical name so the renderer
-  /// can dispatch uniformly.
+  /// `Mutation` — normally a distinct AST type — surfaces here under
+  /// its canonical name so the renderer can dispatch uniformly.
   String? get typeName => switch (expression) {
     CompCall(:final type) => type,
     BuiltinCall(:final name) => name,
-    QueryCall() => 'Query',
     MutationCall() => 'Mutation',
     _ => null,
   };
@@ -198,7 +196,6 @@ void _collectReferences(AstNode node, Set<String> out) {
       }
     case CompCall(:final args):
     case BuiltinCall(:final args):
-    case QueryCall(:final args):
     case MutationCall(:final args):
       for (final a in args) {
         _collectReferences(a.value, out);

@@ -2,6 +2,15 @@
 
 ## 0.1.0 (unreleased)
 
+- **BREAKING**: `Query(name: ..., args: ...)` is removed. Use the new
+  `@Query` builtin as the entire RHS of a `$var =` assignment:
+  `$products = @Query(fetch_products, category: "shoes")`. The slot is
+  `null` until the tool resolves; re-fire with `@Run($products)`. The
+  parser rejects the old form with a migration `ParseException`. The
+  `QueryCall` AST class and `EvalContext.queryResults` are removed.
+  `QueryDecl` now carries `toolName` + `namedArgs` (the legacy
+  `List<Argument> args` field is gone). The `@Run` action step accepts
+  a `StateRef` first arg so `@Run($var)` re-fires the bound query.
 - **BREAKING**: `@Each` now takes three args — `@Each(list, "name", template)`.
   The loop variable is named explicitly via a string literal and bound under
   its bare key inside the template (e.g. `@Each(items, "row", Card(title:

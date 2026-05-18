@@ -382,9 +382,8 @@ final class IndexAccess extends AstNode {
 
 /// A component call: `Type(arg, named: arg, ...)`.
 ///
-/// Distinct from [BuiltinCall] (no `@` sigil) and from [QueryCall] /
-/// [MutationCall] (which the parser emits when [type] is exactly `Query`
-/// or `Mutation`).
+/// Distinct from [BuiltinCall] (no `@` sigil) and from [MutationCall]
+/// (which the parser emits when [type] is exactly `Mutation`).
 @experimental
 @immutable
 final class CompCall extends AstNode {
@@ -438,31 +437,6 @@ final class BuiltinCall extends AstNode {
   String toString() => 'BuiltinCall($name, $args)';
 }
 
-/// A `Query(name: ..., args: ...)` call.
-///
-/// Emitted by the parser when a comp-call's type is exactly `Query` so
-/// downstream classification does not need to peek at strings.
-@experimental
-@immutable
-final class QueryCall extends AstNode {
-  /// Creates a query-call node.
-  QueryCall(List<Argument> args, {required super.offset})
-    : args = List.unmodifiable(args);
-
-  /// Positional and named arguments, in source order.
-  final List<Argument> args;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) || other is QueryCall && _listEq(other.args, args);
-
-  @override
-  int get hashCode => Object.hash(QueryCall, Object.hashAll(args));
-
-  @override
-  String toString() => 'QueryCall($args)';
-}
-
 /// A `Mutation(name: ..., args: ...)` call.
 ///
 /// Emitted by the parser when a comp-call's type is exactly `Mutation`.
@@ -488,7 +462,7 @@ final class MutationCall extends AstNode {
   String toString() => 'MutationCall($args)';
 }
 
-/// A single argument inside a [CompCall], [BuiltinCall], [QueryCall], or
+/// A single argument inside a [CompCall], [BuiltinCall], or
 /// [MutationCall].
 ///
 /// Positional args have `name == null`; `key: expr` syntax produces
@@ -568,7 +542,7 @@ final class Statement {
 ///
 /// Order of checks (in [classifyStatement]):
 /// 1. RHS is a `MutationCall` → [mutation]
-/// 2. RHS is a `QueryCall` → [query]
+/// 2. RHS is `@Query(...)` (a `BuiltinCall` named `@Query`) → [query]
 /// 3. LHS is a `STATEVAR` → [state]
 /// 4. otherwise → [value]
 @experimental
@@ -579,7 +553,7 @@ enum StatementKind {
   /// `$name = ...` where the RHS is not a query or mutation.
   state,
 
-  /// `name = Query(...)` or `$name = Query(...)`.
+  /// `$name = @Query(tool, ...)`.
   query,
 
   /// `name = Mutation(...)`.
@@ -590,7 +564,9 @@ enum StatementKind {
 @experimental
 StatementKind classifyStatement(String name, AstNode expression) {
   if (expression is MutationCall) return StatementKind.mutation;
-  if (expression is QueryCall) return StatementKind.query;
+  if (expression is BuiltinCall && expression.name == '@Query') {
+    return StatementKind.query;
+  }
   if (name.startsWith(r'$')) return StatementKind.state;
   return StatementKind.value;
 }

@@ -28,316 +28,310 @@ class _StubTool extends Tool {
   }
 }
 
+QueryDecl _decl({
+  String statementId = r'$q',
+  String toolName = 'stub',
+  List<Argument> namedArgs = const <Argument>[],
+}) => QueryDecl(
+  statementId: statementId,
+  toolName: toolName,
+  namedArgs: namedArgs,
+);
+
+EvalContext _ctx(Store store) =>
+    EvalContext(statements: const <Statement>[], store: store);
+
 void main() {
-  group('QueryManager', () {
-    Argument nameArg(String value) => Argument(
-      name: 'name',
-      value: Literal(value, offset: 0),
-      offset: 0,
-    );
-
-    Argument argsArg(List<ObjectEntry> entries) => Argument(
-      name: 'args',
-      value: ObjectLit(entries, offset: 0),
-      offset: 0,
-    );
-
-    test(
-      'ensureFired fires once and caches ToolResult for statement id',
-      () async {
-        final tool = _StubTool(
-          name: 'stub',
-          description: 'stub',
-          handler: (args) async => ToolResult('value-${args['tag']}'),
-        );
-        final manager = QueryManager(
-          library: Library<Widget>(components: const [], tools: [tool]),
-        );
-        addTearDown(manager.dispose);
-
-        final args = <Argument>[
-          nameArg('stub'),
-          argsArg(const [
-            ObjectEntry('tag', Literal('q1', offset: 0), offset: 0),
-          ]),
-        ];
-        manager
-          ..ensureFired('q1', args)
-          ..ensureFired('q1', args);
-
-        expect(manager.entryFor('q1').loading, isTrue);
-        await Future<void>.delayed(Duration.zero);
-
-        expect(tool.calls, 1);
-        final entry = manager.entryFor('q1');
-        expect(entry.loading, isFalse);
-        expect(entry.error, isNull);
-        expect(entry.value, isA<ToolResult>());
-        expect((entry.value! as ToolResult).result, 'value-q1');
-      },
-    );
-
-    test('invalidate drops cached entry and re-fires', () async {
+  group('QueryManager.ensureFired', () {
+    test('fires the tool once per (statementId, args) fingerprint', () async {
       final tool = _StubTool(
         name: 'stub',
         description: 'stub',
-        handler: (args) async => ToolResult('call-${args['n']}'),
+        handler: (args) async => const ToolResult('ok'),
       );
+      final store = Store();
+      final errors = <OpenUIError>[];
       final manager = QueryManager(
         library: Library<Widget>(components: const [], tools: [tool]),
+        store: store,
+        onError: errors.add,
       );
       addTearDown(manager.dispose);
 
-      final firstArgs = <Argument>[
-        nameArg('stub'),
-        argsArg(const [ObjectEntry('n', Literal(1, offset: 0), offset: 0)]),
-      ];
-      manager.ensureFired('q', firstArgs);
+      final decl = _decl();
+      manager
+        ..ensureFired(decl, _ctx(store))
+        ..ensureFired(decl, _ctx(store));
       await Future<void>.delayed(Duration.zero);
-      expect((manager.entryFor('q').value! as ToolResult).result, 'call-1');
 
-      final secondArgs = <Argument>[
-        nameArg('stub'),
-        argsArg(const [ObjectEntry('n', Literal(2, offset: 0), offset: 0)]),
-      ];
-      manager.invalidate('q', secondArgs);
-      await Future<void>.delayed(Duration.zero);
-      expect(tool.calls, 2);
-      expect((manager.entryFor('q').value! as ToolResult).result, 'call-2');
+      expect(tool.calls, 1);
+      expect(store.get(r'$q'), 'ok');
+      expect(errors, isEmpty);
     });
 
     test(
-      'extracts name and args from Query AST and passes literal map',
+      'in-flight gate: two ensureFired in the same tick fire once',
       () async {
+        final completer = Completer<ToolResult>();
         final tool = _StubTool(
-          name: 'weather',
-          description: 'Weather lookup',
-          handler: (args) async => const ToolResult('ok'),
+          name: 'stub',
+          description: 'stub',
+          handler: (_) => completer.future,
         );
+        final store = Store();
         final manager = QueryManager(
           library: Library<Widget>(components: const [], tools: [tool]),
+          store: store,
+          onError: (_) {},
         );
         addTearDown(manager.dispose);
 
-        manager.ensureFired('q', <Argument>[
-          nameArg('weather'),
-          argsArg([
-            const ObjectEntry('city', Literal('Berlin', offset: 0), offset: 0),
-            const ObjectEntry('count', Literal(2, offset: 0), offset: 0),
-            const ObjectEntry('none', NullLiteral(offset: 0), offset: 0),
-            ObjectEntry(
-              'complex',
-              ArrayLit(const [Literal(1, offset: 0)], offset: 0),
-              offset: 0,
-            ),
-          ]),
-        ]);
-        await Future<void>.delayed(Duration.zero);
+        final decl = _decl();
+        manager
+          ..ensureFired(decl, _ctx(store))
+          ..ensureFired(decl, _ctx(store));
 
-        expect(tool.lastArgs, <String, Object?>{
-          'city': 'Berlin',
-          'count': 2,
-          'none': null,
-          'complex': null,
-        });
+        // Tool only called once even though the future is still pending.
+        expect(tool.calls, 1);
+        completer.complete(const ToolResult('done'));
+        await Future<void>.delayed(Duration.zero);
       },
     );
 
-    test('missing required string name captures EvaluationError', () async {
+    test('different evaluated args re-fire', () async {
+      var n = 0;
       final tool = _StubTool(
         name: 'stub',
         description: 'stub',
-        handler: (args) async => const ToolResult('unused'),
+        handler: (args) async => ToolResult('call-${++n}-${args['category']}'),
       );
+      final store = Store();
       final manager = QueryManager(
         library: Library<Widget>(components: const [], tools: [tool]),
+        store: store,
+        onError: (_) {},
       );
       addTearDown(manager.dispose);
 
-      manager.ensureFired(
-        'q',
-        <Argument>[
-          const Argument(
-            name: 'name',
-            value: Literal(42, offset: 0),
+      QueryDecl declWith(String category) => _decl(
+        namedArgs: [
+          Argument(
+            name: 'category',
+            value: Literal(category, offset: 0),
             offset: 0,
           ),
         ],
       );
+
+      manager.ensureFired(declWith('shoes'), _ctx(store));
+      await Future<void>.delayed(Duration.zero);
+      manager.ensureFired(declWith('hats'), _ctx(store));
       await Future<void>.delayed(Duration.zero);
 
-      final error = manager.entryFor('q').error;
-      expect(error, isA<EvaluationError>());
-      expect(error!.message, contains('missing required string arg "name"'));
+      expect(tool.calls, 2);
+      expect(store.get(r'$q'), 'call-2-hats');
     });
 
-    test('snapshotValues returns cached entry values', () async {
-      final tool = _StubTool(
-        name: 'stub',
-        description: 'stub',
-        handler: (args) async => ToolResult(args['id']),
-      );
+    test('unknown tool routes to onError, store untouched', () {
+      final store = Store()..set(r'$q', 'prior');
+      final errors = <OpenUIError>[];
       final manager = QueryManager(
-        library: Library<Widget>(components: const [], tools: [tool]),
+        library: const Library<Widget>(
+          components: [],
+          tools: <Tool>[],
+        ),
+        store: store,
+        onError: errors.add,
       );
       addTearDown(manager.dispose);
 
-      manager
-        ..ensureFired(
-          'q1',
-          <Argument>[
-            nameArg('stub'),
-            argsArg(const [
-              ObjectEntry('id', Literal('a', offset: 0), offset: 0),
-            ]),
-          ],
-        )
-        ..ensureFired(
-          'q2',
-          <Argument>[
-            nameArg('stub'),
-            argsArg(const [
-              ObjectEntry('id', Literal('b', offset: 0), offset: 0),
-            ]),
-          ],
+      manager.ensureFired(_decl(toolName: 'missing'), _ctx(store));
+
+      expect(errors, hasLength(1));
+      expect(errors.single, isA<EvaluationError>());
+      expect(errors.single.message, contains('Unknown tool: missing'));
+      expect(store.get(r'$q'), 'prior');
+    });
+
+    test(
+      'tool future failure routes to onError, store retains prior value',
+      () async {
+        final store = Store()..set(r'$q', 'prior');
+        final errors = <OpenUIError>[];
+        final tool = _StubTool(
+          name: 'stub',
+          description: 'stub',
+          handler: (_) async => throw const McpToolError(message: 'boom'),
         );
-      await Future<void>.delayed(Duration.zero);
+        final manager = QueryManager(
+          library: Library<Widget>(components: const [], tools: [tool]),
+          store: store,
+          onError: errors.add,
+        );
+        addTearDown(manager.dispose);
 
-      final snapshot = manager.snapshotValues();
-      expect(snapshot.keys.toSet(), {'q1', 'q2'});
-      expect((snapshot['q1']! as ToolResult).result, 'a');
-      expect((snapshot['q2']! as ToolResult).result, 'b');
-    });
+        manager.ensureFired(_decl(), _ctx(store));
+        await Future<void>.delayed(Duration.zero);
 
-    test('errors() yields collected OpenUIError values', () async {
-      final manager = QueryManager(
-        library: const Library<Widget>(components: [], tools: []),
-      );
-      addTearDown(manager.dispose);
+        expect(errors, hasLength(1));
+        expect(errors.single, isA<McpToolError>());
+        expect(store.get(r'$q'), 'prior');
+      },
+    );
 
-      manager
-        ..ensureFired('q1', const <Argument>[])
-        ..ensureFired('q2', const <Argument>[]);
-      await Future<void>.delayed(Duration.zero);
+    test(
+      'ToolResult.isError routes to onError without writing store',
+      () async {
+        final store = Store()..set(r'$q', 'prior');
+        final errors = <OpenUIError>[];
+        final tool = _StubTool(
+          name: 'stub',
+          description: 'stub',
+          handler: (_) async =>
+              const ToolResult('permission denied', isError: true),
+        );
+        final manager = QueryManager(
+          library: Library<Widget>(components: const [], tools: [tool]),
+          store: store,
+          onError: errors.add,
+        );
+        addTearDown(manager.dispose);
 
-      expect(manager.errors(), hasLength(2));
-      expect(manager.errors().every((e) => e is EvaluationError), isTrue);
-    });
+        manager.ensureFired(_decl(), _ctx(store));
+        await Future<void>.delayed(Duration.zero);
 
-    test('onChange fires at loading and completion transitions', () async {
+        expect(errors, hasLength(1));
+        expect(errors.single, isA<EvaluationError>());
+        expect(store.get(r'$q'), 'prior');
+      },
+    );
+
+    test('non-OpenUIError exceptions wrap as EvaluationError', () async {
+      final store = Store();
+      final errors = <OpenUIError>[];
       final tool = _StubTool(
         name: 'stub',
         description: 'stub',
-        handler: (args) async => const ToolResult('done'),
+        handler: (_) async => throw StateError('nope'),
       );
       final manager = QueryManager(
         library: Library<Widget>(components: const [], tools: [tool]),
+        store: store,
+        onError: errors.add,
       );
       addTearDown(manager.dispose);
 
-      var notifications = 0;
-      manager
-        ..onChange = () {
-          notifications++;
-        }
-        ..ensureFired('q', <Argument>[nameArg('stub')]);
-      expect(notifications, 1, reason: 'loading transition');
-
+      manager.ensureFired(_decl(), _ctx(store));
       await Future<void>.delayed(Duration.zero);
-      expect(notifications, 2, reason: 'resolution transition');
-    });
 
-    test('dispose suppresses post-completion notifications', () async {
-      final completer = Completer<ToolResult>();
+      expect(errors.single, isA<EvaluationError>());
+      expect(errors.single.statementId, r'$q');
+    });
+  });
+
+  group('QueryManager.invalidate', () {
+    test('clears the fingerprint and re-fires with fresh args', () async {
+      var n = 0;
       final tool = _StubTool(
         name: 'stub',
         description: 'stub',
-        handler: (args) => completer.future,
+        handler: (args) async => ToolResult('call-${++n}'),
       );
+      final store = Store();
       final manager = QueryManager(
         library: Library<Widget>(components: const [], tools: [tool]),
+        store: store,
+        onError: (_) {},
       );
+      addTearDown(manager.dispose);
 
-      var notifications = 0;
-      manager
-        ..onChange = () {
-          notifications++;
-        }
-        ..ensureFired('q', <Argument>[nameArg('stub')]);
-      expect(notifications, 1);
-
-      manager.dispose();
-      completer.complete(const ToolResult('done'));
+      manager.ensureFired(_decl(), _ctx(store));
       await Future<void>.delayed(Duration.zero);
-      expect(notifications, 1);
+      manager.invalidate(_decl(), _ctx(store));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(tool.calls, 2);
+      expect(store.get(r'$q'), 'call-2');
     });
+  });
 
-    group('fireMutation', () {
-      test(
-        'returns ToolResult and does not cache successful mutation value',
-        () async {
-          final tool = _StubTool(
-            name: 'mut',
-            description: 'mutation tool',
-            handler: (args) async => const ToolResult('ok-mut'),
-          );
-          final manager = QueryManager(
-            library: Library<Widget>(components: const [], tools: [tool]),
-          );
-          addTearDown(manager.dispose);
+  group('QueryManager.fireMutation', () {
+    test(
+      'returns the resolved value and does not write to the store',
+      () async {
+        final tool = _StubTool(
+          name: 'mut',
+          description: 'mut',
+          handler: (_) async => const ToolResult('ok'),
+        );
+        final store = Store();
+        final manager = QueryManager(
+          library: Library<Widget>(components: const [], tools: [tool]),
+          store: store,
+          onError: (_) {},
+        );
+        addTearDown(manager.dispose);
 
-          final result = await manager.fireMutation('m', <Argument>[
-            nameArg('mut'),
-          ]);
-          expect(result, isA<ToolResult>());
-          expect((result! as ToolResult).result, 'ok-mut');
-          expect(manager.entryFor('m').value, isNull);
-          expect(manager.entryFor('m').error, isNull);
-        },
+        const args = [
+          Argument(
+            name: 'name',
+            value: Literal('mut', offset: 0),
+            offset: 0,
+          ),
+        ];
+        final result = await manager.fireMutation('del', args);
+        expect((result! as ToolResult).result, 'ok');
+        expect(store.get('del'), isNull);
+      },
+    );
+
+    test('failures route through onError and rethrow', () async {
+      final tool = _StubTool(
+        name: 'mut',
+        description: 'mut',
+        handler: (_) async => throw const McpToolError(message: 'down'),
       );
-
-      test(
-        'writes EvaluationError on non-OpenUI failures and rethrows',
-        () async {
-          final tool = _StubTool(
-            name: 'mut',
-            description: 'mutation tool',
-            handler: (args) async => throw StateError('mut-fail'),
-          );
-          final manager = QueryManager(
-            library: Library<Widget>(components: const [], tools: [tool]),
-          );
-          addTearDown(manager.dispose);
-
-          await expectLater(
-            manager.fireMutation('m', <Argument>[nameArg('mut')]),
-            throwsStateError,
-          );
-          expect(manager.entryFor('m').error, isA<EvaluationError>());
-        },
+      final store = Store();
+      final errors = <OpenUIError>[];
+      final manager = QueryManager(
+        library: Library<Widget>(components: const [], tools: [tool]),
+        store: store,
+        onError: errors.add,
       );
+      addTearDown(manager.dispose);
 
-      test(
-        'preserves thrown OpenUIError subtype on mutation failure',
-        () async {
-          final tool = _StubTool(
-            name: 'mut',
-            description: 'mutation tool',
-            handler: (args) async =>
-                throw const McpToolError(message: 'denied'),
-          );
-          final manager = QueryManager(
-            library: Library<Widget>(components: const [], tools: [tool]),
-          );
-          addTearDown(manager.dispose);
-
-          await expectLater(
-            manager.fireMutation('m', <Argument>[nameArg('mut')]),
-            throwsA(isA<McpToolError>()),
-          );
-          expect(manager.entryFor('m').error, isA<McpToolError>());
-        },
+      const args = [
+        Argument(
+          name: 'name',
+          value: Literal('mut', offset: 0),
+          offset: 0,
+        ),
+      ];
+      expect(
+        () => manager.fireMutation('del', args),
+        throwsA(isA<McpToolError>()),
       );
+      await Future<void>.delayed(Duration.zero);
+      expect(errors.single, isA<McpToolError>());
+    });
+  });
+
+  group('QueryManager.dispose', () {
+    test('subsequent ensureFired and invalidate are no-ops', () {
+      final tool = _StubTool(
+        name: 'stub',
+        description: 'stub',
+        handler: (_) async => const ToolResult('ok'),
+      );
+      QueryManager(
+          library: Library<Widget>(components: const [], tools: [tool]),
+          store: Store(),
+          onError: (_) {},
+        )
+        ..dispose()
+        ..ensureFired(_decl(), _ctx(Store()))
+        ..invalidate(_decl(), _ctx(Store()));
+      expect(tool.calls, 0);
     });
   });
 }

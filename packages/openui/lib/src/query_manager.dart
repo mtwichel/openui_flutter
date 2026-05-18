@@ -8,170 +8,164 @@ import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
 import 'package:openui_core/openui_core.dart';
 
-/// One entry in the query cache. The renderer reads [value] when it
-/// builds an [EvalContext] and [loading] / [error] when it decides how
-/// to apply the loading overlay or surface an error placeholder.
+/// Per-renderer gate that turns `@Query` declarations into one-shot
+/// tool calls.
 ///
-/// Marked `@experimental` per D12.
-@experimental
-@immutable
-class QueryEntry {
-  /// Creates a [QueryEntry].
-  const QueryEntry({
-    this.value,
-    this.loading = false,
-    this.error,
-  });
-
-  /// Most recent resolved value, or `null` while loading / on error.
-  final Object? value;
-
-  /// `true` while the underlying future is in flight.
-  final bool loading;
-
-  /// Most recent error from the underlying call, or `null` if the last
-  /// call succeeded.
-  final OpenUIError? error;
-}
-
-/// Per-renderer cache of in-flight and resolved query results.
+/// The manager has no result storage of its own. Results are written
+/// straight to the [Store] via `store.set(decl.statementId, value.result)`,
+/// which the renderer already subscribes to for reactive rebuilds.
+/// Failures are routed to [_onError] (the renderer's existing error
+/// sink). The only state the manager keeps is `_fired`: the most
+/// recently dispatched evaluated-args map per `statementId`, which
+/// gates re-fires.
 ///
-/// Queries fire lazily: the renderer calls [ensureFired] for every
-/// query the parser surfaces in a given pass, and the manager either
-/// kicks off a new call (first time, or after [invalidate]) or returns
-/// the cached entry. `@Run` invalidates one query by id; the next
-/// `ensureFired` re-fires it.
+/// `@Run($var)` invalidates a query by clearing its `_fired` entry and
+/// calling [ensureFired] again. Args are re-evaluated at fire time
+/// against the live [EvalContext], so a `@Set` ahead of `@Run` is
+/// reflected in the new call.
 ///
-/// The manager is owned by the renderer and disposed alongside it. A
-/// single change listener is supported via [onChange]; the renderer
-/// installs itself once and never expects multiple observers.
+/// Mutations keep their pre-`@Query` dispatcher path via [fireMutation]
+/// — they're explicitly out of scope for this iteration.
 ///
 /// Marked `@experimental` per D12.
 @experimental
 class QueryManager {
   /// Creates a [QueryManager].
-  QueryManager({required this.library});
+  QueryManager({
+    required this.library,
+    required this.store,
+    required void Function(OpenUIError) onError,
+  }) : _onError = onError;
 
-  /// The library of components and tools to use for dispatching queries.
+  /// The library of components and tools to use for dispatching
+  /// queries and mutations.
   final Library<Widget> library;
 
-  final Map<String, QueryEntry> _entries = <String, QueryEntry>{};
+  /// The reactive store that receives resolved query values.
+  final Store store;
+
+  final void Function(OpenUIError) _onError;
+
+  final Map<String, Map<String, Object?>> _fired =
+      <String, Map<String, Object?>>{};
   bool _disposed = false;
 
-  /// The renderer's one-shot listener. Called every time an entry's
-  /// loading / value / error transitions. Setting a new value replaces
-  /// the previous listener; set to `null` to remove.
-  void Function()? onChange;
-
-  /// Returns the current entry for [statementId], or an empty entry
-  /// when no call has fired.
-  QueryEntry entryFor(String statementId) =>
-      _entries[statementId] ?? const QueryEntry();
-
-  /// Returns an immutable view of every cached value, suitable for
-  /// passing as `EvalContext.queryResults`.
-  Map<String, Object?> snapshotValues() {
-    return <String, Object?>{
-      for (final entry in _entries.entries) entry.key: entry.value.value,
+  /// Fires the query identified by [decl] when its
+  /// `(statementId, evaluated-args)` fingerprint differs from the
+  /// last fire. Subsequent calls with the same args are no-ops.
+  ///
+  /// Args are evaluated against [ctx] before the fingerprint compare,
+  /// so a `@Run` that re-runs `ensureFired` after a `@Set` re-issues
+  /// the call with fresh values.
+  void ensureFired(QueryDecl decl, EvalContext ctx) {
+    if (_disposed) return;
+    final evaluatedArgs = <String, Object?>{
+      for (final arg in decl.namedArgs)
+        if (arg.name != null) arg.name!: evaluate(arg.value, ctx),
     };
+    final last = _fired[decl.statementId];
+    if (last != null && _mapEquals(last, evaluatedArgs)) return;
+    // Set the in-flight gate synchronously so a second `ensureFired`
+    // landing in the same micro-task tick short-circuits before
+    // dispatching a duplicate tool call.
+    _fired[decl.statementId] = evaluatedArgs;
+
+    final tool = library.tool(decl.toolName);
+    if (tool == null) {
+      _onError(
+        EvaluationError(
+          message: 'Unknown tool: ${decl.toolName}',
+          statementId: decl.statementId,
+        ),
+      );
+      return;
+    }
+    unawaited(
+      tool
+          .callTool(evaluatedArgs)
+          .then((value) {
+            if (_disposed) return;
+            if (value.isError) {
+              _onError(
+                EvaluationError(
+                  message: value.result?.toString() ?? 'Tool call failed',
+                  statementId: decl.statementId,
+                ),
+              );
+              return;
+            }
+            store.set(decl.statementId, value.result);
+          })
+          .catchError((Object error, StackTrace _) {
+            if (_disposed) return;
+            _onError(
+              error is OpenUIError
+                  ? error
+                  : EvaluationError(
+                      message: error.toString(),
+                      statementId: decl.statementId,
+                    ),
+            );
+          }),
+    );
   }
 
-  /// Returns the OpenUIErrors collected across every cached entry.
-  Iterable<OpenUIError> errors() =>
-      _entries.values.map((e) => e.error).whereType<OpenUIError>();
-
-  /// Ensures the query identified by [statementId] has fired at least
-  /// once. Subsequent calls during the same `(statementId, fingerprint)`
-  /// cycle are no-ops; [invalidate] forces a re-fire.
-  void ensureFired(String statementId, List<Argument> args) {
+  /// Drops the fingerprint for [decl] and re-runs [ensureFired]
+  /// against [ctx]. Used by the renderer's `@Run($var)` path and by
+  /// tests covering re-fire semantics.
+  void invalidate(QueryDecl decl, EvalContext ctx) {
     if (_disposed) return;
-    final existing = _entries[statementId];
-    if (existing != null) return;
-    _fire(statementId, args);
-  }
-
-  /// Drops the cached entry for [statementId] and re-fires the call.
-  /// Used by `@Run`.
-  void invalidate(String statementId, List<Argument> args) {
-    if (_disposed) return;
-    _entries.remove(statementId);
-    _fire(statementId, args);
+    _fired.remove(decl.statementId);
+    ensureFired(decl, ctx);
   }
 
   /// Fires a mutation by [statementId]. Returns the resolved value on
-  /// success (mutations are not cached). On failure, writes an
-  /// [OpenUIError] into the entry's error slot, notifies [onChange],
-  /// and rethrows so the dispatcher can halt the plan.
+  /// success (mutations are not cached). Errors are wrapped as
+  /// [OpenUIError] and rethrown so the dispatcher can halt the plan.
   Future<Object?> fireMutation(
     String statementId,
     List<Argument> args,
   ) async {
     if (_disposed) return null;
     try {
-      return await _invoke(statementId, args);
+      return await _invokeMutation(statementId, args);
     } on Object catch (error) {
       if (_disposed) rethrow;
-      _entries[statementId] = QueryEntry(
-        error: error is OpenUIError
-            ? error
-            : EvaluationError(
-                message: error.toString(),
-                statementId: statementId,
-              ),
-      );
-      onChange?.call();
-      rethrow;
+      final wrapped = error is OpenUIError
+          ? error
+          : EvaluationError(
+              message: error.toString(),
+              statementId: statementId,
+            );
+      _onError(wrapped);
+      throw wrapped;
     }
   }
 
-  /// Releases listener and marks the manager unusable. In-flight
-  /// futures still complete; their results are discarded.
+  /// Releases the manager. In-flight futures still complete; their
+  /// results are discarded.
   void dispose() {
     _disposed = true;
-    onChange = null;
   }
 
-  void _fire(String statementId, List<Argument> args) {
-    _entries[statementId] = const QueryEntry(loading: true);
-    final future = _invoke(statementId, args);
-    unawaited(
-      future
-          .then((value) {
-            if (_disposed) return;
-            _entries[statementId] = QueryEntry(value: value);
-            onChange?.call();
-          })
-          .catchError((Object error, StackTrace _) {
-            if (_disposed) return;
-            _entries[statementId] = QueryEntry(
-              error: error is OpenUIError
-                  ? error
-                  : EvaluationError(
-                      message: error.toString(),
-                      statementId: statementId,
-                    ),
-            );
-            onChange?.call();
-          }),
-    );
-    // Listener fires for the loading transition too so the renderer
-    // can drive the loading overlay.
-    onChange?.call();
-  }
-
-  Future<Object?> _invoke(String statementId, List<Argument> args) {
+  Future<Object?> _invokeMutation(String statementId, List<Argument> args) {
     final toolName = _stringArg(args, 'name');
     if (toolName == null) {
       return Future<Object?>.error(
         EvaluationError(
-          message: 'Query is missing required string arg "name"',
+          message: 'Mutation is missing required string arg "name"',
           statementId: statementId,
         ),
       );
     }
     final toolArgs = _mapArg(args, 'args') ?? const <String, Object?>{};
     final tool = library.tool(toolName);
-    return tool!.callTool(toolArgs);
+    if (tool == null) {
+      return Future<Object?>.error(
+        ToolNotFoundError(toolName: toolName, statementId: statementId),
+      );
+    }
+    return tool.callTool(toolArgs);
   }
 }
 
@@ -203,4 +197,14 @@ Object? _literalValue(AstNode node) {
   if (node is Literal) return node.value;
   if (node is NullLiteral) return null;
   return null;
+}
+
+bool _mapEquals(Map<String, Object?> a, Map<String, Object?> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (final entry in a.entries) {
+    if (!b.containsKey(entry.key)) return false;
+    if (b[entry.key] != entry.value) return false;
+  }
+  return true;
 }

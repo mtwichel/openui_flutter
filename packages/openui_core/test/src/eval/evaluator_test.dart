@@ -17,7 +17,7 @@
 // - MemberAccess on Map / List.length / String.length / null
 // - IndexAccess on List (in-range, OOB, non-int) / Map / null
 // - BuiltinCall via a registered handler and unregistered (error path)
-// - CompCall / QueryCall / MutationCall in expression position emit errors
+// - CompCall / MutationCall in expression position emit errors
 // - withIteration shares cycle state and errors
 // - Truthiness rules across every primitive shape
 
@@ -39,9 +39,8 @@ AstNode _rhsOf(String source, String name) {
 
 void main() {
   group('EvalContext', () {
-    test('default queryResults, iterationVars, builtins, errors', () {
+    test('default iterationVars, builtins, errors', () {
       final ctx = EvalContext(statements: const [], store: Store());
-      expect(ctx.queryResults, isEmpty);
       expect(ctx.iterationVars, isEmpty);
       expect(ctx.builtins, isEmpty);
       expect(ctx.errors, isEmpty);
@@ -122,30 +121,43 @@ void main() {
       expect(ctx.errors, isEmpty);
     });
 
-    test('Query reference resolves to the cached query result', () {
-      final program = parseProgram('users = Query(name: "list_users")');
-      final ctx = EvalContext(
-        statements: program.statements,
-        store: Store(),
-        queryResults: const {
-          'users': [1, 2, 3],
-        },
-      );
-      expect(
-        evaluate(const Reference('users', offset: 0), ctx),
-        [1, 2, 3],
-      );
-    });
+    test(
+      '@Query reference returns null until the store gets the result',
+      () {
+        // `$products` is bound to a `@Query` declaration. The bare
+        // identifier `products` (no `$`) still classifies as the same
+        // statement — but the evaluator should return `null` rather
+        // than reading from the gone `queryResults` map. The actual
+        // query value lives in the store under `$products` and is
+        // read via `StateRef`.
+        final program = parseProgram(
+          r'$products = @Query(fetch)',
+        );
+        final ctx = EvalContext(
+          statements: program.statements,
+          store: Store(),
+        );
+        expect(
+          evaluate(const Reference(r'$products', offset: 0), ctx),
+          isNull,
+        );
+      },
+    );
 
-    test('Mutation reference resolves to the cached mutation result', () {
-      final program = parseProgram('del = Mutation(name: "delete")');
-      final ctx = EvalContext(
-        statements: program.statements,
-        store: Store(),
-        queryResults: const {'del': 'ok'},
-      );
-      expect(evaluate(const Reference('del', offset: 0), ctx), 'ok');
-    });
+    test(
+      'Mutation reference resolves to null (no value semantics)',
+      () {
+        final program = parseProgram('del = Mutation(name: "delete")');
+        final ctx = EvalContext(
+          statements: program.statements,
+          store: Store(),
+        );
+        expect(
+          evaluate(const Reference('del', offset: 0), ctx),
+          isNull,
+        );
+      },
+    );
 
     test('cycle emits CyclicStateError and returns null', () {
       final ctx = _ctxFor('a = b\nb = a');
@@ -531,16 +543,6 @@ void main() {
         (ctx.errors.single as EvaluationError).message,
         contains('Stack'),
       );
-    });
-
-    test('QueryCall in expression position (not a Reference) emits error', () {
-      // `Query(...)` directly as a sub-expression — rare, but legal.
-      final ctx = _ctxFor('');
-      final ast = _rhsOf('a = [Query(name: "x")]', 'a');
-      // `a` evaluates to a list whose only element is the result of
-      // evaluating QueryCall; that returns null and emits an error.
-      expect(evaluate(ast, ctx), [null]);
-      expect(ctx.errors.single, isA<EvaluationError>());
     });
 
     test('MutationCall in expression position emits an error', () {

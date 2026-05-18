@@ -3,9 +3,9 @@ description: >
   Flutter Renderer widget for OpenUI Lang. Owns the streaming parser,
   reactive store, error boundary, and form-state cache.
 version: 0.0.1-dev.1
-repository: https://github.com/VeryGoodOpenSource/openui_flutter
-homepage: https://github.com/VeryGoodOpenSource/openui_flutter/tree/main/packages/openui
-issue_tracker: https://github.com/VeryGoodOpenSource/openui_flutter/issues
+repository: https://github.com/mtwichel/openui_flutter
+homepage: https://github.com/mtwichel/openui_flutter/tree/main/packages/openui
+issue_tracker: https://github.com/mtwichel/openui_flutter/issues
 
 environment:
   sdk: ^3.9.0

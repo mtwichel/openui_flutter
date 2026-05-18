@@ -12,7 +12,7 @@ import 'package:openui_core/openui_core.dart';
 /// tool calls.
 ///
 /// The manager has no result storage of its own. Results are written
-/// straight to the [Store] via `store.set(decl.statementId, value)`,
+/// straight to the [Store] via `store.set(decl.statementId, value.result)`,
 /// which the renderer already subscribes to for reactive rebuilds.
 /// Failures are routed to [_onError] (the renderer's existing error
 /// sink). The only state the manager keeps is `_fired`: the most
@@ -85,7 +85,16 @@ class QueryManager {
           .callTool(evaluatedArgs)
           .then((value) {
             if (_disposed) return;
-            store.set(decl.statementId, value);
+            if (value.isError) {
+              _onError(
+                EvaluationError(
+                  message: value.result?.toString() ?? 'Tool call failed',
+                  statementId: decl.statementId,
+                ),
+              );
+              return;
+            }
+            store.set(decl.statementId, value.result);
           })
           .catchError((Object error, StackTrace _) {
             if (_disposed) return;

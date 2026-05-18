@@ -202,15 +202,7 @@ class _RendererState extends State<Renderer> {
     );
     _wasStreaming = widget.isStreaming;
 
-    final manager = _queryManager;
-    if (manager != null &&
-        !widget.isStreaming &&
-        result.meta.incomplete.isEmpty) {
-      final fireCtx = _buildEvalContext(result);
-      for (final query in result.meta.queries) {
-        manager.ensureFired(query, fireCtx);
-      }
-    }
+    _fireReadyQueries(result);
 
     widget.onParseResult?.call(result);
     _maybeReportErrors(result);
@@ -273,7 +265,21 @@ class _RendererState extends State<Renderer> {
     // category errors in `ctx.errors`; surface them so they're not
     // silently swallowed.
     ctx.errors.forEach(_reportError);
-    if (result != null) _maybeReportErrors(result);
+    if (result != null) {
+      _maybeReportErrors(result);
+      _fireReadyQueries(result);
+    }
+  }
+
+  void _fireReadyQueries(ParseResult result) {
+    final manager = _queryManager;
+    if (manager == null || widget.isStreaming) return;
+    final incomplete = result.meta.incomplete.toSet();
+    final fireCtx = _buildEvalContext(result);
+    for (final query in result.meta.queries) {
+      if (incomplete.contains(query.statementId)) continue;
+      manager.ensureFired(query, fireCtx);
+    }
   }
 
   Future<void> _onRun(

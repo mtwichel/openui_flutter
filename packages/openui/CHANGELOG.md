@@ -4,12 +4,13 @@
 
 - **BREAKING**: `QueryManager` rewrite for the new `@Query` builtin.
   Constructor is now `QueryManager({library, store, onError})`. Results
-  flow through `store.set(statementId, value)` instead of an internal
-  `QueryEntry` map; `QueryEntry` is removed. `ensureFired` /
+  flow through `store.set(statementId, value.result)` instead of an
+  internal `QueryEntry` map; `QueryEntry` is removed. `ensureFired` /
   `invalidate` take `(QueryDecl, EvalContext)` and evaluate args at
-  fire time. The renderer gates firing on
-  `!isStreaming && incomplete.isEmpty`, so a `@Query` only fires once
-  the stream completes and the parse is well-formed. `@Run($var)`
+  fire time. The renderer gates firing on `!isStreaming` and skips only
+  queries whose own statement is in `meta.incomplete` (so a missing
+  trailing newline no longer blocks top-level `@Query` declarations).
+  `@Run($var)`
   re-fires the bound query against the live store.
 - **chore**: renderer iteration paths follow the new 3-arg `@Each`
   shape — the template is read from `args[2]` and the named loop var

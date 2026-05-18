@@ -65,8 +65,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(tool.calls, 1);
-      expect(store.get(r'$q'), isA<ToolResult>());
-      expect((store.get(r'$q')! as ToolResult).result, 'ok');
+      expect(store.get(r'$q'), 'ok');
       expect(errors, isEmpty);
     });
 
@@ -130,7 +129,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(tool.calls, 2);
-      expect((store.get(r'$q')! as ToolResult).result, 'call-2-hats');
+      expect(store.get(r'$q'), 'call-2-hats');
     });
 
     test('unknown tool routes to onError, store untouched', () {
@@ -180,6 +179,33 @@ void main() {
       },
     );
 
+    test(
+      'ToolResult.isError routes to onError without writing store',
+      () async {
+        final store = Store()..set(r'$q', 'prior');
+        final errors = <OpenUIError>[];
+        final tool = _StubTool(
+          name: 'stub',
+          description: 'stub',
+          handler: (_) async =>
+              const ToolResult('permission denied', isError: true),
+        );
+        final manager = QueryManager(
+          library: Library<Widget>(components: const [], tools: [tool]),
+          store: store,
+          onError: errors.add,
+        );
+        addTearDown(manager.dispose);
+
+        manager.ensureFired(_decl(), _ctx(store));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(errors, hasLength(1));
+        expect(errors.single, isA<EvaluationError>());
+        expect(store.get(r'$q'), 'prior');
+      },
+    );
+
     test('non-OpenUIError exceptions wrap as EvaluationError', () async {
       final store = Store();
       final errors = <OpenUIError>[];
@@ -225,7 +251,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(tool.calls, 2);
-      expect((store.get(r'$q')! as ToolResult).result, 'call-2');
+      expect(store.get(r'$q'), 'call-2');
     });
   });
 

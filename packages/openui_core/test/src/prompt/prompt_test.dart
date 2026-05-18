@@ -92,10 +92,9 @@ void main() {
         result,
         contains(r'$var = @Query(toolName, namedArg: value, ...)'),
       );
-      expect(
-        result,
-        contains(r'$var == null ? Spinner() : Table(rows: $var)'),
-      );
+      expect(result, contains('top-level assignment'));
+      expect(result, contains(r'`$var == null ? loading : content`'));
+      expect(result, contains('re-fetch when those vars change via `@Set`'));
     });
 
     test('component with description renders Name(props) — description', () {

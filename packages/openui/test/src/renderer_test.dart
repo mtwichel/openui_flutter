@@ -472,7 +472,41 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
         await tester.pumpAndSettle();
         expect(calls, 1);
         expect(find.text('loaded'), findsOneWidget);
-        expect(snapshot[r'$products'], isA<ToolResult>());
+        expect(snapshot[r'$products'], isA<List<Object?>>());
+      },
+    );
+
+    testWidgets(
+      '@Query fires when root is incomplete (no trailing newline)',
+      (tester) async {
+        var calls = 0;
+        final tools = <Tool>[
+          _StubTool(
+            name: 'fetch',
+            description: 'fetch',
+            handler: (_) async {
+              calls++;
+              return const ToolResult(<Map<String, Object?>>[
+                {'title': 'A'},
+              ]);
+            },
+          ),
+        ];
+        // No trailing newline: streaming parser marks `root` incomplete.
+        const program =
+            '\$products = @Query(fetch)\n'
+            'root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")';
+        await tester.pumpWidget(
+          _TestRoot(
+            child: Renderer(
+              response: program,
+              library: _testLibrary(tools: tools),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        expect(find.text('loaded'), findsOneWidget);
       },
     );
 

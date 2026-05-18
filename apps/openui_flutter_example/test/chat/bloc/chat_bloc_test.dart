@@ -377,6 +377,20 @@ void main() {
       },
     );
 
+    blocTest<ChatBloc, ChatState>(
+      'GeminiApiKeySubmitted resets service so agent picks up new key',
+      build: () => ChatBloc(service: service),
+      act: (bloc) async {
+        bloc.add(const GeminiApiKeySubmitted('session-key'));
+        await _tick();
+      },
+      verify: (bloc) {
+        expect(bloc.state.geminiConfigured, isTrue);
+        expect(bloc.state.sessionKeyActive, isTrue);
+        expect(service.resetCount, 1);
+      },
+    );
+
     test('bloc.close() cancels any active stream subscription', () async {
       final bloc = ChatBloc(service: service, skipGeminiAuth: true)
         ..add(const MessageSubmitted('hi'));

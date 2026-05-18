@@ -185,8 +185,6 @@ cd apps/openui_flutter_example && flutter test
 - Melos **^7.7.0**
 - Very Good CLI **^1.2.0**
 
-Flutter pin rationale: **[docs/decisions/2026-05-10-phase0-decisions.md](docs/decisions/2026-05-10-phase0-decisions.md)** (decision **D1**).
-
 ### Status (v0.1)
 
 Feature-complete for the initial scope: core language + streaming parser, Flutter `Renderer` + components, MCP tool provider, and the example app. Post–v0.1 backlog is deferred; see **docs/architecture.md** and repo issues for direction.

@@ -1,3 +1,7 @@
+## 0.0.1-dev.2
+
+- Point pubspec `repository`, `homepage`, and `issue_tracker` URLs at `github.com/mtwichel/openui_flutter`.
+
 ## 0.0.1-dev.1
 
 - **feat**: `McpToolProvider` — implements `openui_core`'s

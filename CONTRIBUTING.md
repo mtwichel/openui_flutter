@@ -137,7 +137,7 @@ For each of the four publishable packages, go to `https://pub.dev/packages/<pack
 
 | Field | Value |
 |-------|-------|
-| Repository | `VeryGoodOpenSource/openui_flutter` |
+| Repository | `mtwichel/openui_flutter` |
 | Workflow file | `.github/workflows/publish.yml` |
 | Environment | _leave empty_ |
 | Tag pattern | `<package>-v.*` (e.g., `openui_core-v.*`) |

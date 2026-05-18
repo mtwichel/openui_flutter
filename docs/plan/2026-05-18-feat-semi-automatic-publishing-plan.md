@@ -51,7 +51,7 @@ git push --follow-tags   # triggers publish workflow per tag
 
 ### Initial seed publish (one-time, before this pipeline takes over)
 
-A maintainer with pub.dev access runs `dart pub publish` from each of the four publishable package directories at `0.1.0`. After that, claim each package on pub.dev and configure trusted-publisher pointing at this repo (`VeryGoodOpenSource/openui_flutter`), workflow file (`publish.yml`), and tag pattern (`<package>-v*`). This step is not part of the PR — it's a prerequisite documented in CONTRIBUTING.md under "First-time pub.dev setup."
+A maintainer with pub.dev access runs `dart pub publish` from each of the four publishable package directories at `0.1.0`. After that, claim each package on pub.dev and configure trusted-publisher pointing at this repo (`mtwichel/openui_flutter`), workflow file (`publish.yml`), and tag pattern (`<package>-v*`). This step is not part of the PR — it's a prerequisite documented in CONTRIBUTING.md under "First-time pub.dev setup."
 
 ### What `melos.yaml` actually gets
 

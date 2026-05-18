@@ -275,6 +275,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final key = event.apiKey.trim();
     if (key.isEmpty) return;
     _registerGeminiProvider(key);
+    // Service is constructed before the key gate; reset so the next send
+    // builds a fresh Agent that picks up the registered provider factory.
+    _service.reset();
     emit(state.copyWith(geminiConfigured: true, sessionKeyActive: true));
   }
 
@@ -286,6 +289,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final fromDefine = _dartDefineGeminiApiKey.trim();
     if (fromDefine.isNotEmpty) {
       _registerGeminiProvider(fromDefine);
+      _service.reset();
       emit(state.copyWith(geminiConfigured: true, sessionKeyActive: false));
     } else {
       _unregisterGeminiProvider();

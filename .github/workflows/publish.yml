@@ -1,5 +1,5 @@
 # Tag patterns must match trusted-publisher tag patterns on pub.dev.
-# See CONTRIBUTING.md for setup and rename procedures.
+# See CONTRIBUTING.md for the rename procedure.
 
 name: publish
 

@@ -114,36 +114,6 @@ If a publish job fails:
 2. **Do not re-tag.** Once a tag exists on `main`, leave it. Re-tagging the same version moves the tag pointer and confuses consumers who already saw the original SHA. If a different commit needs to publish under that version, bump to the next version instead and tag that.
 3. **If the publish must be abandoned**, leave the tag in place and document why in the next release's CHANGELOG. pub.dev never had the version, so consumers won't see a gap.
 
-## First-time pub.dev setup
-
-These steps happen once per package, before the publish pipeline can succeed for that package. They're manual and require a maintainer with pub.dev access.
-
-### 1. Seed the initial publish
-
-The publish pipeline assumes each package already exists on pub.dev. Before this PR's pipeline takes over, run from each publishable package directory:
-
-```bash
-cd packages/openui_core && dart pub publish
-cd packages/openui && dart pub publish
-cd packages/openui_components && dart pub publish
-cd packages/openui_mcp && dart pub publish
-```
-
-This publishes `0.0.1-dev.1` of each package using the maintainer's pub.dev credentials. After this point, no maintainer needs pub.dev credentials again.
-
-### 2. Configure trusted-publisher per package
-
-For each of the four publishable packages, go to `https://pub.dev/packages/<package>/admin` and configure **GitHub Actions trusted publishing** with:
-
-| Field | Value |
-|-------|-------|
-| Repository | `VeryGoodOpenSource/openui_flutter` |
-| Workflow file | `.github/workflows/publish.yml` |
-| Environment | _leave empty_ |
-| Tag pattern | `<package>-v.*` (e.g., `openui_core-v.*`) |
-
-The tag pattern must match the tag pattern in `.github/workflows/publish.yml`'s `on.push.tags` array. If you ever rename a package, update both places — there's a comment at the top of `publish.yml` pointing here.
-
 ## Repo settings prerequisite
 
 For the PR-title-as-commit-subject contract to hold, a repo admin must configure:

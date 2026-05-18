@@ -123,19 +123,6 @@ The renderer pre-resolves prop values for you:
 Need access to the form-state cache or the store from a component?
 `RendererScope.maybeFind(context)` exposes both.
 
-## Decisions honored
-
-- **D3 — Action `$var` resolution** at dispatch time, against the live
-  store. `dispatchAction` already implements this; the renderer carries
-  the unevaluated AST through.
-- **D4 — One `Store` per `Renderer`**. Created in `initState`, disposed
-  in `dispose`.
-- **D7 — Form controller cache** keyed by `(formName, fieldName)` with a
-  250 ms grace before disposal so focus survives streamed rebuilds.
-- **A14 — Error boundary auto-recovery**: a single successful build
-  clears the cached child. Flutter's synchronous build doesn't need
-  React's 3-frame counter.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).

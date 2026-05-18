@@ -1,3 +1,7 @@
+## 0.0.1-dev.2
+
+- Point pubspec `repository`, `homepage`, and `issue_tracker` URLs at `github.com/mtwichel/openui_flutter`.
+
 ## 0.0.1-dev.1
 
 - **BREAKING**: `QueryManager` rewrite for the new `@Query` builtin.

@@ -1,4 +1,4 @@
-## 0.1.0
+## 0.0.1-dev.1
 
 - **BREAKING**: `QueryManager` rewrite for the new `@Query` builtin.
   Constructor is now `QueryManager({library, store, onError})`. Results

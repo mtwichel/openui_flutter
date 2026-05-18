@@ -3,7 +3,7 @@ description: >
   Pure-Dart core for OpenUI Flutter: lexer, parser, AST, streaming parser,
   evaluator, reactive store, library DSL, action steps, and tool-provider
   interface. The language layer that the Flutter renderer sits on top of.
-version: 0.1.0
+version: 0.0.1-dev.1
 repository: https://github.com/VeryGoodOpenSource/openui_flutter
 homepage: https://github.com/VeryGoodOpenSource/openui_flutter/tree/main/packages/openui_core
 issue_tracker: https://github.com/VeryGoodOpenSource/openui_flutter/issues

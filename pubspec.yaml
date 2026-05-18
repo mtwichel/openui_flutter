@@ -9,7 +9,6 @@ workspace:
   - packages/openui
   - packages/openui_components
   - packages/openui_mcp
-  - packages/openui_test_helpers
   - apps/openui_flutter_example
 
 dev_dependencies:

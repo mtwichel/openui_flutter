@@ -1,4 +1,4 @@
-## 0.1.0
+## 0.0.1-dev.1
 
 - **feat**: `McpToolProvider` — implements `openui_core`'s
   `ToolProvider` over `mcp_dart`'s `McpClient`. Wraps every call

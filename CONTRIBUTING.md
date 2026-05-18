@@ -129,7 +129,7 @@ cd packages/openui_components && dart pub publish
 cd packages/openui_mcp && dart pub publish
 ```
 
-This publishes `0.1.0` of each package using the maintainer's pub.dev credentials. After this point, no maintainer needs pub.dev credentials again.
+This publishes `0.0.1-dev.1` of each package using the maintainer's pub.dev credentials. After this point, no maintainer needs pub.dev credentials again.
 
 ### 2. Configure trusted-publisher per package
 

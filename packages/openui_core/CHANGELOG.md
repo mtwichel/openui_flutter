@@ -1,6 +1,4 @@
-# Changelog
-
-## 0.1.0 (unreleased)
+## 0.0.1-dev.1
 
 - **BREAKING**: `Query(name: ..., args: ...)` is removed. Use the new
   `@Query` builtin as the entire RHS of a `$var =` assignment:

@@ -2,12 +2,11 @@ name: openui_mcp
 description: >
   MCP `ToolProvider` for OpenUI Flutter. Wraps `mcp_dart`'s `McpClient`
   with the JS-reference-compatible `extractToolResult` envelope unwrap.
-version: 0.1.0
+version: 0.0.1-dev.1
 repository: https://github.com/VeryGoodOpenSource/openui_flutter
 homepage: https://github.com/VeryGoodOpenSource/openui_flutter/tree/main/packages/openui_mcp
 issue_tracker: https://github.com/VeryGoodOpenSource/openui_flutter/issues
 
-resolution: workspace
 
 environment:
   sdk: ^3.9.0
@@ -15,7 +14,7 @@ environment:
 dependencies:
   mcp_dart: ^2.1.1
   meta: ^1.16.0
-  openui_core: ^0.1.0
+  openui_core: ^0.0.1-dev.1
 
 dev_dependencies:
   test: ^1.25.0

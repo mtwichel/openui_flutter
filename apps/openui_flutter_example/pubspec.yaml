@@ -3,8 +3,6 @@ description: Stubbed-LLM streaming chat demo for OpenUI Flutter.
 version: 0.0.1+1
 publish_to: none
 
-resolution: workspace
-
 environment:
   sdk: ^3.9.0
   flutter: ^3.35.0
@@ -17,9 +15,9 @@ dependencies:
     sdk: flutter
   flutter_bloc: ^9.1.1
   http: ^1.6.0
-  openui: ^0.1.0
-  openui_components: ^0.1.0
-  openui_core: ^0.1.0
+  openui: ^0.0.1-dev.1
+  openui_components: ^0.0.1-dev.1
+  openui_core: ^0.0.1-dev.1
 
 dev_dependencies:
   bloc_test: ^10.0.0

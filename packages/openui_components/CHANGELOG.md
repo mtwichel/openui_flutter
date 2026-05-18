@@ -1,6 +1,4 @@
-# Changelog
-
-## 0.1.0 (unreleased)
+## 0.0.1-dev.1
 
 - **feat**: 21 built-in components ready for the renderer:
   - **Layout** — `Stack`, `Card` + `CardHeader`, `Separator`, `Callout`.

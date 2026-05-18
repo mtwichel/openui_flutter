@@ -1,0 +1,42 @@
+# Tag patterns must match trusted-publisher tag patterns on pub.dev.
+# See CONTRIBUTING.md for setup and rename procedures.
+
+name: publish
+
+on:
+  push:
+    tags:
+      - 'openui_core-v*'
+      - 'openui-v*'
+      - 'openui_components-v*'
+      - 'openui_mcp-v*'
+
+# Workflow-level permissions propagate into the reusable workflow's job.
+# `id-token: write` is required for pub.dev OIDC trusted-publisher exchange.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.pkg.outputs.name }}
+    steps:
+      - id: pkg
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # tag format: <package>-v<version>
+          echo "name=${tag%-v*}" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: resolve
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_pub_publish.yml@v1
+    with:
+      working_directory: packages/${{ needs.resolve.outputs.package }}
+      flutter_channel: stable
+      flutter_version: 3.41.9
+    secrets:
+      # Empty string falls through to OIDC via setup-dart. No long-lived
+      # pub.dev token lives in this repo.
+      pub_credentials: ''

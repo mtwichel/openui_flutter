@@ -1,6 +1,4 @@
-# Changelog
-
-## 0.1.0 (unreleased)
+## 0.1.0
 
 - **feat**: `McpToolProvider` — implements `openui_core`'s
   `ToolProvider` over `mcp_dart`'s `McpClient`. Wraps every call

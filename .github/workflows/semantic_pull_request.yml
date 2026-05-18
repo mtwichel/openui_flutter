@@ -1,3 +1,11 @@
+# We invoke amannn/action-semantic-pull-request@v5 directly instead of using
+# VeryGoodOpenSource/very_good_workflows' reusable semantic_pull_request.yml
+# because the reusable workflow does not expose `requireScope`. We need
+# `requireScope: true` so that melos can attribute every merged commit to a
+# package (or a known cross-cutting bucket) via the scope in the PR title.
+# Without it, a scope-less `feat: ...` would land on main and break per-package
+# changelog generation.
+
 name: semantic_pull_request
 
 on:
@@ -15,3 +23,16 @@ jobs:
       - uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          requireScope: true
+          scopes: |
+            openui_core
+            openui
+            openui_components
+            openui_mcp
+            openui_test_helpers
+            openui_flutter_example
+            ci
+            deps
+            docs
+            chore

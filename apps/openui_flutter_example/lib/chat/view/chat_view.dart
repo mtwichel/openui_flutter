@@ -688,15 +688,17 @@ class _Transcript extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final tiles = <Widget>[
       _CopyableMessageBubble(
         key: const ValueKey('system-prompt'),
         roleLabel: 'System',
         text: systemPrompt,
         alignment: Alignment.center,
-        backgroundColor: Theme.of(
-          context,
-        ).colorScheme.tertiaryContainer.withValues(alpha: 0.6),
+        backgroundColor: theme.colorScheme.tertiaryContainer.withValues(
+          alpha: 0.6,
+        ),
+        foregroundColor: theme.colorScheme.onTertiaryContainer,
       ),
     ];
 
@@ -714,18 +716,21 @@ class _Transcript extends StatelessWidget {
         UiMessageRole.tool => Alignment.centerLeft,
       };
       final background = switch (message.role) {
-        UiMessageRole.user => Theme.of(context).colorScheme.primaryContainer,
-        UiMessageRole.assistant => Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest,
+        UiMessageRole.user => theme.colorScheme.primaryContainer,
+        UiMessageRole.assistant => theme.colorScheme.surfaceContainerHighest,
         UiMessageRole.thinking =>
-          Theme.of(context).colorScheme.secondaryContainer.withValues(
+          theme.colorScheme.secondaryContainer.withValues(
             alpha: 0.65,
           ),
-        UiMessageRole.tool =>
-          Theme.of(context).colorScheme.tertiaryContainer.withValues(
-            alpha: 0.65,
-          ),
+        UiMessageRole.tool => theme.colorScheme.tertiaryContainer.withValues(
+          alpha: 0.65,
+        ),
+      };
+      final foreground = switch (message.role) {
+        UiMessageRole.user => theme.colorScheme.onPrimaryContainer,
+        UiMessageRole.assistant => theme.colorScheme.onSurface,
+        UiMessageRole.thinking => theme.colorScheme.onSecondaryContainer,
+        UiMessageRole.tool => theme.colorScheme.onTertiaryContainer,
       };
       tiles.add(
         _CopyableMessageBubble(
@@ -734,6 +739,7 @@ class _Transcript extends StatelessWidget {
           text: message.text,
           alignment: alignment,
           backgroundColor: background,
+          foregroundColor: foreground,
         ),
       );
     }
@@ -750,6 +756,7 @@ class _CopyableMessageBubble extends StatelessWidget {
     required this.text,
     required this.alignment,
     required this.backgroundColor,
+    required this.foregroundColor,
     super.key,
   });
 
@@ -757,10 +764,12 @@ class _CopyableMessageBubble extends StatelessWidget {
   final String text;
   final Alignment alignment;
   final Color backgroundColor;
+  final Color foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final secondaryTextColor = foregroundColor.withValues(alpha: 0.8);
     return Align(
       alignment: alignment,
       child: Container(
@@ -776,11 +785,20 @@ class _CopyableMessageBubble extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(roleLabel, style: theme.textTheme.labelSmall),
+                  child: Text(
+                    roleLabel,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: secondaryTextColor,
+                    ),
+                  ),
                 ),
                 IconButton(
                   tooltip: 'Copy $roleLabel message',
-                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  icon: Icon(
+                    Icons.copy_outlined,
+                    size: 18,
+                    color: secondaryTextColor,
+                  ),
                   visualDensity: VisualDensity.compact,
                   constraints: const BoxConstraints(),
                   padding: EdgeInsets.zero,
@@ -794,7 +812,12 @@ class _CopyableMessageBubble extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            SelectableText(text.isEmpty ? '(streaming...)' : text),
+            SelectableText(
+              text.isEmpty ? '(streaming...)' : text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: foregroundColor,
+              ),
+            ),
           ],
         ),
       ),

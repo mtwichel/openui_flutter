@@ -29,7 +29,7 @@ class SelectWidget extends StatelessWidget {
     final value = binding?.value as String?;
     final initial = options.contains(value) ? value : null;
     return ShadSelect<String>(
-      value: initial,
+      initialValue: initial,
       options: [
         for (final option in options)
           ShadOption(value: option, child: Text(option)),

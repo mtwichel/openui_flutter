@@ -2,7 +2,6 @@ import 'package:collection/collection.dart';
 import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 import 'package:openui_core/openui_core.dart';
-import '../tools/tools.dart';
 
 part 'library.mapper.dart';
 
@@ -133,7 +132,8 @@ class Library with LibraryMappable {
   }
 }
 
-/// Integrates a spec [Library] with its runtime renderers and execution handlers.
+/// Integrates a spec [Library] with its runtime renderers and execution
+/// handlers.
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -204,7 +204,8 @@ class RenderLibrary<W> {
   }
 }
 
-/// A helper container that bundles a [Component] spec and its platform-specific [render] callback.
+/// A helper container that bundles a [Component] spec and its
+/// platform-specific [render] callback.
 ///
 /// Marked `@experimental` per D12.
 @experimental

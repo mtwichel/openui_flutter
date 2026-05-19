@@ -120,7 +120,7 @@ void main() {
         components: [comp('Stack')],
         tools: const [],
       );
-      final extended = base.extend(components: [comp('Card')], tools: const []);
+      final extended = base.extend(components: [comp('Card')]);
       expect(extended.components.map((c) => c.name).toSet(), {'Stack', 'Card'});
       // Original library is untouched.
       expect(base.component('Card'), isNull);
@@ -135,15 +135,15 @@ void main() {
         name: 'Stack',
         schema: Schema.object(),
       );
-      final extended = base.extend(components: [replacement], tools: const []);
+      final extended = base.extend(components: [replacement]);
       expect(extended.component('Stack'), replacement);
     });
 
     test('duplicate tool names collapse to last-write-wins', () {
-      final first = Tool(name: 'search', description: 'first');
-      final second = Tool(name: 'search', description: 'second');
-      final lib = Library(
-        components: const [],
+      const first = Tool(name: 'search', description: 'first');
+      const second = Tool(name: 'search', description: 'second');
+      const lib = Library(
+        components: [],
         tools: [first, second],
       );
       expect(lib.tool('search')!.description, 'second');

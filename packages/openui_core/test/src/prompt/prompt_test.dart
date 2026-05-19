@@ -286,7 +286,7 @@ void main() {
     );
 
     test(
-      'component schema that is not an object uses the formatted type in the signature',
+      'non-object component schema uses formatted type in signature',
       () {
         final c = Component(
           name: 'Scalar',

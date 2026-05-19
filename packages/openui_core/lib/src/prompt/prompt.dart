@@ -114,7 +114,7 @@ String _formatSchema(Schema schema) {
         final name = entry.key;
         final propVal = entry.value;
         final opt = !required.contains(name);
-        
+
         final typeName = _formatSchema(propVal);
         final desc = propVal.description;
         var piece = '$name${opt ? '?' : ''}: $typeName';
@@ -129,15 +129,17 @@ String _formatSchema(Schema schema) {
   }
 
   if (type is List) {
-    return type.map((t) {
-      if (t is Map<String, Object?>) {
-        return _formatSchema(Schema.fromMap(t));
-      }
-      if (t is Schema) {
-        return _formatSchema(t);
-      }
-      return t.toString();
-    }).join(' | ');
+    return type
+        .map((t) {
+          if (t is Map<String, Object?>) {
+            return _formatSchema(Schema.fromMap(t));
+          }
+          if (t is Schema) {
+            return _formatSchema(t);
+          }
+          return t.toString();
+        })
+        .join(' | ');
   }
 
   return 'any';
@@ -156,7 +158,7 @@ String _formatObjectPropertyList(Schema schema) {
     final name = entry.key;
     final propVal = entry.value;
     final opt = !required.contains(name);
-    
+
     final typeName = _formatSchema(propVal);
     final desc = propVal.description;
     var piece = '$name${opt ? '?' : ''}: $typeName';

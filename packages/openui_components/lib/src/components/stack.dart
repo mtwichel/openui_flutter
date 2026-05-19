@@ -134,7 +134,14 @@ RenderComponent<Widget> stackComponent() {
             enumValues: ['start', 'center', 'end', 'stretch'],
           ),
           'justify': Schema.string(
-            enumValues: ['start', 'center', 'end', 'between', 'around', 'evenly'],
+            enumValues: [
+              'start',
+              'center',
+              'end',
+              'between',
+              'around',
+              'evenly',
+            ],
           ),
           'wrap': Schema.boolean(),
           'children': Schema.list(items: Schema.any()),

@@ -99,4 +99,5 @@ export 'src/parser/streaming.dart'
         createStreamingParser;
 export 'src/prompt/prompt.dart' show generatePrompt;
 export 'src/state/store.dart' show Store, StoreChangeOrigin;
-export 'src/tools/tools.dart' show Tool, ToolHandler, ToolResult, ToolMapper, ToolCopyWith;
+export 'src/tools/tools.dart'
+    show Tool, ToolHandler, ToolResult, ToolMapper, ToolCopyWith;

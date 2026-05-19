@@ -53,7 +53,9 @@ RenderComponent<Widget> buttonComponent() {
       schema: Schema.object(
         properties: {
           'label': Schema.string(),
-          'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
+          'variant': Schema.string(
+            enumValues: ['primary', 'secondary', 'text'],
+          ),
           'onClick': Schema.any().xAction(),
         },
         required: ['label'],

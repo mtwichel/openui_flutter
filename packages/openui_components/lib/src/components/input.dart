@@ -69,7 +69,9 @@ class _InputWidgetState extends State<InputWidget> {
     return ShadInput(
       key: ValueKey<String>('input-default-${widget.name}'),
       controller: controller,
-      placeholder: widget.placeholder != null ? Text(widget.placeholder!) : null,
+      placeholder: widget.placeholder != null
+          ? Text(widget.placeholder!)
+          : null,
       onChanged: (text) {
         final b = widget.binding;
         if (b != null) scope.store.set(b.target, text);

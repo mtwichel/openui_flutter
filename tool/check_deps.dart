@@ -14,7 +14,7 @@ import 'dart:io';
 const _rules = <String, _PackageRule>{
   'openui_core': _PackageRule(
     type: _PackageType.dart,
-    allowed: {'collection', 'json_schema_builder', 'meta'},
+    allowed: {'collection', 'dart_mappable', 'json_schema_builder', 'meta'},
   ),
   'openui': _PackageRule(
     type: _PackageType.flutter,
@@ -29,6 +29,7 @@ const _rules = <String, _PackageRule>{
       'meta',
       'openui',
       'openui_core',
+      'shadcn_ui',
       'url_launcher',
     },
   ),

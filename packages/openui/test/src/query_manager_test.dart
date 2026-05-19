@@ -28,10 +28,10 @@ class _StubTool extends Tool {
 }
 
 RenderLibrary<Widget> _lib(_StubTool tool) => RenderLibrary<Widget>(
-      spec: Library(components: const [], tools: [tool]),
-      renderers: const {},
-      toolHandlers: {tool.name: tool.callTool},
-    );
+  spec: Library(components: const [], tools: [tool]),
+  renderers: const {},
+  toolHandlers: {tool.name: tool.callTool},
+);
 
 const _emptyLib = RenderLibrary<Widget>(
   spec: Library(components: [], tools: []),

@@ -86,7 +86,7 @@ Every statement is classified at parse time as one of:
 | `@Filter` | `@Filter(list, predicateRef)` | Filters `list` by calling the predicate (a comp ref) on each item |
 | `@Each` | `@Each(list, "name", template)` | Materializes `template` once per item with the named loop var (`name.field`) and `$index` bound. The loop name must be a string literal matching the IDENT rule (`[a-z_][a-zA-Z0-9_]*`), not `true`/`false`/`null`, and may not start with `$`. Lazy: not evaluated until needed |
 | `@Map` | `@Map(list, transformRef)` | Maps each element through a comp ref |
-| `@Query` | `@Query(toolName, named: value, ...)` | Only valid as the entire RHS of `$var = @Query(...)`. Runs the named tool exactly once per `(statementId, evaluated-args)` tuple after streaming completes; writes the result through the store. `null` while loading. Errors surface via `Renderer.onError`. Re-fire with `@Run($var)` |
+| `@Query` | `@Query(toolName, named: value, ...)` | Only valid as the entire RHS of `$var = @Query(...)`. Runs the named tool once per `(statementId, evaluated-args)` tuple after streaming completes (`Renderer.isStreaming == false`); writes the result through the store. `null` while loading. Errors surface via `Renderer.onError`. Re-fire with `@Run($var)` |
 
 Action-step builtins (only as elements of a **non-empty array literal** on props marked `x-action: true` in the component schema, for example `onClick: [@Set($count, $count + 1)]` or `onClick: [@Run(refresh), @Set($flag, 1)]`. Bare `@Step(...)`, empty `[]`, `Action(...)`, and arrays containing non-action expressions are rejected.)
 
@@ -101,20 +101,24 @@ The action plan dispatcher executes steps sequentially. `@Run` returning an erro
 
 ## Reactive props
 
-Components declare their props via `defineComponent(name, schema, render)`. To mark a prop as reactive (two-way bound to a `$state` variable), wrap its schema in `reactive(...)`:
+Component props are described by JSON Schema on a `Component` spec. Mark a prop as reactive (two-way bound to a `$state` variable) with the `x-reactive: true` extension on that property's schema (in `openui_components`, use the `Schema.xReactive()` extension on `json_schema_builder` schemas):
 
 ```dart
-defineComponent(
-  'Input',
-  schema: S.object({
-    'value': reactive(S.string()),
-    'placeholder': S.string().optional(),
+Component(
+  name: 'Input',
+  schema: Schema.fromMap(const {
+    'type': 'object',
+    'properties': {
+      'value': {'type': 'string', 'x-reactive': true},
+      'placeholder': {'type': 'string'},
+    },
   }),
-  render: (context, props, renderNode, statementId) => ...,
 );
 ```
 
-When the evaluator encounters a reactive prop whose value resolves to a `$varName` reference, it does not resolve the value. Instead it emits a `ReactiveAssign(target: '$varName', value: <currentValue>)` marker. The component receives the marker via `props['value']`; it calls `isReactiveAssign(value)` and, if true, sets up two-way binding to `store`.
+Pair the spec with a renderer in `RenderComponent<Widget>` / `RenderLibrary<Widget>` (see [Library model](#library-model) below).
+
+When the evaluator encounters a reactive prop whose value resolves to a bare `$varName` reference, it does not resolve the value. Instead it emits a `ReactiveAssign(target: '$varName', value: <currentValue>)` marker. The component receives the marker via `props['value']`; it calls `isReactiveAssign(value)` and, if true, sets up two-way binding to `store`.
 
 ## Action timing
 
@@ -173,22 +177,50 @@ Forward references are allowed: `root = Stack([chart])` may appear before `chart
 
 Per Decision D15, the evaluator carries a per-evaluation `Set<String>` of `$var`s currently being resolved. Re-entering the set yields `null` and emits `meta.errors.add(CyclicStateError(...))`. `a = $b\nb = $a` is data, not a process crash.
 
-## Library and `defineComponent`
+## Library model
 
-A `Library` is a compiled bag of component definitions. Each definition is a `(name, schema, render)` triple. `Library.id` is a stable hash over the registered names plus their schema fingerprints — two libraries with the same components are `==`. Schema-tagging uses `Expando<String>` (Dart's `WeakMap` analogue): the schema's compiled `ParamMap` is attached to the schema instance for O(1) prop mapping at render time.
+**Dart note.** The Dart port separates **specs** from **renderers**:
+
+| Type | Role |
+|---|---|
+| `Component` | Component name + JSON Schema (+ optional `description`, `internal`) |
+| `Tool` | Tool name + description + input/output schemas (prompt metadata) |
+| `Library` | List of `Component` and `Tool` specs; `extend()`; `prompt()` → `generatePrompt` |
+| `RenderComponent<W>` | One `Component` spec + one `ComponentRender<W>` callback |
+| `RenderLibrary<W>` | `spec` + `renderers` map + `toolHandlers` map; `extend()`; `prompt()` |
+
+`Renderer.library` is a `RenderLibrary<Widget>`. Lookups use `library.component(name)` for schemas and `library.renderer(name)` for widgets. `@Query` / `@Run` dispatch through `library.toolHandler(toolName)`.
+
+Builtin components in `openui_components` are registered via `standardLibrary()`:
 
 ```dart
-final lib = createLibrary(components: [
-  defineComponent('Stack', schema: stackSchema, render: stackRender),
-  defineComponent('Card', schema: cardSchema, render: cardRender),
-  // ...
-]);
+RenderLibrary<Widget> standardLibrary() {
+  final list = [stackComponent(), cardComponent(), /* ... */];
+  return RenderLibrary<Widget>(
+    spec: Library(
+      components: list.map((c) => c.spec).toList(),
+      tools: const [],
+    ),
+    renderers: {for (final c in list) c.name: c.render},
+    toolHandlers: const {},
+  );
+}
 ```
 
-`openui_components` ships two ready-made libraries:
+Extend with more tools or components:
 
-- `openuiLibrary()` — no root wrapper
-- `openuiChatLibrary()` — wraps every response in a `Card`, matching the JS `genui-chat-lib`
+```dart
+final snackbar = SnackbarTool(); // implements Tool + callTool
+
+final library = standardLibrary().extend(
+  tools: [snackbar],
+  toolHandlers: {snackbar.name: snackbar.callTool},
+);
+
+final systemPrompt = library.prompt();
+```
+
+Components marked `internal: true` (for example `Col`, `TabItem`) are omitted from generated prompts but remain renderable.
 
 ## `mergeStatements` (edit mode)
 
@@ -213,8 +245,8 @@ This is the LLM "edit, don't rewrite" pathway; the renderer never invokes it aut
 | `EvaluationError` | Evaluator hit an unresolvable expression (member access on null, etc.) |
 | `CyclicStateError` | Reactive-state cycle detected |
 | `UnknownComponentError` | RHS comp name not in library |
-| `McpToolError` | MCP `CallToolResult.isError == true` |
-| `ToolNotFoundError` | `toolProvider.callTool(name)` for an unknown tool |
+| `McpToolError` | MCP tool returned `isError` (when using `openui_mcp`) |
+| `ToolNotFoundError` | No `toolHandler` registered for the requested tool name |
 | `AdapterMismatchError` | Stream adapter encountered a malformed event |
 
 All errors are surfaced via `meta.errors` (parse-time and eval-time) or `Renderer.onError` (render-time and adapter-time) — never thrown out of the renderer.
@@ -222,9 +254,9 @@ All errors are surfaced via `meta.errors` (parse-time and eval-time) or `Rendere
 ## Out of scope for v0.1
 
 - Comments
-- Function definitions (only `defineComponent` is exposed)
+- User-defined functions in OpenUI Lang (components are registered in Dart only)
 - Imports / namespaces
-- Type annotations beyond what `defineComponent` schemas express
+- Type annotations beyond component JSON schemas
 - `langgraph` and `openai-readable-stream` adapters (Acceptance Gap A21)
 - Multi-thread chat state (Acceptance Gap A12)
 - Persistence (Acceptance Gap A13)

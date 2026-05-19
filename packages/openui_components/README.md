@@ -6,18 +6,21 @@
 
 Builtin component library for OpenUI Flutter.
 
-Ships 21 components ready to drop into the `openui` renderer:
+Ships 16 components as `RenderComponent<Widget>` pairs (spec + renderer),
+styled with [shadcn_ui](https://pub.dev/packages/shadcn_ui). Wrap your app in
+`ShadApp` (see the example app's `main.dart`) so buttons, inputs, cards, and
+tabs pick up the theme.
 
 - **Layout** — `Stack`, `Card`, `CardHeader`, `Separator`, `Callout`
-- **Content** — `TextContent`, `MarkDownRenderer`, `Image`, `CodeBlock`
-- **Forms** — `Form`, `FormControl`, `Input`, `Select`, `Button`, `Buttons`
+- **Content** — `TextContent`, `MarkDownRenderer`, `Image`
+- **Forms** — `Input`, `Select`, `Button`
 - **Data** — `Table`, `Col`, `Tabs`, `TabItem`
 - **Charts** — `BarChart`, `LineChart`
 
 Each component is wired to the renderer's reactive store and
-`FormStateCache`. Reactive inputs (`Input.value`, `Select.value`) are
-two-way bound to `$state` variables through the renderer's
-`ReactiveAssign` marker.
+`FormStateCache`. Reactive props (`Input.value`, `Select.value`) use the
+`x-reactive` schema keyword and arrive as `ReactiveAssign` markers from the
+renderer.
 
 ## Status
 
@@ -27,7 +30,8 @@ v0.1, Phase 3 complete.
 
 ```yaml
 dependencies:
-  openui_components: ^0.1.0
+  openui_components: ^0.0.1-dev.2
+  shadcn_ui: ^0.54.0   # required for correct builtin styling
 ```
 
 ## Quick start
@@ -36,8 +40,25 @@ dependencies:
 import 'package:flutter/material.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
-void main() => runApp(const MaterialApp(home: MyPage()));
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadApp.custom(
+      theme: ShadThemeData(brightness: Brightness.light),
+      appBuilder: (context) => MaterialApp(
+        theme: Theme.of(context),
+        home: const MyPage(),
+        builder: (context, child) => ShadAppBuilder(child: child),
+      ),
+    );
+  }
+}
 
 class MyPage extends StatelessWidget {
   const MyPage({super.key});
@@ -54,19 +75,31 @@ root = Stack(children: [
   TextContent(text: $count)
 ])
 ''',
-        library: openuiLibrary(),
+        library: standardLibrary(),
       ),
     );
   }
 }
 ```
 
-## Two libraries
+## `standardLibrary()`
 
-| Factory | Behavior |
-| --- | --- |
-| `openuiLibrary()` | All 21 components, no root wrapper. |
-| `openuiChatLibrary()` | Same component set — drop-in for chat surfaces. |
+`standardLibrary()` returns a `RenderLibrary<Widget>` with every builtin
+registered. Extend it with extra tools or components:
+
+```dart
+final snackbar = SnackbarTool(); // your Tool spec + callTool handler
+
+final library = standardLibrary().extend(
+  tools: [snackbar],
+  toolHandlers: {snackbar.name: snackbar.callTool},
+);
+
+final systemPrompt = library.prompt();
+```
+
+`library.prompt()` delegates to `openui_core`'s `generatePrompt` and lists
+all non-`internal` components (for example `Col` and `TabItem` are omitted).
 
 ## License
 

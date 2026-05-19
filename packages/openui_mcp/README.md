@@ -4,16 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![style: very_good_analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
-MCP `ToolProvider` for OpenUI Flutter.
+MCP tools for OpenUI Flutter.
 
-Wraps `mcp_dart`'s `McpClient` and exposes a `ToolProvider` to the
-OpenUI Lang runtime. The `extractToolResult` envelope unwrap from
-`openui_core` mirrors the JS reference:
-
-1. `result.isError` → throw `McpToolError(messageJoinedFromTextContent)`
-2. `result.structuredContent != null` → return it
-3. otherwise join `TextContent.text`, attempt `jsonDecode`, fall back
-   to the raw string
+Wraps `mcp_dart`'s `McpClient` as `Tool` specs plus `ToolHandler`
+callbacks compatible with `RenderLibrary.toolHandlers`. Each `McpTool`
+maps MCP input/output JSON schemas to `openui_core` `Schema` objects and
+forwards `callTool` to the client.
 
 ## Status
 
@@ -23,7 +19,9 @@ v0.1, Phase 4 complete.
 
 ```yaml
 dependencies:
-  openui_mcp: ^0.1.0
+  openui_mcp: ^0.0.1-dev.2
+  openui: ^0.0.1-dev.2
+  openui_components: ^0.0.1-dev.2
 ```
 
 ## Quick start
@@ -34,21 +32,27 @@ import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_mcp/openui_mcp.dart';
 
-final client = McpClient(...);                  // connect your transport
+final client = McpClient(...);
 await client.connect();
-final provider = McpToolProvider.from(client);
+
+final mcpTools = await client.asOpenUITools();
+
+final library = standardLibrary().extend(
+  tools: mcpTools,
+  toolHandlers: {
+    for (final t in mcpTools) t.name: t.callTool,
+  },
+);
 
 Renderer(
   response: response,
-  library: openuiLibrary(),
-  toolProvider: provider,                       // → Query / Mutation calls
+  library: library,
 );
 ```
 
-The renderer routes `Query(name: "...", args: {...})` statements
-through `provider.callTool`, which forwards to `mcp.McpClient.callTool`
-and runs the result through `extractToolResult` before caching the
-value under the statement id.
+`@Query` assignments in OpenUI Lang call `library.toolHandler(toolName)`; results
+are written to the reactive store under the query statement id. Use
+`library.prompt()` so the model sees the MCP tool names and input shapes.
 
 ## License
 

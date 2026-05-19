@@ -5,9 +5,9 @@
 [![style: very_good_analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
 Pure-Dart language core for the [OpenUI Flutter](../../README.md) port. Lexer,
-parser, evaluator, reactive store, library DSL, action dispatcher, tool-provider
-interface, and JS-compatible integration entry — everything OpenUI Lang needs
-that does not touch Flutter.
+parser, evaluator, reactive store, library specs, action dispatcher, tool
+metadata, and prompt generation — everything OpenUI Lang needs that does not
+touch Flutter.
 
 Runs in any Dart context — a Flutter app, a server, a Cloudflare Worker, a
 CLI. The `openui` (Flutter) and `openui_components` packages sit on top.
@@ -16,7 +16,7 @@ CLI. The `openui` (Flutter) and `openui_components` packages sit on top.
 
 ```yaml
 dependencies:
-  openui_core: ^0.1.0
+  openui_core: ^0.0.1-dev.2
 ```
 
 ## Status
@@ -141,49 +141,69 @@ final merged = mergeStatements(
 Strips Markdown fences, upserts patches, deletes `NullLiteral` statements,
 runs the orphan GC, re-emits with per-statement whitespace preserved.
 
-### Library and `defineComponent`
+### Library specs, renderers, and prompts
+
+Component **specs** (`Component` + JSON `Schema`) live in a platform-agnostic
+`Library`. Flutter (or any host) pairs that spec with render callbacks in a
+`RenderLibrary<W>`.
 
 ```dart
-final lib = Library<MyWidget>([
-  defineComponent<MyWidget>(
-    name: 'Input',
-    schema: Schema.object(properties: {
-      'value': reactive(Schema.string()),  // marks as two-way bound
-      'placeholder': Schema.string(),
-    }),
-    render: (ctx, props, renderNode, statementId) => MyWidget.input(props),
-  ),
-]);
-
-final props = evaluateElementProps(
-  call: compCall,
-  schema: lib['Input']!.schema,
-  context: ctx,
+// Spec only — safe to ship to an LLM or serialize.
+final spec = Library(
+  components: [
+    Component(
+      name: 'Input',
+      description: 'Text field',
+      schema: Schema.fromMap(const {
+        'type': 'object',
+        'properties': {
+          'value': {'type': 'string', 'x-reactive': true},
+          'placeholder': {'type': 'string'},
+        },
+      }),
+    ),
+  ],
+  tools: [
+    Tool(
+      name: 'fetch_items',
+      description: 'Load items from the API',
+      input: Schema.object(properties: {'limit': Schema.integer()}),
+    ),
+  ],
 );
-// Reactive props bound to `$state` arrive as `ReactiveAssign(target, value)`
-// markers; check via `isReactiveAssign(value)`.
+
+// Flutter host wires renderers + tool handlers separately.
+final library = RenderLibrary<Widget>(
+  spec: spec,
+  renderers: {
+    'Input': (ctx, props, renderNode, id) => MyInput(props: props),
+  },
+  toolHandlers: {
+    'fetch_items': (args) async => ToolResult(await api.fetch(args)),
+  },
+);
+
+// LLM-facing system prompt from registered components + tools.
+final systemPrompt = library.prompt(
+  examples: ['root = Stack(children: [TextContent(text: "Hi")])'],
+);
 ```
 
-### Tool provider
+Use `RenderComponent<W>` when defining builtins: one `Component` spec plus
+one `ComponentRender<W>` callback. `evaluateElementProps` resolves props;
+reactive props bound to `$state` arrive as `ReactiveAssign` markers (check
+with `isReactiveAssign`).
 
-```dart
-class MyProvider implements ToolProvider {
-  @override
-  Future<Object?> callTool(String name, Map<String, Object?> args) async {
-    final raw = await transport.call(name, args);
-    return extractToolResult(
-      ToolResult(text: raw.body, isError: raw.statusCode >= 400),
-    );
-  }
-}
-```
+`generatePrompt` is the lower-level helper; `Library.prompt` /
+`RenderLibrary.prompt` delegate to it and omit `internal: true` components
+from the component list.
 
-### Error vocabulary
+### Tools
 
-`OpenUIError` is sealed. Subclasses: `ParseError`, `EvaluationError`,
-`CyclicStateError`, `UnknownComponentError`, `McpToolError`,
-`ToolNotFoundError`, `AdapterMismatchError`. Each carries `code`, optional
-`message` / `hint` / `statementId`, and structural equality.
+`Tool` holds prompt metadata (`name`, `description`, `input` / `output`
+schemas). Execution is host-specific: register a `ToolHandler` on
+`RenderLibrary.toolHandlers`. `ToolResult` wraps success or
+`isError: true` failures.
 
 ## Layout
 
@@ -193,11 +213,12 @@ lib/src/
 ├── parse/     integration entry, ResolvedElement, ParamMap
 ├── state/     reactive Store
 ├── eval/      evaluator + functional builtins
-├── library/   Component, Library, reactive, evaluateElementProps
+├── library/   Component, Library, RenderLibrary, RenderComponent, …
 ├── actions/   ActionStep, ActionPlan, dispatcher
 ├── merge/     mergeStatements
 ├── errors/    sealed OpenUIError hierarchy
-└── tools/     ToolProvider, ToolResult, extractToolResult
+├── prompt/    generatePrompt
+└── tools/     Tool, ToolHandler, ToolResult
 ```
 
 See [`docs/lang-reference.md`](../../docs/lang-reference.md) for the language

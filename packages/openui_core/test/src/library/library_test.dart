@@ -54,6 +54,96 @@ void main() {
       );
       expect(out, 'hello-world');
       expect(capturedId, 'root');
+      expect(renderComp.name, 'X');
+    });
+  });
+
+  group('RenderLibrary', () {
+    Component comp(String name) => Component(
+      name: name,
+      schema: Schema.object(),
+    );
+
+    test('delegates to spec and exposes renderers and tool handlers', () {
+      final tool = Tool(
+        name: 'search',
+        description: 'find items',
+        input: Schema.object(),
+      );
+      final stack = comp('Stack');
+      final spec = Library(
+        components: [stack],
+        tools: [tool],
+        libraryPrompt: 'use these widgets',
+      );
+      Future<ToolResult> searchHandler(Map<String, Object?> args) async {
+        return ToolResult(args);
+      }
+
+      final renderLib = RenderLibrary<String>(
+        spec: spec,
+        renderers: {
+          'Stack': (_, props, renderNode, id) => 'rendered-${props.length}',
+        },
+        toolHandlers: {'search': searchHandler},
+      );
+
+      expect(renderLib.components, spec.components);
+      expect(renderLib.tools, spec.tools);
+      expect(renderLib.libraryPrompt, 'use these widgets');
+      expect(renderLib.component('Stack'), stack);
+      expect(renderLib.tool('search'), tool);
+      expect(renderLib.renderer('Stack'), isNotNull);
+      expect(renderLib.toolHandler('search'), searchHandler);
+      expect(renderLib.prompt(), contains('GRAMMAR'));
+      expect(
+        renderLib.prompt(
+          preamble: 'custom preamble',
+          examples: const ['Example A'],
+          additionalRules: const ['Extra rule.'],
+        ),
+        allOf([
+          contains('custom preamble'),
+          contains('Example A'),
+          contains('Extra rule.'),
+        ]),
+      );
+    });
+
+    test('extend merges spec, renderers, and tool handlers', () {
+      final base = RenderLibrary<String>(
+        spec: Library(
+          components: [comp('Stack')],
+          tools: const [],
+        ),
+        renderers: {
+          'Stack': (_, props, renderNode, id) => 'stack',
+        },
+        toolHandlers: const {},
+      );
+      final tool = Tool(
+        name: 'search',
+        description: 'find',
+        input: Schema.object(),
+      );
+      Future<ToolResult> searchHandler(Map<String, Object?> args) async {
+        return const ToolResult(<String, Object?>{});
+      }
+
+      final extended = base.extend(
+        components: [comp('Card')],
+        tools: [tool],
+        renderers: {
+          'Card': (_, props, renderNode, id) => 'card',
+        },
+        toolHandlers: {'search': searchHandler},
+      );
+
+      expect(extended.component('Stack'), isNotNull);
+      expect(extended.component('Card'), isNotNull);
+      expect(extended.tool('search'), tool);
+      expect(extended.renderer('Card'), isNotNull);
+      expect(extended.toolHandler('search'), searchHandler);
     });
   });
 

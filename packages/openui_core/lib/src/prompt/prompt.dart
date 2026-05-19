@@ -134,9 +134,6 @@ String _formatSchema(Schema schema) {
           if (t is Map<String, Object?>) {
             return _formatSchema(Schema.fromMap(t));
           }
-          if (t is Schema) {
-            return _formatSchema(t);
-          }
           return t.toString();
         })
         .join(' | ');

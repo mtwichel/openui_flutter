@@ -205,6 +205,25 @@ void main() {
       },
     );
 
+    test(
+      'object property description from Schema API renders inline comment',
+      () {
+        final c = Component(
+          name: 'Button',
+          schema: Schema.object(
+            properties: {
+              'label': Schema.string(description: 'button text'),
+            },
+            required: const ['label'],
+          ),
+        );
+        final result = generatePrompt(
+          Library(components: [c], tools: const []),
+        );
+        expect(result, contains('label: string /* button text */'));
+      },
+    );
+
     test('non-empty tools list produces a TOOLS: section', () {
       final tool = Tool(
         name: 'search',
@@ -370,6 +389,24 @@ void main() {
         properties: {
           'gap': const {
             'type': ['string', 'integer'],
+          },
+        },
+      );
+      final result = generatePrompt(
+        Library(components: [c], tools: const []),
+      );
+      expect(result, contains('gap?: string | integer'));
+    });
+
+    test('renders union of schema maps in a type list', () {
+      final c = _comp(
+        'Flex',
+        properties: {
+          'gap': const {
+            'type': [
+              {'type': 'string'},
+              {'type': 'integer'},
+            ],
           },
         },
       );

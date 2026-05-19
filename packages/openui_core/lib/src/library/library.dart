@@ -1,6 +1,10 @@
 import 'package:collection/collection.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 import 'package:openui_core/openui_core.dart';
+import '../tools/tools.dart';
+
+part 'library.mapper.dart';
 
 /// Render callback for one component definition.
 ///
@@ -36,18 +40,16 @@ typedef ComponentRender<W> =
     );
 
 /// One component definition: a name (matching the `TYPE` token in
-/// source), a JSON-schema describing its props, and a render
-/// callback.
+/// source) and a JSON-schema describing its props.
 ///
 /// Marked `@experimental` per D12.
 @experimental
-@immutable
-class Component<W> {
+@MappableClass()
+class Component with ComponentMappable {
   /// Creates a [Component] definition.
   const Component({
     required this.name,
     required this.schema,
-    required this.render,
     this.description,
     this.internal = false,
   });
@@ -59,10 +61,6 @@ class Component<W> {
   /// `x-reactive` keyword marks a prop as
   /// two-way bound.
   final Schema schema;
-
-  /// Render callback invoked when the renderer dispatches a
-  /// matching `CompCall`.
-  final ComponentRender<W> render;
 
   /// Optional LLM-facing description, rendered in generated prompts.
   final String? description;
@@ -76,14 +74,11 @@ class Component<W> {
 /// Registry of [Component]s keyed by name.
 ///
 /// Construct from a list of definitions; lookups go through `[]`.
-/// `Library` is parameterised over the rendered widget type so the
-/// pure-Dart core can hold typed definitions without depending on
-/// Flutter.
 ///
 /// Marked `@experimental` per D12.
 @experimental
-@immutable
-class Library<W> {
+@MappableClass()
+class Library with LibraryMappable {
   /// Creates a [Library] from the given component definitions.
   /// Last-write-wins on duplicate names.
   const Library({
@@ -93,7 +88,7 @@ class Library<W> {
   });
 
   /// The components in the library.
-  final List<Component<W>> components;
+  final List<Component> components;
 
   /// The tools in the library.
   final List<Tool> tools;
@@ -103,7 +98,7 @@ class Library<W> {
 
   /// Returns the component with the given [name], or `null` when no
   /// matching component is registered.
-  Component<W>? component(String name) =>
+  Component? component(String name) =>
       components.reversed.firstWhereOrNull((c) => c.name == name);
 
   /// Returns the tool with the given [name], or `null` when no
@@ -114,10 +109,10 @@ class Library<W> {
   /// Returns a new library that adds components on top of
   /// this one's and  tools on top of this one's.
   /// Last-write-wins on duplicate names.
-  Library<W> extend({
-    List<Component<W>> components = const [],
+  Library extend({
+    List<Component> components = const [],
     List<Tool> tools = const [],
-  }) => Library<W>(
+  }) => Library(
     components: [...this.components, ...components],
     tools: [...this.tools, ...tools],
   );
@@ -130,12 +125,104 @@ class Library<W> {
   }) {
     final filtered = components.where((c) => !c.internal).toList();
     return generatePrompt(
-      Library<W>(components: filtered, tools: tools),
+      Library(components: filtered, tools: tools),
       preamble: preamble,
       examples: examples,
       additionalRules: additionalRules,
     );
   }
+}
+
+/// Integrates a spec [Library] with its runtime renderers and execution handlers.
+///
+/// Marked `@experimental` per D12.
+@experimental
+@immutable
+class RenderLibrary<W> {
+  /// Creates a [RenderLibrary].
+  const RenderLibrary({
+    required this.spec,
+    required this.renderers,
+    required this.toolHandlers,
+  });
+
+  /// The non-generic spec library containing components and tools metadata.
+  final Library spec;
+
+  /// Map of component names to their platform-specific renderers.
+  final Map<String, ComponentRender<W>> renderers;
+
+  /// Map of tool names to their execution handlers.
+  final Map<String, ToolHandler> toolHandlers;
+
+  /// The spec components.
+  List<Component> get components => spec.components;
+
+  /// The spec tools.
+  List<Tool> get tools => spec.tools;
+
+  /// Explains to the LLM how to use the components and tools in the library.
+  String? get libraryPrompt => spec.libraryPrompt;
+
+  /// Returns the component spec with [name], or `null` if not registered.
+  Component? component(String name) => spec.component(name);
+
+  /// Returns the tool spec with [name], or `null` if not registered.
+  Tool? tool(String name) => spec.tool(name);
+
+  /// Returns the renderer callback for the component with [name].
+  ComponentRender<W>? renderer(String name) => renderers[name];
+
+  /// Returns the tool execution callback for the tool with [name].
+  ToolHandler? toolHandler(String name) => toolHandlers[name];
+
+  /// Returns a new RenderLibrary extending this one.
+  RenderLibrary<W> extend({
+    List<Component> components = const [],
+    List<Tool> tools = const [],
+    Map<String, ComponentRender<W>> renderers = const {},
+    Map<String, ToolHandler> toolHandlers = const {},
+  }) {
+    return RenderLibrary<W>(
+      spec: spec.extend(components: components, tools: tools),
+      renderers: {...this.renderers, ...renderers},
+      toolHandlers: {...this.toolHandlers, ...toolHandlers},
+    );
+  }
+
+  /// Generates a system prompt.
+  String prompt({
+    String? preamble,
+    List<String> examples = const [],
+    List<String> additionalRules = const [],
+  }) {
+    return spec.prompt(
+      preamble: preamble,
+      examples: examples,
+      additionalRules: additionalRules,
+    );
+  }
+}
+
+/// A helper container that bundles a [Component] spec and its platform-specific [render] callback.
+///
+/// Marked `@experimental` per D12.
+@experimental
+class RenderComponent<W> {
+  /// Creates a [RenderComponent] wrapper.
+  const RenderComponent({
+    required this.spec,
+    required this.render,
+  });
+
+  /// The component spec.
+  final Component spec;
+
+  /// The component's render function.
+  final ComponentRender<W> render;
+
+  /// Convenience getter for the component name.
+  String get name => spec.name;
 }
 
 /// Marker emitted by the props-evaluator when a reactive prop

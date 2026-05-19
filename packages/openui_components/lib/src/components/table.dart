@@ -2,9 +2,10 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_components/src/components/callout.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// `Table(columns, rows)` — a paginated `DataTable`. Each row is a
 /// `Map<String, Object?>` keyed by column name. Page size fixed at
@@ -47,23 +48,23 @@ class _TableWidgetState extends State<TableWidget> {
       children: <Widget>[
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: <DataColumn>[
+          child: ShadTable.list(
+            header: [
               for (final col in widget.columns)
-                DataColumn(
-                  label: Text(
+                ShadTableCell.header(
+                  child: Text(
                     (col['label'] ?? col['name'] ?? '').toString(),
                   ),
                 ),
             ],
-            rows: <DataRow>[
+            children: [
               for (final row in pageRows)
-                DataRow(
-                  cells: <DataCell>[
-                    for (final col in widget.columns)
-                      DataCell(Text('${row[col['name']] ?? ''}')),
-                  ],
-                ),
+                [
+                  for (final col in widget.columns)
+                    ShadTableCell(
+                      child: Text('${row[col['name']] ?? ''}'),
+                    ),
+                ],
             ],
           ),
         ),
@@ -72,13 +73,16 @@ class _TableWidgetState extends State<TableWidget> {
             padding: const EdgeInsets.only(top: 8),
             child: Row(
               children: <Widget>[
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
+                ShadIconButton.outline(
+                  icon: const Icon(LucideIcons.chevronLeft),
                   onPressed: _page > 0 ? () => setState(() => _page--) : null,
                 ),
-                Text('${_page + 1} / ${lastPage + 1}'),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('${_page + 1} / ${lastPage + 1}'),
+                ),
+                ShadIconButton.outline(
+                  icon: const Icon(LucideIcons.chevronRight),
                   onPressed: _page < lastPage
                       ? () => setState(() => _page++)
                       : null,
@@ -93,30 +97,32 @@ class _TableWidgetState extends State<TableWidget> {
 
 /// Registration for `Table`. Accepts either `{name, label?}` column
 /// objects or bare strings, and either map-keyed or positional rows.
-Component<Widget> tableComponent() {
-  return Component<Widget>(
-    name: 'Table',
-    description: 'paginated data table',
-    schema: Schema.object(
-      properties: {
-        'columns': Schema.list(
-          items: Schema.object(
-            properties: {
-              'name': Schema.string(),
-              'label': Schema.string(),
-            },
+RenderComponent<Widget> tableComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Table',
+      description: 'paginated data table',
+      schema: Schema.object(
+        properties: {
+          'columns': Schema.list(
+            items: Schema.object(
+              properties: {
+                'name': Schema.string(),
+                'label': Schema.string(),
+              },
+            ),
           ),
-        ),
-        'rows': Schema.list(
-          items: Schema.object(
-            properties: {
-              'name': Schema.string(),
-              'value': Schema.any(),
-            },
+          'rows': Schema.list(
+            items: Schema.object(
+              properties: {
+                'name': Schema.string(),
+                'value': Schema.any(),
+              },
+            ),
           ),
-        ),
-      },
-      required: ['columns', 'rows'],
+        },
+        required: ['columns', 'rows'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final rawCols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
@@ -175,16 +181,18 @@ Map<String, Object?>? _coerceStringKeyMap(Object? value) {
 /// The renderer's evaluator handles object args directly; this
 /// component just defines the schema so the parser recognises the
 /// shape.
-Component<Widget> colComponent() {
-  return Component<Widget>(
-    name: 'Col',
-    internal: true,
-    schema: Schema.object(
-      properties: {
-        'name': Schema.string(),
-        'label': Schema.string(),
-      },
-      required: ['name'],
+RenderComponent<Widget> colComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Col',
+      internal: true,
+      schema: Schema.object(
+        properties: {
+          'name': Schema.string(),
+          'label': Schema.string(),
+        },
+        required: ['name'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       // Col is a definitional helper; in practice consumers build the

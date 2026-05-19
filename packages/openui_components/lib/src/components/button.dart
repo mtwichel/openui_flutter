@@ -2,12 +2,13 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
-/// `Button(label, onClick, variant?)` — a Material button wired to an
+/// `Button(label, onClick, variant?)` — a Shadcn button wired to an
 /// action plan via the `onClick` prop.
 class ButtonWidget extends StatelessWidget {
   /// Creates a [ButtonWidget].
@@ -33,28 +34,30 @@ class ButtonWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (variant) {
       case 'secondary':
-        return OutlinedButton(onPressed: onPressed, child: Text(label));
+        return ShadButton.secondary(onPressed: onPressed, child: Text(label));
       case 'text':
-        return TextButton(onPressed: onPressed, child: Text(label));
+        return ShadButton.ghost(onPressed: onPressed, child: Text(label));
       case 'primary':
       default:
-        return ElevatedButton(onPressed: onPressed, child: Text(label));
+        return ShadButton(onPressed: onPressed, child: Text(label));
     }
   }
 }
 
 /// Registration for `Button`.
-Component<Widget> buttonComponent() {
-  return Component<Widget>(
-    name: 'Button',
-    description: 'tappable button with action',
-    schema: Schema.object(
-      properties: {
-        'label': Schema.string(),
-        'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
-        'onClick': Schema.any().xAction(),
-      },
-      required: ['label'],
+RenderComponent<Widget> buttonComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Button',
+      description: 'tappable button with action',
+      schema: Schema.object(
+        properties: {
+          'label': Schema.string(),
+          'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
+          'onClick': Schema.any().xAction(),
+        },
+        required: ['label'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final label = props['label']?.toString() ?? '';

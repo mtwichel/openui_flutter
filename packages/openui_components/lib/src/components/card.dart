@@ -2,8 +2,9 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Renders the OpenUI Lang `Card`. `variant` is `'card'` (default,
 /// elevated), `'sunk'` (filled / no elevation), or `'clear'` (no
@@ -34,16 +35,18 @@ class CardWidget extends StatelessWidget {
     );
     switch (variant) {
       case 'sunk':
-        return Material(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: const BorderRadius.all(Radius.circular(12)),
+        return Container(
+          decoration: BoxDecoration(
+            color: ShadTheme.of(context).colorScheme.muted,
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+          ),
           child: body,
         );
       case 'clear':
         return body;
       case 'card':
       default:
-        return Card(child: body);
+        return ShadCard(child: body);
     }
   }
 }
@@ -61,18 +64,23 @@ class CardHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(title, style: theme.textTheme.titleMedium),
+          Text(
+            title,
+            style: theme.textTheme.large.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           if (subtitle != null && subtitle!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Text(subtitle!, style: theme.textTheme.bodySmall),
+              child: Text(subtitle!, style: theme.textTheme.muted),
             ),
         ],
       ),
@@ -81,18 +89,20 @@ class CardHeaderWidget extends StatelessWidget {
 }
 
 /// Registration for the `Card` component.
-Component<Widget> cardComponent() {
-  return Component<Widget>(
-    name: 'Card',
-    description: 'elevated surface container',
-    schema: Schema.object(
-      properties: {
-        'variant': Schema.string(
-          enumValues: ['card', 'sunk', 'clear'],
-        ),
-        'children': Schema.list(items: Schema.any()),
-      },
-      required: ['children'],
+RenderComponent<Widget> cardComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Card',
+      description: 'elevated surface container',
+      schema: Schema.object(
+        properties: {
+          'variant': Schema.string(
+            enumValues: ['card', 'sunk', 'clear'],
+          ),
+          'children': Schema.list(items: Schema.any()),
+        },
+        required: ['children'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final children =
@@ -107,16 +117,18 @@ Component<Widget> cardComponent() {
 }
 
 /// Registration for the `CardHeader` component.
-Component<Widget> cardHeaderComponent() {
-  return Component<Widget>(
-    name: 'CardHeader',
-    description: 'title and optional subtitle block',
-    schema: Schema.object(
-      properties: {
-        'title': Schema.string(),
-        'subtitle': Schema.string(),
-      },
-      required: ['title'],
+RenderComponent<Widget> cardHeaderComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'CardHeader',
+      description: 'title and optional subtitle block',
+      schema: Schema.object(
+        properties: {
+          'title': Schema.string(),
+          'subtitle': Schema.string(),
+        },
+        required: ['title'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       return CardHeaderWidget(

@@ -2,12 +2,13 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Renders text with a semantic-size token (`large-heavy`, `medium`,
-/// `small-light`, etc.) mapped to Material's text theme.
+/// `small-light`, etc.) mapped to Shadcn UI's text theme.
 ///
 /// While the containing statement is streaming, the widget wraps its
 /// text in a `Semantics` node marked `liveRegion: true` so screen
@@ -33,22 +34,16 @@ class TextContentWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
+    final theme = ShadTheme.of(context).textTheme;
     final style = switch (size) {
-      'display-heavy' => theme.displaySmall?.copyWith(
-        fontWeight: FontWeight.bold,
-      ),
-      'large-heavy' => theme.headlineMedium?.copyWith(
-        fontWeight: FontWeight.bold,
-      ),
-      'large' => theme.headlineSmall,
-      'medium-heavy' => theme.titleMedium,
-      'small-heavy' => theme.labelLarge,
-      'small' => theme.bodySmall,
-      'small-light' => theme.bodySmall?.copyWith(
-        color: Theme.of(context).hintColor,
-      ),
-      _ => theme.bodyMedium,
+      'display-heavy' => theme.h1Large,
+      'large-heavy' => theme.h2.copyWith(fontWeight: FontWeight.bold),
+      'large' => theme.large,
+      'medium-heavy' => theme.p.copyWith(fontWeight: FontWeight.bold),
+      'small-heavy' => theme.small.copyWith(fontWeight: FontWeight.bold),
+      'small' => theme.small,
+      'small-light' => theme.muted,
+      _ => theme.p,
     };
     return Semantics(
       liveRegion: isStreaming,
@@ -58,16 +53,18 @@ class TextContentWidget extends StatelessWidget {
 }
 
 /// Registration for the `TextContent` component.
-Component<Widget> textContentComponent() {
-  return Component<Widget>(
-    name: 'TextContent',
-    description: 'styled paragraph text',
-    schema: Schema.object(
-      properties: {
-        'text': Schema.string(),
-        'size': Schema.string(),
-      },
-      required: ['text'],
+RenderComponent<Widget> textContentComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'TextContent',
+      description: 'styled paragraph text',
+      schema: Schema.object(
+        properties: {
+          'text': Schema.string(),
+          'size': Schema.string(),
+        },
+        required: ['text'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       return Builder(

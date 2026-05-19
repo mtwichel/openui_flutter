@@ -5,8 +5,9 @@
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// `LineChart(series, labels?)` — multi-series line chart. `series` is
 /// a list of `{name: String, values: List<num>}`.
@@ -45,12 +46,12 @@ class LineChartWidget extends StatelessWidget {
     final minY = minValue - yPadding;
     final maxY = maxValue + yPadding;
 
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = ShadTheme.of(context).colorScheme;
     final palette = <Color>[
       scheme.primary,
-      scheme.tertiary,
+      scheme.accent,
       scheme.secondary,
-      scheme.error,
+      scheme.destructive,
     ];
     return SizedBox(
       height: height,
@@ -82,7 +83,7 @@ class LineChartWidget extends StatelessWidget {
                 horizontal: 12,
                 vertical: 8,
               ),
-              getTooltipColor: (_) => scheme.inverseSurface,
+              getTooltipColor: (_) => scheme.popover,
               getTooltipItems: (touchedSpots) {
                 return touchedSpots
                     .map((spot) {
@@ -91,7 +92,7 @@ class LineChartWidget extends StatelessWidget {
                       return LineTooltipItem(
                         '$seriesName\n$value',
                         TextStyle(
-                          color: scheme.onInverseSurface,
+                          color: scheme.popoverForeground,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           height: 1.3,
@@ -138,23 +139,25 @@ class LineChartWidget extends StatelessWidget {
 }
 
 /// Registration for `LineChart`.
-Component<Widget> lineChartComponent() {
-  return Component<Widget>(
-    name: 'LineChart',
-    description: 'multi-series line chart',
-    schema: Schema.object(
-      properties: {
-        'series': Schema.list(
-          items: Schema.object(
-            properties: {
-              'name': Schema.string(),
-              'values': Schema.list(items: Schema.number()),
-            },
+RenderComponent<Widget> lineChartComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'LineChart',
+      description: 'multi-series line chart',
+      schema: Schema.object(
+        properties: {
+          'series': Schema.list(
+            items: Schema.object(
+              properties: {
+                'name': Schema.string(),
+                'values': Schema.list(items: Schema.number()),
+              },
+            ),
           ),
-        ),
-        'labels': Schema.list(items: Schema.string()),
-      },
-      required: ['series'],
+          'labels': Schema.list(items: Schema.string()),
+        },
+        required: ['series'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];

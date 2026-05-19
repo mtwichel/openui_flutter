@@ -2,10 +2,11 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// `Select(options, value)` — `DropdownButton` whose selection is
 /// two-way bound to a `$state` variable.
@@ -26,12 +27,15 @@ class SelectWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = binding?.value as String?;
-    return DropdownButtonFormField<String>(
-      initialValue: options.contains(value) ? value : null,
-      items: <DropdownMenuItem<String>>[
+    final initial = options.contains(value) ? value : null;
+    return ShadSelect<String>(
+      value: initial,
+      options: [
         for (final option in options)
-          DropdownMenuItem<String>(value: option, child: Text(option)),
+          ShadOption(value: option, child: Text(option)),
       ],
+      selectedOptionBuilder: (context, val) => Text(val),
+      placeholder: const Text('Select option...'),
       onChanged: binding == null
           ? null
           : (next) {
@@ -43,16 +47,18 @@ class SelectWidget extends StatelessWidget {
 }
 
 /// Registration for `Select`. `value` is reactive.
-Component<Widget> selectComponent() {
-  return Component<Widget>(
-    name: 'Select',
-    description: 'dropdown bound to state variable',
-    schema: Schema.object(
-      properties: {
-        'options': Schema.list(items: Schema.string()),
-        'value': Schema.string().xReactive(),
-      },
-      required: const ['options', 'value'],
+RenderComponent<Widget> selectComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Select',
+      description: 'dropdown bound to state variable',
+      schema: Schema.object(
+        properties: {
+          'options': Schema.list(items: Schema.string()),
+          'value': Schema.string().xReactive(),
+        },
+        required: const ['options', 'value'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final raw = props['options'];

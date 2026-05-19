@@ -40,8 +40,14 @@ export 'src/library/library.dart'
         ComponentRender,
         Library,
         ReactiveAssign,
+        RenderComponent,
+        RenderLibrary,
         evaluateElementProps,
-        isReactiveAssign;
+        isReactiveAssign,
+        ComponentMapper,
+        ComponentCopyWith,
+        LibraryMapper,
+        LibraryCopyWith;
 export 'src/merge/merge.dart' show mergeStatements;
 export 'src/parse/parse.dart'
     show
@@ -93,4 +99,4 @@ export 'src/parser/streaming.dart'
         createStreamingParser;
 export 'src/prompt/prompt.dart' show generatePrompt;
 export 'src/state/store.dart' show Store, StoreChangeOrigin;
-export 'src/tools/tools.dart' show Tool, ToolResult;
+export 'src/tools/tools.dart' show Tool, ToolHandler, ToolResult, ToolMapper, ToolCopyWith;

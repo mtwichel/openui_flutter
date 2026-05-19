@@ -12,7 +12,7 @@ import 'package:openui_core/openui_core.dart';
 
 /// Render callback alias for the Flutter renderer's library.
 ///
-/// `Renderer.library` is a `Library<Widget>`; component definitions
+/// `Renderer.library` is a `RenderLibrary<Widget>`; component definitions
 /// against this library use [ComponentWidgetRenderer] as their render
 /// signature.
 typedef ComponentWidgetRenderer = ComponentRender<Widget>;
@@ -50,7 +50,7 @@ class Renderer extends StatefulWidget {
   final String? response;
 
   /// Component and tool library used to dispatch each `CompCall` and `Query` / `Mutation`.
-  final Library<Widget> library;
+  final RenderLibrary<Widget> library;
 
   /// Whether `response` is still being appended to by the upstream
   /// stream. Propagated to component implementations via
@@ -302,9 +302,9 @@ class _RendererState extends State<Renderer> {
         return;
       }
     }
-    final directTool = widget.library.tool(id);
+    final directTool = widget.library.toolHandler(id);
     if (directTool != null) {
-      await directTool.callTool(args);
+      await directTool(args);
       return;
     }
     throw EvaluationError(
@@ -428,7 +428,8 @@ class _RendererState extends State<Renderer> {
     String? statementHint,
   }) {
     final component = widget.library.component(call.type);
-    if (component == null) {
+    final renderer = widget.library.renderer(call.type);
+    if (component == null || renderer == null) {
       return _errorPlaceholder(
         UnknownComponentError(
           component: call.type,
@@ -446,7 +447,7 @@ class _RendererState extends State<Renderer> {
       onError: _reportError,
       builder: (context) {
         final props = _resolveProps(call, component.schema, ctx, id);
-        return component.render(ctx, props, _renderAst, id);
+        return renderer(ctx, props, _renderAst, id);
       },
     );
   }

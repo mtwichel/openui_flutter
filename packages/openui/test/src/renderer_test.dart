@@ -10,11 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_core/openui_core.dart';
 
-Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
-  return Library<Widget>(
-    tools: tools,
-    components: <Component<Widget>>[
-      Component<Widget>(
+RenderLibrary<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
+  final components = <RenderComponent<Widget>>[
+    RenderComponent<Widget>(
+      spec: Component(
         name: 'Text',
         schema: Schema.fromMap(const <String, Object?>{
           'type': 'object',
@@ -22,11 +21,13 @@ Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
             'text': <String, Object?>{'type': 'string'},
           },
         }),
-        render: (ctx, props, renderNode, id) {
-          return Text(props['text'] as String? ?? '');
-        },
       ),
-      Component<Widget>(
+      render: (ctx, props, renderNode, id) {
+        return Text(props['text'] as String? ?? '');
+      },
+    ),
+    RenderComponent<Widget>(
+      spec: Component(
         name: 'Column',
         schema: Schema.fromMap(const <String, Object?>{
           'type': 'object',
@@ -34,18 +35,20 @@ Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
             'children': <String, Object?>{'type': 'array'},
           },
         }),
-        render: (ctx, props, renderNode, id) {
-          final children =
-              (props['children'] as List<Object?>?)?.cast<Widget>() ??
-              const <Widget>[];
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children,
-          );
-        },
       ),
-      Component<Widget>(
+      render: (ctx, props, renderNode, id) {
+        final children =
+            (props['children'] as List<Object?>?)?.cast<Widget>() ??
+            const <Widget>[];
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        );
+      },
+    ),
+    RenderComponent<Widget>(
+      spec: Component(
         name: 'Counter',
         schema: Schema.fromMap(const <String, Object?>{
           'type': 'object',
@@ -57,28 +60,28 @@ Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
             },
           },
         }),
-        render: (ctx, props, renderNode, id) {
-          final value = props['value'] as int? ?? 0;
-          final hasAction = props.containsKey('onIncrement');
-          final action = props['onIncrement'] as ActionPlan?;
-          // Disabled when the prop was supplied but resolved to null
-          // (streaming-incomplete AST); inert when the prop is absent.
-          final disabled = hasAction && action == null;
-          return Builder(
-            builder: (context) {
-              final scope = RendererScope.maybeFind(context);
-              final onTap = (scope == null || disabled || action == null)
-                  ? null
-                  : () => scope.triggerAction('', action: action);
-              return GestureDetector(
-                onTap: onTap,
-                child: Text('count=$value'),
-              );
-            },
-          );
-        },
       ),
-      Component<Widget>(
+      render: (ctx, props, renderNode, id) {
+        final value = props['value'] as int? ?? 0;
+        final hasAction = props.containsKey('onIncrement');
+        final action = props['onIncrement'] as ActionPlan?;
+        final disabled = hasAction && action == null;
+        return Builder(
+          builder: (context) {
+            final scope = RendererScope.maybeFind(context);
+            final onTap = (scope == null || disabled || action == null)
+                ? null
+                : () => scope.triggerAction('', action: action);
+            return GestureDetector(
+              onTap: onTap,
+              child: Text('count=$value'),
+            );
+          },
+        );
+      },
+    ),
+    RenderComponent<Widget>(
+      spec: Component(
         name: 'Input',
         schema: Schema.fromMap(<String, Object?>{
           'type': 'object',
@@ -90,49 +93,65 @@ Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
             },
           },
         }),
-        render: (ctx, props, renderNode, id) {
-          return Builder(
-            builder: (context) {
-              final binding = props['value'];
-              final field = props['name'] as String? ?? id;
-              final cache = RendererScope.of(context).formStateCache;
-              final storeText = binding is ReactiveAssign
-                  ? (binding.value as String? ?? '')
-                  : '';
-              final controller = cache.controllerFor(
-                formName: 'form',
-                fieldName: field,
-                initialValue: storeText,
-              );
-              final store = RendererScope.of(context).store;
-              if (store.lastNotifyOrigin == StoreChangeOrigin.mutation &&
-                  controller.text != storeText) {
-                controller.value = TextEditingValue(
-                  text: storeText,
-                  selection: TextSelection.collapsed(offset: storeText.length),
-                );
-              }
-              return TextField(
-                key: ValueKey<String>('input-$field'),
-                controller: controller,
-                onChanged: (text) {
-                  if (binding is ReactiveAssign) {
-                    ctx.store.set(binding.target, text);
-                  }
-                },
-              );
-            },
-          );
-        },
       ),
-      Component<Widget>(
+      render: (ctx, props, renderNode, id) {
+        return Builder(
+          builder: (context) {
+            final binding = props['value'];
+            final field = props['name'] as String? ?? id;
+            final cache = RendererScope.of(context).formStateCache;
+            final storeText = binding is ReactiveAssign
+                ? (binding.value as String? ?? '')
+                : '';
+            final controller = cache.controllerFor(
+              formName: 'form',
+              fieldName: field,
+              initialValue: storeText,
+            );
+            final store = RendererScope.of(context).store;
+            if (store.lastNotifyOrigin == StoreChangeOrigin.mutation &&
+                controller.text != storeText) {
+              controller.value = TextEditingValue(
+                text: storeText,
+                selection: TextSelection.collapsed(offset: storeText.length),
+              );
+            }
+            return TextField(
+              key: ValueKey<String>('input-$field'),
+              controller: controller,
+              onChanged: (text) {
+                if (binding is ReactiveAssign) {
+                  ctx.store.set(binding.target, text);
+                }
+              },
+            );
+          },
+        );
+      },
+    ),
+    RenderComponent<Widget>(
+      spec: Component(
         name: 'Throwing',
         schema: Schema.fromMap(const <String, Object?>{'type': 'object'}),
-        render: (ctx, props, renderNode, id) {
-          throw StateError('boom from $id');
-        },
       ),
-    ],
+      render: (ctx, props, renderNode, id) {
+        throw StateError('boom from $id');
+      },
+    ),
+  ];
+
+  final toolHandlers = <String, ToolHandler>{
+    for (final t in tools)
+      if (t is _StubTool) t.name: t.callTool,
+  };
+
+  return RenderLibrary<Widget>(
+    spec: Library(
+      components: components.map((c) => c.spec).toList(),
+      tools: tools,
+    ),
+    renderers: {for (final c in components) c.name: c.render},
+    toolHandlers: toolHandlers,
   );
 }
 
@@ -1081,6 +1100,5 @@ class _StubTool extends Tool {
 
   final Future<ToolResult> Function(Map<String, Object?> args) handler;
 
-  @override
   Future<ToolResult> callTool(Map<String, Object?> args) => handler(args);
 }

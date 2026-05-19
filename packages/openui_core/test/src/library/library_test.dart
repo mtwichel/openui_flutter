@@ -1,9 +1,5 @@
-// Library, Component, defineComponent, reactive, ReactiveAssign,
+// Library, Component, RenderComponent, reactive, ReactiveAssign,
 // and isReactiveAssign contract tests.
-//
-// `Component` and `Library` are generic over the rendered widget
-// type `W`; tests pin W to `String` so we can exercise the
-// `ComponentRender` callback in pure Dart without a Flutter Widget.
 
 import 'package:openui_core/openui_core.dart';
 import 'package:test/test.dart';
@@ -11,39 +7,38 @@ import 'package:test/test.dart';
 void main() {
   group('Component', () {
     test('defineComponent with description sets the field', () {
-      final c = Component<String>(
+      final c = Component(
         name: 'X',
         description: 'a test component',
         schema: Schema.object(),
-        render: (c, p, r, id) => '',
       );
       expect(c.description, 'a test component');
     });
 
     test('internal defaults to false', () {
-      final c = Component<String>(
+      final c = Component(
         name: 'X',
         schema: Schema.object(),
-        render: (c, p, r, id) => '',
       );
       expect(c.internal, isFalse);
     });
 
     test('defineComponent with internal: true sets the field', () {
-      final c = Component<String>(
+      final c = Component(
         name: 'X',
         internal: true,
         schema: Schema.object(),
-        render: (c, p, r, id) => '',
       );
       expect(c.internal, isTrue);
     });
 
-    test('the render callback can be invoked', () {
+    test('the render callback of RenderComponent can be invoked', () {
       var capturedId = '';
-      final c = Component<String>(
-        name: 'X',
-        schema: Schema.object(),
+      final renderComp = RenderComponent<String>(
+        spec: Component(
+          name: 'X',
+          schema: Schema.object(),
+        ),
         render: (context, props, renderNode, statementId) {
           capturedId = statementId;
           return 'hello-${props['n']}';
@@ -51,7 +46,7 @@ void main() {
       );
       // Invoke through a stub renderNode that we don't actually use.
       String stubRender(AstNode node, EvalContext ctx) => 'stub';
-      final out = c.render(
+      final out = renderComp.render(
         EvalContext(statements: const [], store: Store()),
         const {'n': 'world'},
         stubRender,
@@ -63,14 +58,13 @@ void main() {
   });
 
   group('Library', () {
-    Component<String> comp(String name) => Component<String>(
+    Component comp(String name) => Component(
       name: name,
       schema: Schema.object(),
-      render: (c, p, r, id) => name,
     );
 
     test('lookup returns the registered component', () {
-      final lib = Library<String>(
+      final lib = Library(
         components: [comp('Stack'), comp('Card')],
         tools: const [],
       );
@@ -80,7 +74,7 @@ void main() {
     });
 
     test('lookup returns null for unknown names', () {
-      final lib = Library<String>(
+      final lib = Library(
         components: [comp('Stack')],
         tools: const [],
       );
@@ -88,7 +82,7 @@ void main() {
     });
 
     test('names enumerates registrations in insertion order', () {
-      final lib = Library<String>(
+      final lib = Library(
         components: [
           comp('Stack'),
           comp('Card'),
@@ -104,37 +98,25 @@ void main() {
     });
 
     test('duplicate names collapse to last-write-wins', () {
-      final first = Component<String>(
+      final first = Component(
         name: 'Stack',
         schema: Schema.object(),
-        render: (c, p, r, id) => 'first',
       );
-      final second = Component<String>(
+      final second = Component(
         name: 'Stack',
         schema: Schema.object(),
-        render: (c, p, r, id) => 'second',
       );
-      final lib = Library<String>(
+      final lib = Library(
         components: [first, second],
         tools: const [],
       );
       expect(lib.components.map((c) => c.name).toSet(), {'Stack'});
       // The second registration wins.
-      expect(
-        lib
-            .component('Stack')!
-            .render(
-              EvalContext(statements: const [], store: Store()),
-              const {},
-              (n, c) => 'stub',
-              'r',
-            ),
-        'second',
-      );
+      expect(lib.component('Stack'), second);
     });
 
     test('extend layers extra components on top of the base', () {
-      final base = Library<String>(
+      final base = Library(
         components: [comp('Stack')],
         tools: const [],
       );
@@ -145,33 +127,22 @@ void main() {
     });
 
     test('extend supports overriding a base component', () {
-      final base = Library<String>(
+      final base = Library(
         components: [comp('Stack')],
         tools: const [],
       );
-      final replacement = Component<String>(
+      final replacement = Component(
         name: 'Stack',
         schema: Schema.object(),
-        render: (c, p, r, id) => 'overridden',
       );
       final extended = base.extend(components: [replacement], tools: const []);
-      expect(
-        extended
-            .component('Stack')!
-            .render(
-              EvalContext(statements: const [], store: Store()),
-              const {},
-              (n, c) => 'stub',
-              'r',
-            ),
-        'overridden',
-      );
+      expect(extended.component('Stack'), replacement);
     });
 
     test('duplicate tool names collapse to last-write-wins', () {
-      final first = _StubTool(name: 'search', description: 'first');
-      final second = _StubTool(name: 'search', description: 'second');
-      final lib = Library<String>(
+      final first = Tool(name: 'search', description: 'first');
+      final second = Tool(name: 'search', description: 'second');
+      final lib = Library(
         components: const [],
         tools: [first, second],
       );
@@ -378,12 +349,4 @@ void main() {
       expect((second['value']! as ReactiveAssign).value, 'after');
     });
   });
-}
-
-final class _StubTool extends Tool {
-  _StubTool({required super.name, required super.description});
-
-  @override
-  Future<ToolResult> callTool(Map<String, Object?> args) async =>
-      ToolResult(args);
 }

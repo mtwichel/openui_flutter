@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_core/openui_core.dart';
@@ -74,15 +74,17 @@ class _MarkDownRendererState extends State<MarkDownRendererWidget> {
 }
 
 /// Registration for the `MarkDownRenderer` component.
-Component<Widget> markdownComponent() {
-  return Component<Widget>(
-    name: 'MarkDownRenderer',
-    description: 'renders Markdown source text',
-    schema: Schema.object(
-      properties: {
-        'source': Schema.string(),
-      },
-      required: ['source'],
+RenderComponent<Widget> markdownComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'MarkDownRenderer',
+      description: 'renders Markdown source text',
+      schema: Schema.object(
+        properties: {
+          'source': Schema.string(),
+        },
+        required: ['source'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       return Builder(

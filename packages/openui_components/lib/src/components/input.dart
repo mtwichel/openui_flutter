@@ -2,10 +2,11 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// `Input(name, value, placeholder?)` — a text field whose value is
 /// two-way bound to a `$state` variable. The controller lives in the
@@ -65,13 +66,10 @@ class _InputWidgetState extends State<InputWidget> {
     if (scope.store.lastNotifyOrigin == StoreChangeOrigin.mutation) {
       _syncControllerIfNeeded(controller, storeText);
     }
-    return TextField(
+    return ShadInput(
       key: ValueKey<String>('input-default-${widget.name}'),
       controller: controller,
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        hintText: widget.placeholder,
-      ),
+      placeholder: widget.placeholder != null ? Text(widget.placeholder!) : null,
       onChanged: (text) {
         final b = widget.binding;
         if (b != null) scope.store.set(b.target, text);
@@ -83,17 +81,19 @@ class _InputWidgetState extends State<InputWidget> {
 /// Registration for `Input`. The `value` prop is marked reactive so
 /// the renderer surfaces a `ReactiveAssign` marker when bound to a
 /// `$state` var.
-Component<Widget> inputComponent() {
-  return Component<Widget>(
-    name: 'Input',
-    description: 'text field bound to state variable',
-    schema: Schema.object(
-      properties: {
-        'name': Schema.string(),
-        'value': Schema.string().xReactive(),
-        'placeholder': Schema.string(),
-      },
-      required: const ['name', 'value'],
+RenderComponent<Widget> inputComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Input',
+      description: 'text field bound to state variable',
+      schema: Schema.object(
+        properties: {
+          'name': Schema.string(),
+          'value': Schema.string().xReactive(),
+          'placeholder': Schema.string(),
+        },
+        required: const ['name', 'value'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final value = props['value'];

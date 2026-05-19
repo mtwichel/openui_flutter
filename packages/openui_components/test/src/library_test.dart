@@ -89,8 +89,8 @@ void main() {
 
       // Smoke test: call render with empty props and a stub renderNode.
       for (final name in lib.components.map((c) => c.name)) {
-        final component = lib.component(name)!;
-        final widget = component.render(
+        final renderer = lib.renderer(name)!;
+        final widget = renderer(
           ctx,
           const <String, Object?>{},
           stubRender,

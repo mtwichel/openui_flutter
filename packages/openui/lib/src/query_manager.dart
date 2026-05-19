@@ -39,7 +39,7 @@ class QueryManager {
 
   /// The library of components and tools to use for dispatching
   /// queries and mutations.
-  final Library<Widget> library;
+  final RenderLibrary<Widget> library;
 
   /// The reactive store that receives resolved query values.
   final Store store;
@@ -70,7 +70,7 @@ class QueryManager {
     // dispatching a duplicate tool call.
     _fired[decl.statementId] = evaluatedArgs;
 
-    final tool = library.tool(decl.toolName);
+    final tool = library.toolHandler(decl.toolName);
     if (tool == null) {
       _onError(
         EvaluationError(
@@ -81,8 +81,7 @@ class QueryManager {
       return;
     }
     unawaited(
-      tool
-          .callTool(evaluatedArgs)
+      tool(evaluatedArgs)
           .then((value) {
             if (_disposed) return;
             if (value.isError) {
@@ -159,13 +158,13 @@ class QueryManager {
       );
     }
     final toolArgs = _mapArg(args, 'args') ?? const <String, Object?>{};
-    final tool = library.tool(toolName);
+    final tool = library.toolHandler(toolName);
     if (tool == null) {
       return Future<Object?>.error(
         ToolNotFoundError(toolName: toolName, statementId: statementId),
       );
     }
-    return tool.callTool(toolArgs);
+    return tool(toolArgs);
   }
 }
 

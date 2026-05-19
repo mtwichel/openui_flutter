@@ -1,56 +1,54 @@
 import 'package:openui_core/openui_core.dart';
 import 'package:test/test.dart';
 
-class _TestTool extends Tool {
-  _TestTool({
-    required super.name,
-    required super.description,
-    super.input,
-    super.output,
-  });
-
-  @override
-  Future<ToolResult> callTool(Map<String, Object?> args) async =>
-      ToolResult(args);
-}
-
-// Stub render — prompt tests never invoke the render callback.
-String _noRender(dynamic a, dynamic b, dynamic c, dynamic d) => '';
-
-Component<String> _comp(
+Component _comp(
   String name, {
   Map<String, Object?> properties = const {},
   List<String>? required,
   String? description,
   bool internal = false,
 }) {
+  Map<String, Object?> castMap(Map<dynamic, dynamic> map) {
+    return map.map((key, value) {
+      if (value is Map) {
+        return MapEntry(key as String, castMap(value));
+      }
+      if (value is List) {
+        return MapEntry(
+          key as String,
+          value.map((e) => e is Map ? castMap(e) : e).toList(),
+        );
+      }
+      return MapEntry(key as String, value);
+    });
+  }
+
   final schemaMap = <String, Object?>{
     'type': 'object',
-    'properties': properties,
+    'properties': castMap(properties),
     if (required != null && required.isNotEmpty) 'required': required,
   };
-  return Component<String>(
+  return Component(
     name: name,
     description: description,
     internal: internal,
     schema: Schema.fromMap(schemaMap),
-    render: _noRender,
   );
 }
 
 void main() {
   group('generatePrompt', () {
     test('empty components returns a string containing the grammar primer', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
       );
       expect(result, contains('GRAMMAR (essential):'));
       expect(result, contains('Programs are a sequence of statements'));
     });
 
     test('grammar primer explains x-action requires array of builtins', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
       );
       expect(result, contains('x-action: true'));
       expect(result, contains('[@Set('));
@@ -60,8 +58,8 @@ void main() {
     });
 
     test('grammar primer is explicit about valid built-in action calls', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
       );
       expect(result, contains('All `@Name(...)` calls are built-ins'));
       expect(
@@ -107,7 +105,7 @@ void main() {
         description: 'primary container',
       );
       final result = generatePrompt(
-        Library<String>(components: [c], tools: const []),
+        Library(components: [c], tools: const []),
       );
       expect(result, contains('Card(children: array) — primary container'));
     });
@@ -119,7 +117,7 @@ void main() {
           'Separator',
         );
         final result = generatePrompt(
-          Library<String>(components: [c], tools: const []),
+          Library(components: [c], tools: const []),
         );
         expect(result, contains('Separator()'));
         expect(result, isNot(contains('Separator() —')));
@@ -129,7 +127,7 @@ void main() {
     test('component with no props renders Name() with no trailing content', () {
       final c = _comp('Separator');
       final result = generatePrompt(
-        Library<String>(components: [c], tools: const []),
+        Library(components: [c], tools: const []),
       );
       expect(result, contains('Separator()'));
     });
@@ -144,7 +142,7 @@ void main() {
         required: ['label'],
       );
       final result = generatePrompt(
-        Library<String>(components: [c], tools: const []),
+        Library(components: [c], tools: const []),
       );
       expect(result, contains('label: string'));
       expect(result, isNot(contains('label?: string')));
@@ -157,7 +155,7 @@ void main() {
         properties: {'onClick': const {}},
       );
       final result = generatePrompt(
-        Library<String>(components: [c], tools: const []),
+        Library(components: [c], tools: const []),
       );
       expect(result, contains('onClick?: any'));
     });
@@ -170,7 +168,7 @@ void main() {
         },
       );
       final result = generatePrompt(
-        Library<String>(components: [c], tools: const []),
+        Library(components: [c], tools: const []),
       );
       expect(result, contains('config?: object'));
     });
@@ -184,7 +182,7 @@ void main() {
         required: ['value'],
       );
       final result = generatePrompt(
-        Library<String>(components: [c], tools: const []),
+        Library(components: [c], tools: const []),
       );
       expect(result, contains('value: string'));
       expect(result, isNot(contains('x-reactive')));
@@ -201,14 +199,14 @@ void main() {
           required: ['label'],
         );
         final result = generatePrompt(
-          Library<String>(components: [c], tools: const []),
+          Library(components: [c], tools: const []),
         );
         expect(result, contains('label: string /* button text */'));
       },
     );
 
     test('non-empty tools list produces a TOOLS: section', () {
-      final tool = _TestTool(
+      final tool = Tool(
         name: 'search',
         description: 'full-text search',
         input: Schema.object(
@@ -216,8 +214,8 @@ void main() {
           required: ['query'],
         ),
       );
-      final result = generatePrompt<String>(
-        Library<String>(components: const [], tools: [tool]),
+      final result = generatePrompt(
+        Library(components: const [], tools: [tool]),
       );
       expect(result, contains('TOOLS:'));
       expect(result, contains('search('));
@@ -225,14 +223,14 @@ void main() {
     });
 
     test('empty tools list omits the TOOLS: section', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
       );
       expect(result, isNot(contains('TOOLS:')));
     });
 
     test('ToolSpec with object outputSchema renders output signature', () {
-      final tool = _TestTool(
+      final tool = Tool(
         name: 'lookup',
         description: 'look up a record',
         input: Schema.object(
@@ -248,8 +246,8 @@ void main() {
           },
         ),
       );
-      final result = generatePrompt<String>(
-        Library<String>(components: const [], tools: [tool]),
+      final result = generatePrompt(
+        Library(components: const [], tools: [tool]),
       );
       expect(result, contains('lookup('));
       expect(result, contains('→ {'));
@@ -258,54 +256,132 @@ void main() {
     });
 
     test('ToolSpec with scalar outputSchema renders output type', () {
-      final tool = _TestTool(
+      final tool = Tool(
         name: 'count',
         description: 'count items',
         input: Schema.object(properties: {}),
         output: Schema.integer(),
       );
-      final result = generatePrompt<String>(
-        Library<String>(components: const [], tools: [tool]),
+      final result = generatePrompt(
+        Library(components: const [], tools: [tool]),
       );
       expect(result, contains('→ integer'));
     });
 
     test(
-      'ToolSpec with number outputSchema embeds JSON in the prompt line',
+      'ToolSpec with number outputSchema renders output type',
       () {
-        final tool = _TestTool(
+        final tool = Tool(
           name: 'measure',
           description: 'read a sensor',
           input: Schema.object(properties: {}),
           output: Schema.number(),
         );
-        final result = generatePrompt<String>(
-          Library<String>(components: const [], tools: [tool]),
+        final result = generatePrompt(
+          Library(components: const [], tools: [tool]),
         );
         expect(result, contains('measure('));
-        expect(result, contains('"type":"number"'));
+        expect(result, contains('→ number'));
       },
     );
 
     test(
-      'component schema that is not an object uses JSON in the signature',
+      'component schema that is not an object uses the formatted type in the signature',
       () {
-        final c = Component<String>(
+        final c = Component(
           name: 'Scalar',
           schema: Schema.number(),
-          render: _noRender,
         );
         final result = generatePrompt(
-          Library<String>(components: [c], tools: const []),
+          Library(components: [c], tools: const []),
         );
-        expect(result, contains('Scalar('));
-        expect(result, contains('"type":"number"'));
+        expect(result, contains('Scalar(number)'));
       },
     );
 
+    test('renders enum values as a union of strings/numbers', () {
+      final c = _comp(
+        'Button',
+        properties: {
+          'variant': const {
+            'type': 'string',
+            'enum': ['primary', 'secondary', 'outline'],
+          },
+          'size': const {
+            'type': 'integer',
+            'enum': [1, 2, 3],
+          },
+        },
+      );
+      final result = generatePrompt(
+        Library(components: [c], tools: const []),
+      );
+      expect(result, contains('variant?: "primary" | "secondary" | "outline"'));
+      expect(result, contains('size?: 1 | 2 | 3'));
+    });
+
+    test('renders array items recursively', () {
+      final c = _comp(
+        'List',
+        properties: {
+          'tags': const {
+            'type': 'array',
+            'items': {'type': 'string'},
+          },
+          'points': const {
+            'type': 'array',
+            'items': {
+              'type': 'integer',
+              'enum': [10, 20],
+            },
+          },
+        },
+      );
+      final result = generatePrompt(
+        Library(components: [c], tools: const []),
+      );
+      expect(result, contains('tags?: string[]'));
+      expect(result, contains('points?: (10 | 20)[]'));
+    });
+
+    test('renders nested objects recursively', () {
+      final c = _comp(
+        'Container',
+        properties: {
+          'style': const {
+            'type': 'object',
+            'properties': {
+              'color': {'type': 'string'},
+              'padding': {'type': 'integer'},
+            },
+            'required': ['color'],
+          },
+        },
+      );
+      final result = generatePrompt(
+        Library(components: [c], tools: const []),
+      );
+      expect(result, contains('style?: {color: string, padding?: integer}'));
+    });
+
+    test('renders list of types as union', () {
+      final c = _comp(
+        'Flex',
+        properties: {
+          'gap': const {
+            'type': ['string', 'integer'],
+          },
+        },
+      );
+      final result = generatePrompt(
+        Library(components: [c], tools: const []),
+      );
+      expect(result, contains('gap?: string | integer'));
+    });
+
     test('non-empty examples list produces an EXAMPLES: section', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
         examples: ['Example 1 — hello world', 'Example 2 — counter'],
       );
       expect(result, contains('EXAMPLES:'));
@@ -314,15 +390,15 @@ void main() {
     });
 
     test('empty examples list omits the EXAMPLES: section', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
       );
       expect(result, isNot(contains('EXAMPLES:')));
     });
 
     test('additionalRules are appended after default rules', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
         additionalRules: ['Never use inline styles.'],
       );
       expect(result, contains('RULES:'));
@@ -332,8 +408,8 @@ void main() {
     });
 
     test('caller-supplied preamble replaces the default preamble', () {
-      final result = generatePrompt<String>(
-        const Library<String>(components: [], tools: []),
+      final result = generatePrompt(
+        const Library(components: [], tools: []),
         preamble: 'Custom preamble.',
       );
       expect(result, startsWith('Custom preamble.'));
@@ -343,7 +419,7 @@ void main() {
     test(
       'LibraryPromptExtension.prompt output contains every non-internal name',
       () {
-        final lib = Library<String>(
+        final lib = Library(
           components: [
             _comp('Card', description: 'card'),
             _comp('Button', description: 'button'),
@@ -361,7 +437,7 @@ void main() {
     test(
       'LibraryPromptExtension.prompt excludes internal: true components',
       () {
-        final lib = Library<String>(
+        final lib = Library(
           components: [
             _comp('TabItem', internal: true),
             _comp('Tabs', description: 'tabs'),
@@ -395,7 +471,7 @@ void main() {
       );
 
       final result = generatePrompt(
-        Library<String>(components: [stubCard, stubButton], tools: const []),
+        Library(components: [stubCard, stubButton], tools: const []),
       );
 
       expect(

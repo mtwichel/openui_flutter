@@ -2,8 +2,9 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// `Image(src, alt?)` — wraps `Image.network` with an error placeholder
 /// (Acceptance Gap A7).
@@ -27,8 +28,8 @@ class ImageWidget extends StatelessWidget {
         errorBuilder: (context, error, stackTrace) {
           return Container(
             padding: const EdgeInsets.all(12),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const Icon(Icons.broken_image_outlined),
+            color: ShadTheme.of(context).colorScheme.muted,
+            child: const Icon(LucideIcons.imageOff),
           );
         },
       ),
@@ -37,16 +38,18 @@ class ImageWidget extends StatelessWidget {
 }
 
 /// Registration for the `Image` component.
-Component<Widget> imageComponent() {
-  return Component<Widget>(
-    name: 'Image',
-    description: 'network image with fallback',
-    schema: Schema.object(
-      properties: {
-        'src': Schema.string(),
-        'alt': Schema.string(),
-      },
-      required: const ['src'],
+RenderComponent<Widget> imageComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Image',
+      description: 'network image with fallback',
+      schema: Schema.object(
+        properties: {
+          'src': Schema.string(),
+          'alt': Schema.string(),
+        },
+        required: const ['src'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       return ImageWidget(

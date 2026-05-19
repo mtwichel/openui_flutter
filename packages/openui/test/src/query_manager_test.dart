@@ -20,13 +20,24 @@ class _StubTool extends Tool {
   Map<String, Object?>? lastArgs;
   int calls = 0;
 
-  @override
   Future<ToolResult> callTool(Map<String, Object?> args) {
     calls++;
     lastArgs = args;
     return handler(args);
   }
 }
+
+RenderLibrary<Widget> _lib(_StubTool tool) => RenderLibrary<Widget>(
+      spec: Library(components: const [], tools: [tool]),
+      renderers: const {},
+      toolHandlers: {tool.name: tool.callTool},
+    );
+
+const _emptyLib = RenderLibrary<Widget>(
+  spec: Library(components: [], tools: []),
+  renderers: {},
+  toolHandlers: {},
+);
 
 QueryDecl _decl({
   String statementId = r'$q',
@@ -52,7 +63,7 @@ void main() {
       final store = Store();
       final errors = <OpenUIError>[];
       final manager = QueryManager(
-        library: Library<Widget>(components: const [], tools: [tool]),
+        library: _lib(tool),
         store: store,
         onError: errors.add,
       );
@@ -80,7 +91,7 @@ void main() {
         );
         final store = Store();
         final manager = QueryManager(
-          library: Library<Widget>(components: const [], tools: [tool]),
+          library: _lib(tool),
           store: store,
           onError: (_) {},
         );
@@ -107,7 +118,7 @@ void main() {
       );
       final store = Store();
       final manager = QueryManager(
-        library: Library<Widget>(components: const [], tools: [tool]),
+        library: _lib(tool),
         store: store,
         onError: (_) {},
       );
@@ -136,10 +147,7 @@ void main() {
       final store = Store()..set(r'$q', 'prior');
       final errors = <OpenUIError>[];
       final manager = QueryManager(
-        library: const Library<Widget>(
-          components: [],
-          tools: <Tool>[],
-        ),
+        library: _emptyLib,
         store: store,
         onError: errors.add,
       );
@@ -164,7 +172,7 @@ void main() {
           handler: (_) async => throw const McpToolError(message: 'boom'),
         );
         final manager = QueryManager(
-          library: Library<Widget>(components: const [], tools: [tool]),
+          library: _lib(tool),
           store: store,
           onError: errors.add,
         );
@@ -191,7 +199,7 @@ void main() {
               const ToolResult('permission denied', isError: true),
         );
         final manager = QueryManager(
-          library: Library<Widget>(components: const [], tools: [tool]),
+          library: _lib(tool),
           store: store,
           onError: errors.add,
         );
@@ -215,7 +223,7 @@ void main() {
         handler: (_) async => throw StateError('nope'),
       );
       final manager = QueryManager(
-        library: Library<Widget>(components: const [], tools: [tool]),
+        library: _lib(tool),
         store: store,
         onError: errors.add,
       );
@@ -239,7 +247,7 @@ void main() {
       );
       final store = Store();
       final manager = QueryManager(
-        library: Library<Widget>(components: const [], tools: [tool]),
+        library: _lib(tool),
         store: store,
         onError: (_) {},
       );
@@ -266,7 +274,7 @@ void main() {
         );
         final store = Store();
         final manager = QueryManager(
-          library: Library<Widget>(components: const [], tools: [tool]),
+          library: _lib(tool),
           store: store,
           onError: (_) {},
         );
@@ -294,7 +302,7 @@ void main() {
       final store = Store();
       final errors = <OpenUIError>[];
       final manager = QueryManager(
-        library: Library<Widget>(components: const [], tools: [tool]),
+        library: _lib(tool),
         store: store,
         onError: errors.add,
       );
@@ -324,7 +332,7 @@ void main() {
         handler: (_) async => const ToolResult('ok'),
       );
       QueryManager(
-          library: Library<Widget>(components: const [], tools: [tool]),
+          library: _lib(tool),
           store: Store(),
           onError: (_) {},
         )

@@ -3,8 +3,9 @@
 // ignore_for_file: experimental_member_use
 
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// `BarChart(series, labels?)` — multi-series bar chart. `series` is a
 /// list of `{name: String, values: List<num>}` maps. `labels` is the
@@ -31,12 +32,12 @@ class BarChartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     if (series.isEmpty) return SizedBox(height: height);
     final groupCount = series.map((s) => s.values.length).reduce(_max);
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = ShadTheme.of(context).colorScheme;
     final palette = <Color>[
       scheme.primary,
-      scheme.tertiary,
+      scheme.accent,
       scheme.secondary,
-      scheme.error,
+      scheme.destructive,
     ];
     return SizedBox(
       height: height,
@@ -52,7 +53,7 @@ class BarChartWidget extends StatelessWidget {
                 horizontal: 12,
                 vertical: 8,
               ),
-              getTooltipColor: (_) => scheme.inverseSurface,
+              getTooltipColor: (_) => scheme.popover,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final seriesName = series[rodIndex].name;
                 final label = labels != null && group.x < labels!.length
@@ -62,7 +63,7 @@ class BarChartWidget extends StatelessWidget {
                 return BarTooltipItem(
                   '$seriesName\n$label: $value',
                   TextStyle(
-                    color: scheme.onInverseSurface,
+                    color: scheme.popoverForeground,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     height: 1.3,
@@ -120,22 +121,24 @@ class BarChartWidget extends StatelessWidget {
 int _max(int a, int b) => a > b ? a : b;
 
 /// Registration for `BarChart`.
-Component<Widget> barChartComponent() {
-  return Component<Widget>(
-    name: 'BarChart',
-    description: 'multi-series bar chart',
-    schema: Schema.object(
-      properties: {
-        'series': Schema.list(
-          description:
-              'array of {name: string, values: array of numbers} objects. '
-              '`data` is accepted as an alias for `values`.',
-        ),
-        'labels': Schema.list(
-          description: 'array of x-axis label strings, one per data point',
-        ),
-      },
-      required: ['series'],
+RenderComponent<Widget> barChartComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'BarChart',
+      description: 'multi-series bar chart',
+      schema: Schema.object(
+        properties: {
+          'series': Schema.list(
+            description:
+                'array of {name: string, values: array of numbers} objects. '
+                '`data` is accepted as an alias for `values`.',
+          ),
+          'labels': Schema.list(
+            description: 'array of x-axis label strings, one per data point',
+          ),
+        },
+        required: ['series'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];

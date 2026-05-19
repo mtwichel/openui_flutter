@@ -2,13 +2,14 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
-/// `Tabs(children)` — `DefaultTabController` + `TabBar` + `TabBarView`.
+/// `Tabs(children)` — `ShadTabs` switcher.
 /// Children are [TabItemDescription] entries (label + pre-rendered
 /// content widget).
-class TabsWidget extends StatelessWidget {
+class TabsWidget extends StatefulWidget {
   /// Creates a [TabsWidget].
   const TabsWidget({
     required this.items,
@@ -19,32 +20,52 @@ class TabsWidget extends StatelessWidget {
   /// One entry per tab.
   final List<TabItemDescription> items;
 
-  /// Fixed height for the [TabBarView] body. The widget tree is
-  /// frequently inside an unbounded `Column`, so a `TabBarView` (which
-  /// requires bounded vertical space) needs a concrete height.
+  /// Fixed height parameter kept for backwards compatibility.
   final double bodyHeight;
 
   @override
+  State<TabsWidget> createState() => _TabsWidgetState();
+}
+
+class _TabsWidgetState extends State<TabsWidget> {
+  String? _activeTabValue;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.items.isNotEmpty) {
+      _activeTabValue = widget.items.first.label;
+    }
+  }
+
+  @override
+  void didUpdateWidget(TabsWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.isNotEmpty &&
+        (_activeTabValue == null ||
+            !widget.items.any((item) => item.label == _activeTabValue))) {
+      _activeTabValue = widget.items.first.label;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return DefaultTabController(
-      length: items.length,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          TabBar(
-            isScrollable: true,
-            tabs: <Widget>[for (final item in items) Tab(text: item.label)],
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+    return ShadTabs<String>(
+      value: _activeTabValue,
+      onChanged: (val) {
+        setState(() {
+          _activeTabValue = val;
+        });
+      },
+      tabs: [
+        for (final item in widget.items)
+          ShadTab(
+            value: item.label,
+            content: item.content,
+            child: Text(item.label),
           ),
-          SizedBox(
-            height: bodyHeight,
-            child: TabBarView(
-              children: <Widget>[for (final item in items) item.content],
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -63,15 +84,17 @@ class TabItemDescription {
 
 /// Registration for `Tabs`. Child slots come from inline `TabItem(...)`
 /// values that the renderer pre-renders.
-Component<Widget> tabsComponent() {
-  return Component<Widget>(
-    name: 'Tabs',
-    description: 'tabbed content switcher',
-    schema: Schema.object(
-      properties: {
-        'children': Schema.list(items: Schema.any()),
-      },
-      required: ['children'],
+RenderComponent<Widget> tabsComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Tabs',
+      description: 'tabbed content switcher',
+      schema: Schema.object(
+        properties: {
+          'children': Schema.list(items: Schema.any()),
+        },
+        required: ['children'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       // The renderer wraps `TabItem(...)` into a Widget that carries
@@ -119,16 +142,18 @@ Component<Widget> tabsComponent() {
 /// Registration for `TabItem`. Not normally rendered standalone — Tabs
 /// reads the inline TabItem args. If a TabItem somehow surfaces on its
 /// own (e.g. orphan statement), render the content prop alone.
-Component<Widget> tabItemComponent() {
-  return Component<Widget>(
-    name: 'TabItem',
-    internal: true,
-    schema: Schema.object(
-      properties: {
-        'label': Schema.string(),
-        'content': Schema.any(),
-      },
-      required: const ['label', 'content'],
+RenderComponent<Widget> tabItemComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'TabItem',
+      internal: true,
+      schema: Schema.object(
+        properties: {
+          'label': Schema.string(),
+          'content': Schema.any(),
+        },
+        required: const ['label', 'content'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final content = props['content'];

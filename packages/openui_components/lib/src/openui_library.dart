@@ -19,29 +19,34 @@ import 'package:openui_components/src/components/tabs.dart';
 import 'package:openui_components/src/components/text_content.dart';
 import 'package:openui_core/openui_core.dart';
 
-/// Builds the v0.1 `Library<Widget>` with every builtin component
+/// Builds the v0.1 `RenderLibrary<Widget>` with every builtin component
 /// registered.
-Library<Widget> standardLibrary() {
-  return Library<Widget>(
-    components: [
-      stackComponent(),
-      cardComponent(),
-      cardHeaderComponent(),
-      separatorComponent(),
-      calloutComponent(),
-      textContentComponent(),
-      markdownComponent(),
-      imageComponent(),
-      inputComponent(),
-      selectComponent(),
-      buttonComponent(),
-      tableComponent(),
-      colComponent(),
-      tabsComponent(),
-      tabItemComponent(),
-      barChartComponent(),
-      lineChartComponent(),
-    ],
-    tools: const [],
+RenderLibrary<Widget> standardLibrary() {
+  final list = [
+    stackComponent(),
+    cardComponent(),
+    cardHeaderComponent(),
+    separatorComponent(),
+    calloutComponent(),
+    textContentComponent(),
+    markdownComponent(),
+    imageComponent(),
+    inputComponent(),
+    selectComponent(),
+    buttonComponent(),
+    tableComponent(),
+    colComponent(),
+    tabsComponent(),
+    tabItemComponent(),
+    barChartComponent(),
+    lineChartComponent(),
+  ];
+  return RenderLibrary<Widget>(
+    spec: Library(
+      components: list.map((c) => c.spec).toList(),
+      tools: const [],
+    ),
+    renderers: {for (final c in list) c.name: c.render},
+    toolHandlers: const {},
   );
 }

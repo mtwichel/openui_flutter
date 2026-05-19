@@ -121,24 +121,26 @@ WrapCrossAlignment _wrapAlign(String? value) {
 }
 
 /// Registration for the `Stack` component.
-Component<Widget> stackComponent() {
-  return Component<Widget>(
-    name: 'Stack',
-    description: 'vertical or horizontal layout container',
-    schema: Schema.object(
-      properties: {
-        'direction': Schema.string(enumValues: ['row', 'column']),
-        'gap': Schema.string(enumValues: ['xs', 's', 'm', 'l', 'xl']),
-        'align': Schema.string(
-          enumValues: ['start', 'center', 'end', 'stretch'],
-        ),
-        'justify': Schema.string(
-          enumValues: ['start', 'center', 'end', 'between', 'around', 'evenly'],
-        ),
-        'wrap': Schema.boolean(),
-        'children': Schema.list(items: Schema.any()),
-      },
-      required: ['children'],
+RenderComponent<Widget> stackComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Stack',
+      description: 'vertical or horizontal layout container',
+      schema: Schema.object(
+        properties: {
+          'direction': Schema.string(enumValues: ['row', 'column']),
+          'gap': Schema.string(enumValues: ['xs', 's', 'm', 'l', 'xl']),
+          'align': Schema.string(
+            enumValues: ['start', 'center', 'end', 'stretch'],
+          ),
+          'justify': Schema.string(
+            enumValues: ['start', 'center', 'end', 'between', 'around', 'evenly'],
+          ),
+          'wrap': Schema.boolean(),
+          'children': Schema.list(items: Schema.any()),
+        },
+        required: ['children'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       final children =

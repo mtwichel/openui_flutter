@@ -2,8 +2,9 @@
 // openui_core surface is marked @experimental in v0.1.
 // ignore_for_file: experimental_member_use
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:openui_core/openui_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Banner with a leading icon. `variant` selects the color scheme
 /// (`'info'`, `'warning'`, `'error'`, `'success'`).
@@ -23,46 +24,50 @@ class CalloutWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (icon, color) = switch (variant) {
-      'warning' => (Icons.warning_amber_outlined, scheme.tertiaryContainer),
-      'error' => (Icons.error_outline, scheme.errorContainer),
-      'success' => (Icons.check_circle_outline, scheme.primaryContainer),
-      _ => (Icons.info_outline, scheme.secondaryContainer),
+    final (iconData, isDestructive) = switch (variant) {
+      'warning' => (LucideIcons.triangleAlert, false),
+      'error' => (LucideIcons.circleAlert, true),
+      'success' => (LucideIcons.checkCircle, false),
+      _ => (LucideIcons.info, false),
     };
-    return Semantics(
-      container: true,
-      label: 'Callout: $text',
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
+
+    final content = Text(text);
+
+    if (isDestructive) {
+      return Semantics(
+        container: true,
+        label: 'Callout: $text',
+        child: ShadAlert.destructive(
+          icon: Icon(iconData),
+          description: content,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Icon(icon),
-            const SizedBox(width: 8),
-            Expanded(child: Text(text)),
-          ],
+      );
+    } else {
+      return Semantics(
+        container: true,
+        label: 'Callout: $text',
+        child: ShadAlert(
+          icon: Icon(iconData),
+          description: content,
         ),
-      ),
-    );
+      );
+    }
   }
 }
 
 /// Registration for the `Callout` component.
-Component<Widget> calloutComponent() {
-  return Component<Widget>(
-    name: 'Callout',
-    description: 'tinted banner for alerts and notices',
-    schema: Schema.object(
-      properties: {
-        'text': Schema.string(),
-        'variant': Schema.string(),
-      },
-      required: const ['text'],
+RenderComponent<Widget> calloutComponent() {
+  return RenderComponent<Widget>(
+    spec: Component(
+      name: 'Callout',
+      description: 'tinted banner for alerts and notices',
+      schema: Schema.object(
+        properties: {
+          'text': Schema.string(),
+          'variant': Schema.string(),
+        },
+        required: const ['text'],
+      ),
     ),
     render: (ctx, props, renderNode, id) {
       return CalloutWidget(

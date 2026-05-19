@@ -173,7 +173,8 @@ The example app is a **live Gemini chat** that streams OpenUI Lang into `Rendere
 
 ```bash
 dart pub global activate melos
-melos bootstrap
+dart pub get          # resolves the pub workspace (root pubspec.lock)
+melos bootstrap       # optional: syncs shared deps and runs bootstrap hooks
 melos run analyze
 melos run test
 melos run test:flutter

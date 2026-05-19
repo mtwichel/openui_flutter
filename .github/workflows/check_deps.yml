@@ -6,12 +6,14 @@ on:
       - .github/workflows/check_deps.yml
       - tool/check_deps.dart
       - packages/**/pubspec.yaml
+      - pubspec.yaml
   push:
     branches: [main]
     paths:
       - .github/workflows/check_deps.yml
       - tool/check_deps.dart
       - packages/**/pubspec.yaml
+      - pubspec.yaml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

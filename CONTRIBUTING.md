@@ -2,6 +2,21 @@
 
 Thanks for working on `openui_flutter`. This document covers the conventions you need to follow to land a PR and the recipe maintainers use to cut a release.
 
+## Pub workspace (Melos 7)
+
+This repo uses a [Dart pub workspace](https://dart.dev/tools/pub/workspaces): the root `pubspec.yaml` lists every package, and each member declares `resolution: workspace`. Local packages link automatically — **do not** commit `pubspec_overrides.yaml` (Melos no longer generates them).
+
+After cloning or changing dependencies:
+
+```bash
+dart pub get          # required — resolves the whole workspace
+melos bootstrap       # optional — IDE files and bootstrap hooks
+```
+
+Commit the root **`pubspec.lock`** when dependency versions change. Per-package `pubspec.lock` files are gitignored. `dart pub publish` never ships `pubspec_overrides.yaml` even if one exists locally.
+
+Melos configuration lives under the `melos:` key in the root `pubspec.yaml` (there is no `melos.yaml`).
+
 ## Conventional commits and PR titles
 
 This repo squash-merges every PR, so the **PR title becomes the commit subject on `main`**. PR titles are validated by `.github/workflows/semantic_pull_request.yml` and must follow [Conventional Commits](https://www.conventionalcommits.org/):
@@ -43,7 +58,7 @@ Every PR title must carry a scope. The allowed scopes are:
 
 **Cross-cutting scopes** — use when no single package owns the change. These don't show up in per-package changelogs:
 
-- `ci` — workflow files, `melos.yaml`, repo automation
+- `ci` — workflow files, root `pubspec.yaml` (`melos:` config), repo automation
 - `deps` — dependency bumps that don't fit a single package
 - `docs` — top-level docs (`README.md`, `CONTRIBUTING.md`, `docs/`)
 - `chore` — everything else cross-cutting
@@ -74,7 +89,7 @@ Only these four are published to pub.dev:
 - `openui_components`
 - `openui_mcp`
 
-`openui_test_helpers` and `openui_flutter_example` are private. Both declare `publish_to: none` in their pubspec. **Never remove that line.** `noPrivate: true` in `melos.yaml` keeps them out of the release flow, and pub.dev has no trusted-publisher relationship for either — but `publish_to: none` is the load-bearing guardrail. Removing it would let an accidental tag push attempt a publish.
+`openui_test_helpers` and `openui_flutter_example` are private. Both declare `publish_to: none` in their pubspec. **Never remove that line.** `noPrivate: true` in the root `pubspec.yaml` `melos:` scripts keeps them out of the release flow, and pub.dev has no trusted-publisher relationship for either — but `publish_to: none` is the load-bearing guardrail. Removing it would let an accidental tag push attempt a publish.
 
 ### Release recipe
 

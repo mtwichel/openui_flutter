@@ -4,16 +4,22 @@ on:
   pull_request:
     paths:
       - .github/workflows/openui_components.yml
+      - .github/workflows/flutter_package_workspace.yml
       - packages/openui_components/**
       - packages/openui/**
       - packages/openui_core/**
+      - pubspec.yaml
+      - pubspec.lock
   push:
     branches: [main]
     paths:
       - .github/workflows/openui_components.yml
+      - .github/workflows/flutter_package_workspace.yml
       - packages/openui_components/**
       - packages/openui/**
       - packages/openui_core/**
+      - pubspec.yaml
+      - pubspec.lock
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    uses: ./.github/workflows/flutter_package_workspace.yml
     with:
       working_directory: packages/openui_components
       # Phase 0 scaffold: barrel is empty pending Phase 3 implementation.

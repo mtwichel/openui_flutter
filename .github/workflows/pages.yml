@@ -10,6 +10,7 @@ on:
       - packages/openui_components/**
       - packages/openui_core/**
       - pubspec.yaml
+      - pubspec.lock
   workflow_dispatch:
 
 permissions:

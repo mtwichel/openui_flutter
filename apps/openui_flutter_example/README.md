@@ -64,5 +64,5 @@ flutter test
 ```
 
 `openui_flutter_example` is intentionally excluded from `melos run test:flutter`
-(see `melos.yaml`). Tests use a fake `DartanticChatService` and mocked
+(see `melos:` scripts in the root `pubspec.yaml`). Tests use a fake `DartanticChatService` and mocked
 `ChatBloc` — no real Gemini calls in CI.

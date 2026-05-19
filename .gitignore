@@ -6,7 +6,9 @@
 .pub-cache/
 .pub/
 build/
-pubspec.lock
+# Workspace root lockfile is committed; member and spike locks stay local.
+packages/*/pubspec.lock
+apps/*/pubspec.lock
 pubspec_overrides.yaml
 
 # Generated

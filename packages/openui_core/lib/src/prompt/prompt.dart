@@ -1,6 +1,6 @@
 import 'package:json_schema_builder/json_schema_builder.dart';
 import 'package:meta/meta.dart';
-import 'package:openui_core/src/library/library.dart';
+import 'package:openui_core/src/library/definitions.dart';
 
 const String _kDefaultPreamble =
     'You are a UI generator that outputs OpenUI Lang only. '
@@ -125,7 +125,7 @@ String _formatObjectPropertyList(Schema schema) {
   return segments.join(', ');
 }
 
-String _formatComponentSignature<W>(Component<W> component) {
+String _formatComponentSignature(ComponentDefinition component) {
   final root = component.schema.value;
   if (root['type'] != 'object') {
     return '${component.name}(${component.schema.toJson()})';
@@ -154,7 +154,7 @@ String? _formatToolOutput(Schema? output) {
   return output.toJson();
 }
 
-/// Builds a complete system prompt from a [Library] and other options.
+/// Builds a complete system prompt from a [LibraryDefinition] and options.
 ///
 /// The output structure:
 /// ```text
@@ -180,8 +180,8 @@ String? _formatToolOutput(Schema? output) {
 ///
 /// Marked `@experimental` per D12.
 @experimental
-String generatePrompt<W>(
-  Library<W> library, {
+String generatePrompt(
+  LibraryDefinition library, {
   String? preamble,
   List<String> examples = const [],
   List<String> additionalRules = const [],
@@ -195,7 +195,7 @@ String generatePrompt<W>(
     ..writeln(library.libraryPrompt != null ? 'HOW TO USE THE COMPONENTS' : '')
     ..writeln(library.libraryPrompt ?? '')
     ..writeln('COMPONENTS (use only these):');
-  for (final component in library.components) {
+  for (final component in _effectiveByName(library.components, (c) => c.name)) {
     final sig = _formatComponentSignature(component);
     final desc = component.description;
     buf.writeln(desc != null ? '$sig — $desc' : sig);
@@ -204,7 +204,7 @@ String generatePrompt<W>(
 
   if (library.tools.isNotEmpty) {
     buf.writeln('TOOLS:');
-    for (final tool in library.tools) {
+    for (final tool in _effectiveByName(library.tools, (t) => t.name)) {
       buf.writeln(
         '${tool.name}(input: ${tool.input?.toJson()}, '
         'output: ${_formatToolOutput(tool.output)}) — ${tool.description}',
@@ -225,4 +225,13 @@ String generatePrompt<W>(
   }
 
   return buf.toString();
+}
+
+/// Last-write-wins deduplication by [nameOf] for prompt generation.
+List<T> _effectiveByName<T>(List<T> items, String Function(T) nameOf) {
+  final byName = <String, T>{};
+  for (final item in items) {
+    byName[nameOf(item)] = item;
+  }
+  return byName.values.toList();
 }

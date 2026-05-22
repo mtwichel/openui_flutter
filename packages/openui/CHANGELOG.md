@@ -1,5 +1,10 @@
 ## 0.0.1-dev.2
 
+- **BREAKING**: `Renderer` now requires `library: LibraryDefinition`,
+  `componentRegistry: ComponentRegistry`, and `toolRegistry: ToolRegistry`
+  (triple wiring). Removed `toolProvider`.
+- **feat**: `ComponentRegistry`, `ToolRegistry`, and dual lookup in
+  `Renderer` / `QueryManager`.
 - Point pubspec `repository`, `homepage`, and `issue_tracker` URLs at `github.com/mtwichel/openui_flutter`.
 
 ## 0.0.1-dev.1

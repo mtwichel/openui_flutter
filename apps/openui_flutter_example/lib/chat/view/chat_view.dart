@@ -93,13 +93,21 @@ class ChatView extends StatefulWidget {
   /// Creates a [ChatView].
   const ChatView({
     required this.library,
+    required this.componentRegistry,
+    required this.toolRegistry,
     required this.systemPrompt,
     this.onMenuTap,
     super.key,
   });
 
-  /// OpenUI component library for the renderer.
-  final Library<Widget> library;
+  /// OpenUI component and tool definitions for the renderer.
+  final LibraryDefinition library;
+
+  /// Render callbacks keyed by component name.
+  final ComponentRegistry componentRegistry;
+
+  /// Tool executors keyed by tool name.
+  final ToolRegistry toolRegistry;
 
   /// Optional callback that opens the surrounding shell's drawer.
   final VoidCallback? onMenuTap;
@@ -159,6 +167,8 @@ class _ChatViewState extends State<ChatView> {
         }
         return _LiveChatScaffold(
           library: widget.library,
+          componentRegistry: widget.componentRegistry,
+          toolRegistry: widget.toolRegistry,
           systemPrompt: widget.systemPrompt,
           onMenuTap: widget.onMenuTap,
           inputController: _inputController,
@@ -173,13 +183,17 @@ class _ChatViewState extends State<ChatView> {
 class _LiveChatScaffold extends StatelessWidget {
   const _LiveChatScaffold({
     required this.library,
+    required this.componentRegistry,
+    required this.toolRegistry,
     required this.systemPrompt,
     required this.inputController,
     required this.onSend,
     this.onMenuTap,
   });
 
-  final Library<Widget> library;
+  final LibraryDefinition library;
+  final ComponentRegistry componentRegistry;
+  final ToolRegistry toolRegistry;
   final String systemPrompt;
   final TextEditingController inputController;
   final VoidCallback onSend;
@@ -219,7 +233,11 @@ class _LiveChatScaffold extends StatelessWidget {
           body: LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= kWideBreakpoint;
-              final renderer = _RendererPane(library: library);
+              final renderer = _RendererPane(
+                library: library,
+                componentRegistry: componentRegistry,
+                toolRegistry: toolRegistry,
+              );
               final chat = _ChatPane(
                 controller: inputController,
                 onSend: onSend,
@@ -365,9 +383,15 @@ class _GeminiApiKeyGate extends StatelessWidget {
 }
 
 class _RendererPane extends StatefulWidget {
-  const _RendererPane({required this.library});
+  const _RendererPane({
+    required this.library,
+    required this.componentRegistry,
+    required this.toolRegistry,
+  });
 
-  final Library<Widget> library;
+  final LibraryDefinition library;
+  final ComponentRegistry componentRegistry;
+  final ToolRegistry toolRegistry;
 
   @override
   State<_RendererPane> createState() => _RendererPaneState();
@@ -434,6 +458,8 @@ class _RendererPaneState extends State<_RendererPane> {
                         response: rendererResponse,
                         isStreaming: isStreaming,
                         library: widget.library,
+                        componentRegistry: widget.componentRegistry,
+                        toolRegistry: widget.toolRegistry,
                         onAction: (event) {
                           context.read<ChatBloc>().add(
                             OpenUiHostActionLogged(

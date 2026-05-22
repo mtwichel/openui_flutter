@@ -61,10 +61,10 @@ class TabItemDescription {
   final Widget content;
 }
 
-/// Registration for `Tabs`. Child slots come from inline `TabItem(...)`
-/// values that the renderer pre-renders.
-Component<Widget> tabsComponent() {
-  return Component<Widget>(
+/// Registration metadata for `Tabs`. Child slots come from inline
+/// `TabItem(...)` values that the renderer pre-renders.
+ComponentDefinition tabsDefinition() {
+  return ComponentDefinition(
     name: 'Tabs',
     description: 'tabbed content switcher',
     schema: Schema.object(
@@ -73,54 +73,57 @@ Component<Widget> tabsComponent() {
       },
       required: ['children'],
     ),
-    render: (ctx, props, renderNode, id) {
-      // The renderer wraps `TabItem(...)` into a Widget that carries
-      // its label as a fallback Text. To present a real TabBar, we
-      // need access to the AST. Read the source statement and walk its
-      // CompCall args directly.
-      final stmt = ctx.statements[id];
-      final expression = stmt?.expression;
-      if (expression is! CompCall) {
-        return const SizedBox.shrink();
-      }
-      final childrenArg = expression.args.firstWhere(
-        (a) => a.name == 'children',
-        orElse: () => const Argument(value: NullLiteral(offset: 0), offset: 0),
-      );
-      final list = childrenArg.value;
-      if (list is! ArrayLit) return const SizedBox.shrink();
-      final items = <TabItemDescription>[];
-      for (final element in list.elements) {
-        if (element is! CompCall || element.type != 'TabItem') continue;
-        var label = '';
-        AstNode? body;
-        for (final arg in element.args) {
-          if (arg.name == 'label') {
-            final v = arg.value;
-            if (v is Literal && v.value is String) label = v.value! as String;
-          } else if (arg.name == 'content') {
-            body = arg.value;
-          }
-        }
-        items.add(
-          TabItemDescription(
-            label: label,
-            content: body == null
-                ? const SizedBox.shrink()
-                : renderNode(body, ctx),
-          ),
-        );
-      }
-      return TabsWidget(items: items);
-    },
   );
 }
 
-/// Registration for `TabItem`. Not normally rendered standalone — Tabs
-/// reads the inline TabItem args. If a TabItem somehow surfaces on its
-/// own (e.g. orphan statement), render the content prop alone.
-Component<Widget> tabItemComponent() {
-  return Component<Widget>(
+/// Renders `Tabs`.
+Widget renderTabs(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  // The renderer wraps `TabItem(...)` into a Widget that carries
+  // its label as a fallback Text. To present a real TabBar, we
+  // need access to the AST. Read the source statement and walk its
+  // CompCall args directly.
+  final stmt = ctx.statements[statementId];
+  final expression = stmt?.expression;
+  if (expression is! CompCall) {
+    return const SizedBox.shrink();
+  }
+  final childrenArg = expression.args.firstWhere(
+    (a) => a.name == 'children',
+    orElse: () => const Argument(value: NullLiteral(offset: 0), offset: 0),
+  );
+  final list = childrenArg.value;
+  if (list is! ArrayLit) return const SizedBox.shrink();
+  final items = <TabItemDescription>[];
+  for (final element in list.elements) {
+    if (element is! CompCall || element.type != 'TabItem') continue;
+    var label = '';
+    AstNode? body;
+    for (final arg in element.args) {
+      if (arg.name == 'label') {
+        final v = arg.value;
+        if (v is Literal && v.value is String) label = v.value! as String;
+      } else if (arg.name == 'content') {
+        body = arg.value;
+      }
+    }
+    items.add(
+      TabItemDescription(
+        label: label,
+        content: body == null ? const SizedBox.shrink() : renderNode(body, ctx),
+      ),
+    );
+  }
+  return TabsWidget(items: items);
+}
+
+/// Registration metadata for `TabItem`.
+ComponentDefinition tabItemDefinition() {
+  return ComponentDefinition(
     name: 'TabItem',
     internal: true,
     schema: Schema.object(
@@ -130,10 +133,17 @@ Component<Widget> tabItemComponent() {
       },
       required: const ['label', 'content'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final content = props['content'];
-      if (content is Widget) return content;
-      return const SizedBox.shrink();
-    },
   );
+}
+
+/// Renders `TabItem`.
+Widget renderTabItem(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final content = props['content'];
+  if (content is Widget) return content;
+  return const SizedBox.shrink();
 }

@@ -80,11 +80,11 @@ class _InputWidgetState extends State<InputWidget> {
   }
 }
 
-/// Registration for `Input`. The `value` prop is marked reactive so
-/// the renderer surfaces a `ReactiveAssign` marker when bound to a
+/// Registration metadata for `Input`. The `value` prop is marked reactive
+/// so the renderer surfaces a `ReactiveAssign` marker when bound to a
 /// `$state` var.
-Component<Widget> inputComponent() {
-  return Component<Widget>(
+ComponentDefinition inputDefinition() {
+  return ComponentDefinition(
     name: 'Input',
     description: 'text field bound to state variable',
     schema: Schema.object(
@@ -95,13 +95,20 @@ Component<Widget> inputComponent() {
       },
       required: const ['name', 'value'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final value = props['value'];
-      return InputWidget(
-        name: props['name'] as String? ?? id,
-        binding: value is ReactiveAssign ? value : null,
-        placeholder: props['placeholder'] as String?,
-      );
-    },
+  );
+}
+
+/// Renders `Input`.
+Widget renderInput(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final value = props['value'];
+  return InputWidget(
+    name: props['name'] as String? ?? statementId,
+    binding: value is ReactiveAssign ? value : null,
+    placeholder: props['placeholder'] as String?,
   );
 }

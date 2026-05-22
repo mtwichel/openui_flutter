@@ -10,131 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openui/openui.dart';
 import 'package:openui_core/openui_core.dart';
 
-Library<Widget> _testLibrary({List<Tool> tools = const <Tool>[]}) {
-  return Library<Widget>(
-    tools: tools,
-    components: <Component<Widget>>[
-      Component<Widget>(
-        name: 'Text',
-        schema: Schema.fromMap(const <String, Object?>{
-          'type': 'object',
-          'properties': <String, Object?>{
-            'text': <String, Object?>{'type': 'string'},
-          },
-        }),
-        render: (ctx, props, renderNode, id) {
-          return Text(props['text'] as String? ?? '');
-        },
-      ),
-      Component<Widget>(
-        name: 'Column',
-        schema: Schema.fromMap(const <String, Object?>{
-          'type': 'object',
-          'properties': <String, Object?>{
-            'children': <String, Object?>{'type': 'array'},
-          },
-        }),
-        render: (ctx, props, renderNode, id) {
-          final children =
-              (props['children'] as List<Object?>?)?.cast<Widget>() ??
-              const <Widget>[];
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children,
-          );
-        },
-      ),
-      Component<Widget>(
-        name: 'Counter',
-        schema: Schema.fromMap(const <String, Object?>{
-          'type': 'object',
-          'properties': <String, Object?>{
-            'value': <String, Object?>{'type': 'integer'},
-            'onIncrement': <String, Object?>{
-              'type': 'object',
-              'x-action': true,
-            },
-          },
-        }),
-        render: (ctx, props, renderNode, id) {
-          final value = props['value'] as int? ?? 0;
-          final hasAction = props.containsKey('onIncrement');
-          final action = props['onIncrement'] as ActionPlan?;
-          // Disabled when the prop was supplied but resolved to null
-          // (streaming-incomplete AST); inert when the prop is absent.
-          final disabled = hasAction && action == null;
-          return Builder(
-            builder: (context) {
-              final scope = RendererScope.maybeFind(context);
-              final onTap = (scope == null || disabled || action == null)
-                  ? null
-                  : () => scope.triggerAction('', action: action);
-              return GestureDetector(
-                onTap: onTap,
-                child: Text('count=$value'),
-              );
-            },
-          );
-        },
-      ),
-      Component<Widget>(
-        name: 'Input',
-        schema: Schema.fromMap(<String, Object?>{
-          'type': 'object',
-          'properties': <String, Object?>{
-            'name': const <String, Object?>{'type': 'string'},
-            'value': <String, Object?>{
-              'type': 'string',
-              'x-reactive': true,
-            },
-          },
-        }),
-        render: (ctx, props, renderNode, id) {
-          return Builder(
-            builder: (context) {
-              final binding = props['value'];
-              final field = props['name'] as String? ?? id;
-              final cache = RendererScope.of(context).formStateCache;
-              final storeText = binding is ReactiveAssign
-                  ? (binding.value as String? ?? '')
-                  : '';
-              final controller = cache.controllerFor(
-                formName: 'form',
-                fieldName: field,
-                initialValue: storeText,
-              );
-              final store = RendererScope.of(context).store;
-              if (store.lastNotifyOrigin == StoreChangeOrigin.mutation &&
-                  controller.text != storeText) {
-                controller.value = TextEditingValue(
-                  text: storeText,
-                  selection: TextSelection.collapsed(offset: storeText.length),
-                );
-              }
-              return TextField(
-                key: ValueKey<String>('input-$field'),
-                controller: controller,
-                onChanged: (text) {
-                  if (binding is ReactiveAssign) {
-                    ctx.store.set(binding.target, text);
-                  }
-                },
-              );
-            },
-          );
-        },
-      ),
-      Component<Widget>(
-        name: 'Throwing',
-        schema: Schema.fromMap(const <String, Object?>{'type': 'object'}),
-        render: (ctx, props, renderNode, id) {
-          throw StateError('boom from $id');
-        },
-      ),
-    ],
-  );
-}
+import '../helpers/wiring.dart';
 
 class _TestRoot extends StatelessWidget {
   const _TestRoot({required this.child});
@@ -146,56 +22,73 @@ class _TestRoot extends StatelessWidget {
       MaterialApp(home: Material(child: child));
 }
 
+Widget _renderer(
+  TestOpenUiHarness harness, {
+  String? response,
+  ComponentRegistry? componentRegistry,
+  ToolRegistry? toolRegistry,
+  bool isStreaming = false,
+  void Function(ActionEvent event)? onAction,
+  void Function(String message)? onContinueConversation,
+  void Function(Map<String, Object?> snapshot)? onStateUpdate,
+  Map<String, Object?>? initialState,
+  void Function(ParseResult result)? onParseResult,
+  void Function(List<OpenUIError> errors)? onError,
+}) {
+  return _TestRoot(
+    child: Renderer(
+      response: response,
+      library: harness.library,
+      componentRegistry: componentRegistry ?? harness.componentRegistry,
+      toolRegistry: toolRegistry ?? harness.toolRegistry,
+      isStreaming: isStreaming,
+      onAction: onAction,
+      onContinueConversation: onContinueConversation,
+      onStateUpdate: onStateUpdate,
+      initialState: initialState,
+      onParseResult: onParseResult,
+      onError: onError,
+    ),
+  );
+}
+
 void main() {
   group('Renderer', () {
     testWidgets('cold renders a static program', (tester) async {
-      final library = _testLibrary();
+      final harness = TestOpenUiHarness();
       await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: 'root = Text(text: "hello")',
-            library: library,
-          ),
-        ),
+        _renderer(harness, response: 'root = Text(text: "hello")'),
       );
       expect(find.text('hello'), findsOneWidget);
     });
 
     testWidgets('renders nothing when response is null', (tester) async {
-      await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(library: _testLibrary()),
-        ),
-      );
+      await tester.pumpWidget(_renderer(TestOpenUiHarness()));
       expect(find.byType(Text), findsNothing);
     });
 
     testWidgets(
       'incrementally renders new statements appended mid-stream',
       (tester) async {
-        final library = _testLibrary();
+        final harness = TestOpenUiHarness();
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: 'root = Text(text: "first")',
-              library: library,
-              isStreaming: true,
-            ),
+          _renderer(
+            harness,
+            response: 'root = Text(text: "first")',
+            isStreaming: true,
           ),
         );
         expect(find.text('first'), findsOneWidget);
 
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response:
-                  '\n'
-                  'root = Column(children: [a, b])\n'
-                  'a = Text(text: "first")\n'
-                  'b = Text(text: "second")\n',
-              library: library,
-              isStreaming: true,
-            ),
+          _renderer(
+            harness,
+            response:
+                '\n'
+                'root = Column(children: [a, b])\n'
+                'a = Text(text: "first")\n'
+                'b = Text(text: "second")\n',
+            isStreaming: true,
           ),
         );
         await tester.pump();
@@ -209,17 +102,15 @@ void main() {
     ) async {
       final updates = <Map<String, Object?>>[];
       await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response:
-                '\n'
-                r'$name = ""'
-                '\n'
-                r'root = Input(name: "field", value: $name)'
-                '\n',
-            library: _testLibrary(),
-            onStateUpdate: updates.add,
-          ),
+        _renderer(
+          TestOpenUiHarness(),
+          response:
+              '\n'
+              r'$name = ""'
+              '\n'
+              r'root = Input(name: "field", value: $name)'
+              '\n',
+          onStateUpdate: updates.add,
         ),
       );
 
@@ -232,12 +123,11 @@ void main() {
     testWidgets(
       'TextEditingController persists across mid-stream rebuilds',
       (tester) async {
-        Widget app(String response) => _TestRoot(
-          child: Renderer(
-            response: response,
-            library: _testLibrary(),
-            isStreaming: true,
-          ),
+        final harness = TestOpenUiHarness();
+        Widget app(String response) => _renderer(
+          harness,
+          response: response,
+          isStreaming: true,
         );
 
         await tester.pumpWidget(
@@ -256,7 +146,6 @@ void main() {
         );
         await tester.pump();
 
-        // Mid-stream: a new sibling appears (LLM appends).
         const expanded = '''
 
 \$name = ""
@@ -286,12 +175,10 @@ root = Column(children: [Input(name: "field", value: \$name), Input(name: "secon
 root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-              onAction: events.add,
-            ),
+          _renderer(
+            TestOpenUiHarness(),
+            response: program,
+            onAction: events.add,
           ),
         );
 
@@ -314,12 +201,10 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
             '\n'
             r'root = Counter(value: $count, onIncrement: [@Set($count, $count + 1)])';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-              onAction: events.add,
-            ),
+          _renderer(
+            TestOpenUiHarness(),
+            response: program,
+            onAction: events.add,
           ),
         );
 
@@ -342,20 +227,13 @@ root = Column(children: [
 ])
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-            ),
-          ),
+          _renderer(TestOpenUiHarness(), response: program),
         );
 
-        // Tap the first Counter to decrement.
         await tester.tap(find.byType(GestureDetector).first);
         await tester.pump();
         expect(find.text('count=6'), findsOneWidget);
 
-        // Tap the reset Counter.
         await tester.tap(find.byType(GestureDetector).last);
         await tester.pump();
         expect(find.text('count=7'), findsOneWidget);
@@ -366,39 +244,32 @@ root = Column(children: [
       tester,
     ) async {
       var calls = 0;
-      final tools = <Tool>[
-        _StubTool(
-          name: 'lookup',
-          description: 'query tool',
-          handler: (args) async {
-            calls++;
-            return const ToolResult('query');
-          },
-        ),
-        _StubTool(
-          name: 'refresh',
-          description: 'mutation tool',
-          handler: (args) async {
-            calls++;
-            return const ToolResult('mutation');
-          },
-        ),
-      ];
+      final harness = TestOpenUiHarness(
+        tools: [
+          StubToolSpec(
+            name: 'lookup',
+            description: 'query tool',
+            execute: (args) async {
+              calls++;
+              return const ToolResult('query');
+            },
+          ),
+          StubToolSpec(
+            name: 'refresh',
+            description: 'mutation tool',
+            execute: (args) async {
+              calls++;
+              return const ToolResult('mutation');
+            },
+          ),
+        ],
+      );
       const program = '''\$data = @Query(lookup)
 refresh = Mutation(name: "refresh")
 root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
 ''';
-      await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: program,
-            library: _testLibrary(tools: tools),
-          ),
-        ),
-      );
+      await tester.pumpWidget(_renderer(harness, response: program));
 
-      // `$data` (a `@Query`) auto-fires once streaming completes; the
-      // mutation only fires on `@Run`.
       await tester.pump();
       await tester.pumpAndSettle();
       expect(calls, 1);
@@ -406,7 +277,6 @@ root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
       await tester.tap(find.byType(GestureDetector));
       await tester.pump();
       await tester.pumpAndSettle();
-      // `@Run($data)` invalidated and re-fired the query.
       expect(calls, 2);
     });
 
@@ -414,24 +284,24 @@ root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
       '@Query does not fire while isStreaming is true',
       (tester) async {
         var calls = 0;
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (_) async {
-              calls++;
-              return const ToolResult('value');
-            },
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (_) async {
+                calls++;
+                return const ToolResult('value');
+              },
+            ),
+          ],
+        );
         const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              isStreaming: true,
-              library: _testLibrary(tools: tools),
-            ),
+          _renderer(
+            harness,
+            response: program,
+            isStreaming: true,
           ),
         );
         await tester.pumpAndSettle();
@@ -443,30 +313,30 @@ root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
       '@Query fires once after streaming flips to false and writes to the store',
       (tester) async {
         var calls = 0;
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (_) async {
-              calls++;
-              return const ToolResult(<Map<String, Object?>>[
-                {'title': 'A'},
-                {'title': 'B'},
-              ]);
-            },
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (_) async {
+                calls++;
+                return const ToolResult(<Map<String, Object?>>[
+                  {'title': 'A'},
+                  {'title': 'B'},
+                ]);
+              },
+            ),
+          ],
+        );
         const program = '''\$products = @Query(fetch)
 root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
 ''';
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-              onStateUpdate: (s) => snapshot = s,
-            ),
+          _renderer(
+            harness,
+            response: program,
+            onStateUpdate: (s) => snapshot = s,
           ),
         );
         await tester.pumpAndSettle();
@@ -480,30 +350,24 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
       '@Query fires when root is incomplete (no trailing newline)',
       (tester) async {
         var calls = 0;
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (_) async {
-              calls++;
-              return const ToolResult(<Map<String, Object?>>[
-                {'title': 'A'},
-              ]);
-            },
-          ),
-        ];
-        // No trailing newline: streaming parser marks `root` incomplete.
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (_) async {
+                calls++;
+                return const ToolResult(<Map<String, Object?>>[
+                  {'title': 'A'},
+                ]);
+              },
+            ),
+          ],
+        );
         const program =
             '\$products = @Query(fetch)\n'
             'root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")';
-        await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-            ),
-          ),
-        );
+        await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
         expect(calls, 1);
         expect(find.text('loaded'), findsOneWidget);
@@ -514,29 +378,27 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
       '@Query failure surfaces via onError and leaves the store untouched',
       (tester) async {
         final errors = <OpenUIError>[];
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (_) async => throw const McpToolError(message: 'boom'),
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (_) async => throw const McpToolError(message: 'boom'),
+            ),
+          ],
+        );
         const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-              onError: errors.addAll,
-              onStateUpdate: (s) => snapshot = s,
-            ),
+          _renderer(
+            harness,
+            response: program,
+            onError: errors.addAll,
+            onStateUpdate: (s) => snapshot = s,
           ),
         );
         await tester.pumpAndSettle();
         expect(errors.whereType<McpToolError>(), isNotEmpty);
-        // Store slot stays at its prior value (null in this case — the
-        // tool failed before it could write anything).
         expect(snapshot[r'$products'], isNull);
       },
     );
@@ -545,33 +407,35 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
       'identical args across two parse passes fire the tool once',
       (tester) async {
         var calls = 0;
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (_) async {
-              calls++;
-              return const ToolResult('value');
-            },
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (_) async {
+                calls++;
+                return const ToolResult('value');
+              },
+            ),
+          ],
+        );
         const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
         final notifier = ValueNotifier<String>(program);
-        final library = _testLibrary(tools: tools);
         await tester.pumpWidget(
           _TestRoot(
             child: ValueListenableBuilder<String>(
               valueListenable: notifier,
               builder: (context, value, _) => Renderer(
                 response: value,
-                library: library,
+                library: harness.library,
+                componentRegistry: harness.componentRegistry,
+                toolRegistry: harness.toolRegistry,
               ),
             ),
           ),
         );
         await tester.pumpAndSettle();
         expect(calls, 1);
-        // Same response, second pump — the firing gate must short-circuit.
         notifier.value = '$program ';
         await tester.pumpAndSettle();
         expect(calls, 1);
@@ -582,35 +446,28 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
       r'@Run($var) re-evaluates args against the post-@Set store',
       (tester) async {
         final categories = <Object?>[];
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (args) async {
-              categories.add(args['category']);
-              return const ToolResult('value');
-            },
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (args) async {
+                categories.add(args['category']);
+                return const ToolResult('value');
+              },
+            ),
+          ],
+        );
         const program = '''\$category = "shoes"
 \$products = @Query(fetch, category: \$category)
 root = Counter(value: 0, onIncrement: [@Set(\$category, "hats"), @Run(\$products)])
 ''';
-        await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-            ),
-          ),
-        );
+        await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
         expect(categories, ['shoes']);
 
         await tester.tap(find.byType(GestureDetector));
         await tester.pumpAndSettle();
-        // The dispatcher evaluates `@Set` first, so `@Run($products)`
-        // re-fires the query with the post-set category.
         expect(categories, ['shoes', 'hats']);
       },
     );
@@ -619,29 +476,29 @@ root = Counter(value: 0, onIncrement: [@Set(\$category, "hats"), @Run(\$products
       r'@Reset on a query-backed $var skips and leaves the store unchanged',
       (tester) async {
         var calls = 0;
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fetch',
-            description: 'fetch',
-            handler: (_) async {
-              calls++;
-              return const ToolResult('value');
-            },
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fetch',
+              description: 'fetch',
+              execute: (_) async {
+                calls++;
+                return const ToolResult('value');
+              },
+            ),
+          ],
+        );
         const program = '''\$products = @Query(fetch)
 root = Counter(value: 0, onIncrement: [@Reset(\$products)])
 ''';
         final events = <ActionEvent>[];
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-              onAction: events.add,
-              onStateUpdate: (s) => snapshot = s,
-            ),
+          _renderer(
+            harness,
+            response: program,
+            onAction: events.add,
+            onStateUpdate: (s) => snapshot = s,
           ),
         );
         await tester.pumpAndSettle();
@@ -650,8 +507,6 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
 
         await tester.tap(find.byType(GestureDetector));
         await tester.pumpAndSettle();
-        // `@Reset` falls through the "no declared default" branch — it
-        // does not call the tool and leaves the store value untouched.
         expect(calls, 1);
         expect(snapshot[r'$products'], beforeValue);
         final resetEvent = events.singleWhere(
@@ -662,52 +517,47 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
       },
     );
 
-    testWidgets('Run step can invoke a tool directly by name', (tester) async {
-      var calls = 0;
-      Map<String, Object?>? lastArgs;
-      final tools = <Tool>[
-        _StubTool(
-          name: 'snackbar',
-          description: 'snackbar tool',
-          handler: (args) async {
-            calls++;
-            lastArgs = args;
-            return const ToolResult(null);
-          },
-        ),
-      ];
-      const program =
-          'root = Counter(value: 0, onIncrement: [@Run(snackbar, message: "Hello")])';
-      await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: program,
-            library: _testLibrary(tools: tools),
-          ),
-        ),
-      );
+    testWidgets(
+      '@Run(toolName) invokes the tool directly via toolRegistry',
+      (tester) async {
+        var calls = 0;
+        Map<String, Object?>? lastArgs;
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'snackbar',
+              description: 'snackbar tool',
+              execute: (args) async {
+                calls++;
+                lastArgs = args;
+                return const ToolResult(null);
+              },
+            ),
+          ],
+        );
+        const program =
+            'root = Counter(value: 0, onIncrement: [@Run(snackbar, message: "Hello")])';
+        await tester.pumpWidget(_renderer(harness, response: program));
 
-      await tester.tap(find.byType(GestureDetector));
-      await tester.pump();
-      await tester.pumpAndSettle();
-      expect(calls, 1);
-      expect(lastArgs, isNotNull);
-      expect(lastArgs!['message'], 'Hello');
-    });
+        await tester.tap(find.byType(GestureDetector));
+        await tester.pump();
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        expect(lastArgs, isNotNull);
+        expect(lastArgs!['message'], 'Hello');
+      },
+    );
 
     testWidgets('error boundary captures component throws', (tester) async {
       final errors = <OpenUIError>[];
       await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: 'root = Throwing()',
-            library: _testLibrary(),
-            onError: errors.addAll,
-          ),
+        _renderer(
+          TestOpenUiHarness(),
+          response: 'root = Throwing()',
+          onError: errors.addAll,
         ),
       );
 
-      // Drain Flutter's caught error.
       tester.takeException();
 
       expect(errors, isNotEmpty);
@@ -717,12 +567,10 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
     testWidgets('onParseResult fires after each parse', (tester) async {
       ParseResult? captured;
       await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: 'root = Text(text: "x")',
-            library: _testLibrary(),
-            onParseResult: (r) => captured = r,
-          ),
+        _renderer(
+          TestOpenUiHarness(),
+          response: 'root = Text(text: "x")',
+          onParseResult: (r) => captured = r,
         ),
       );
 
@@ -735,31 +583,22 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
     ) async {
       final snapshots = <Map<String, Object?>>[];
       await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: '\$count = 0\nroot = Text(text: "")',
-            library: _testLibrary(),
-            initialState: const <String, Object?>{r'$count': 42},
-            onStateUpdate: snapshots.add,
-          ),
+        _renderer(
+          TestOpenUiHarness(),
+          response: '\$count = 0\nroot = Text(text: "")',
+          initialState: const <String, Object?>{r'$count': 42},
+          onStateUpdate: snapshots.add,
         ),
       );
 
-      // The store's initialize semantics treat persisted (initialState)
-      // as winning over defaults.
-      // Trigger a write so onStateUpdate fires once, capturing the
-      // resulting snapshot.
-      // We do this via a synthetic Counter action on the next pump.
       await tester.pumpWidget(
-        _TestRoot(
-          child: Renderer(
-            response: '''\$count = 0
+        _renderer(
+          TestOpenUiHarness(),
+          response: '''\$count = 0
 root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
 ''',
-            library: _testLibrary(),
-            initialState: const <String, Object?>{r'$count': 42},
-            onStateUpdate: snapshots.add,
-          ),
+          initialState: const <String, Object?>{r'$count': 42},
+          onStateUpdate: snapshots.add,
         ),
       );
       await tester.pump();
@@ -775,12 +614,10 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
       (tester) async {
         final errors = <OpenUIError>[];
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: 'root = Mystery()',
-              library: _testLibrary(),
-              onError: errors.addAll,
-            ),
+          _renderer(
+            TestOpenUiHarness(),
+            response: 'root = Mystery()',
+            onError: errors.addAll,
           ),
         );
         await tester.pump();
@@ -791,16 +628,37 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
     );
 
     testWidgets(
+      'missing renderer surfaces MissingRendererError and renders placeholder',
+      (tester) async {
+        final errors = <OpenUIError>[];
+        final harness = TestOpenUiHarness();
+        await tester.pumpWidget(
+          _renderer(
+            harness,
+            response: 'root = Text(text: "hello")',
+            componentRegistry: const ComponentRegistry(renderers: {}),
+            onError: errors.addAll,
+          ),
+        );
+        await tester.pump();
+
+        expect(errors.whereType<MissingRendererError>(), isNotEmpty);
+        expect(
+          errors.whereType<MissingRendererError>().first.component,
+          'Text',
+        );
+      },
+    );
+
+    testWidgets(
       'reference cycle surfaces as CyclicStateError, not stack overflow',
       (tester) async {
         final errors = <OpenUIError>[];
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: '\nroot = a\na = b\nb = a\n',
-              library: _testLibrary(),
-              onError: errors.addAll,
-            ),
+          _renderer(
+            TestOpenUiHarness(),
+            response: '\nroot = a\na = b\nb = a\n',
+            onError: errors.addAll,
           ),
         );
         await tester.pump();
@@ -818,12 +676,10 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
             '''root = Counter(value: 0, onIncrement: [@ToAssistant("retry")])
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-              onContinueConversation: messages.add,
-            ),
+          _renderer(
+            TestOpenUiHarness(),
+            response: program,
+            onContinueConversation: messages.add,
           ),
         );
 
@@ -837,28 +693,25 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
     testWidgets(
       '@Run on a mutation fires the mutation and halts on failure',
       (tester) async {
-        // $flag defaults to 0; @Set targets 999. A halted plan leaves
-        // $flag at 0; a passing-by-coincidence value cannot arise —
-        // @Set is the only writer.
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fail',
-            description: 'failing mutation tool',
-            handler: (args) async => throw StateError('mut-fail'),
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fail',
+              description: 'failing mutation tool',
+              execute: (args) async => throw StateError('mut-fail'),
+            ),
+          ],
+        );
         const program = '''refresh = Mutation(name: "fail")
 \$flag = 0
 root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
 ''';
         final stateUpdates = <Map<String, Object?>>[];
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-              onStateUpdate: stateUpdates.add,
-            ),
+          _renderer(
+            harness,
+            response: program,
+            onStateUpdate: stateUpdates.add,
           ),
         );
 
@@ -866,7 +719,6 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
         await tester.pump();
         await tester.pumpAndSettle();
 
-        // @Set after the failed @Run did not run — $flag is still 0.
         final lastFlag = stateUpdates.isEmpty ? 0 : stateUpdates.last[r'$flag'];
         expect(lastFlag, 0);
       },
@@ -876,26 +728,26 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
       '@Run on a failing mutation surfaces a single OpenUIError through '
       'onError',
       (tester) async {
-        final tools = <Tool>[
-          _StubTool(
-            name: 'fail',
-            description: 'failing mutation tool',
-            handler: (args) async => throw StateError('boom'),
-          ),
-        ];
+        final harness = TestOpenUiHarness(
+          tools: [
+            StubToolSpec(
+              name: 'fail',
+              description: 'failing mutation tool',
+              execute: (args) async => throw StateError('boom'),
+            ),
+          ],
+        );
         const program = '''refresh = Mutation(name: "fail")
 root = Counter(value: 0, onIncrement: [@Run(refresh)])
 ''';
         var lastSnapshot = const <OpenUIError>[];
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(tools: tools),
-              onError: (errors) {
-                lastSnapshot = errors;
-              },
-            ),
+          _renderer(
+            harness,
+            response: program,
+            onError: (errors) {
+              lastSnapshot = errors;
+            },
           ),
         );
 
@@ -903,9 +755,6 @@ root = Counter(value: 0, onIncrement: [@Run(refresh)])
         await tester.pump();
         await tester.pumpAndSettle();
 
-        // The renderer's onError snapshot accumulates active errors,
-        // so a regression that double-reports the mutation failure
-        // would land two entries here, not one.
         final mutationErrors = lastSnapshot.whereType<EvaluationError>();
         expect(mutationErrors, hasLength(1));
       },
@@ -914,29 +763,17 @@ root = Counter(value: 0, onIncrement: [@Run(refresh)])
     testWidgets(
       'last-good cache covers ticks where the parser produces no root',
       (tester) async {
-        // The cache only activates when the new parse produces a null
-        // root mid-stream — primarily before the LLM emits its first
-        // `root = ...` token. Drive that case with a `$state` decl
-        // before the root statement appears.
-        Widget tree(String response) => _TestRoot(
-          child: Renderer(
-            response: response,
-            library: _testLibrary(),
-            isStreaming: true,
-          ),
+        final harness = TestOpenUiHarness();
+        Widget tree(String response) => _renderer(
+          harness,
+          response: response,
+          isStreaming: true,
         );
 
-        // 1. A complete program → cache retains this root.
-        await tester.pumpWidget(
-          tree('root = Text(text: "kept")\n'),
-        );
+        await tester.pumpWidget(tree('root = Text(text: "kept")\n'));
         await tester.pumpAndSettle();
         expect(find.text('kept'), findsOneWidget);
 
-        // 2. The stream "restarts" but starts with a $state decl —
-        //    the buffer is now a non-prefix of the previous one, so
-        //    the cache resets. The first chunk has no root, so the
-        //    body collapses to an empty placeholder.
         await tester.pumpWidget(
           tree(
             r'$x = 0'
@@ -958,12 +795,7 @@ root = Column(children: [
 ])
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-            ),
-          ),
+          _renderer(TestOpenUiHarness(), response: program),
         );
         await tester.pump();
 
@@ -988,12 +820,7 @@ root = Column(children: [
 ])
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-            ),
-          ),
+          _renderer(TestOpenUiHarness(), response: program),
         );
         await tester.pump();
 
@@ -1009,12 +836,7 @@ root = Column(children: [
 root = @Each(items, "row", Text(text: row))
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-            ),
-          ),
+          _renderer(TestOpenUiHarness(), response: program),
         );
         await tester.pump();
         expect(find.text('alpha'), findsOneWidget);
@@ -1026,19 +848,11 @@ root = @Each(items, "row", Text(text: row))
     testWidgets(
       'component prop set to @Each resolves through the prop-iteration branch',
       (tester) async {
-        // Column.children is an array prop; the @Each call's template
-        // is a CompCall (Text), so the prop-branch in _resolvePropValue
-        // must pre-render each item with the loop var in scope.
         const program = '''items = ["one", "two"]
 root = Column(children: @Each(items, "row", Text(text: row)))
 ''';
         await tester.pumpWidget(
-          _TestRoot(
-            child: Renderer(
-              response: program,
-              library: _testLibrary(),
-            ),
-          ),
+          _renderer(TestOpenUiHarness(), response: program),
         );
         await tester.pump();
         expect(find.text('one'), findsOneWidget);
@@ -1049,38 +863,21 @@ root = Column(children: @Each(items, "row", Text(text: row)))
     testWidgets(
       'cache resets when a new response is unrelated to the previous',
       (tester) async {
-        Widget tree(String response, {bool streaming = true}) => _TestRoot(
-          child: Renderer(
-            response: response,
-            library: _testLibrary(),
-            isStreaming: streaming,
-          ),
+        final harness = TestOpenUiHarness();
+        Widget tree(String response, {bool streaming = true}) => _renderer(
+          harness,
+          response: response,
+          isStreaming: streaming,
         );
 
         await tester.pumpWidget(tree('root = Text(text: "alpha")\n'));
         await tester.pumpAndSettle();
         expect(find.text('alpha'), findsOneWidget);
 
-        // A shorter, non-prefix response — this is a fresh stream.
-        // The cache from the alpha response must be discarded so a
-        // null root produces an empty body, not the stale alpha tree.
         await tester.pumpWidget(tree(''));
         await tester.pumpAndSettle();
         expect(find.text('alpha'), findsNothing);
       },
     );
   });
-}
-
-class _StubTool extends Tool {
-  _StubTool({
-    required super.name,
-    required super.description,
-    required this.handler,
-  });
-
-  final Future<ToolResult> Function(Map<String, Object?> args) handler;
-
-  @override
-  Future<ToolResult> callTool(Map<String, Object?> args) => handler(args);
 }

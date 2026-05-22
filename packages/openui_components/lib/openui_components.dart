@@ -21,4 +21,5 @@ export 'src/components/tabs.dart' show TabItemDescription, TabsWidget;
 export 'src/components/text_content.dart' show TextContentWidget;
 export 'src/internal/tokens.dart'
     show kSpacingTokens, kTextSizeTokens, resolveSpacing;
-export 'src/openui_library.dart' show standardLibrary;
+export 'src/openui_library.dart'
+    show standardComponentRegistry, standardLibraryDefinition;

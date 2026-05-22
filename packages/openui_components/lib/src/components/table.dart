@@ -91,10 +91,10 @@ class _TableWidgetState extends State<TableWidget> {
   }
 }
 
-/// Registration for `Table`. Accepts either `{name, label?}` column
+/// Registration metadata for `Table`. Accepts either `{name, label?}` column
 /// objects or bare strings, and either map-keyed or positional rows.
-Component<Widget> tableComponent() {
-  return Component<Widget>(
+ComponentDefinition tableDefinition() {
+  return ComponentDefinition(
     name: 'Table',
     description: 'paginated data table',
     schema: Schema.object(
@@ -118,15 +118,22 @@ Component<Widget> tableComponent() {
       },
       required: ['columns', 'rows'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final rawCols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
-      final rawRows = (props['rows'] as List<Object?>?) ?? const <Object?>[];
-      final columns = _normalizeColumns(rawCols);
-      return TableWidget(
-        columns: columns,
-        rows: _normalizeRows(rawRows, columns),
-      );
-    },
+  );
+}
+
+/// Renders `Table`.
+Widget renderTable(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final rawCols = (props['columns'] as List<Object?>?) ?? const <Object?>[];
+  final rawRows = (props['rows'] as List<Object?>?) ?? const <Object?>[];
+  final columns = _normalizeColumns(rawCols);
+  return TableWidget(
+    columns: columns,
+    rows: _normalizeRows(rawRows, columns),
   );
 }
 
@@ -171,12 +178,9 @@ Map<String, Object?>? _coerceStringKeyMap(Object? value) {
   };
 }
 
-/// `Col(name, label?)` resolves to a literal `Map<String, Object?>`.
-/// The renderer's evaluator handles object args directly; this
-/// component just defines the schema so the parser recognises the
-/// shape.
-Component<Widget> colComponent() {
-  return Component<Widget>(
+/// Registration metadata for `Col`.
+ComponentDefinition colDefinition() {
+  return ComponentDefinition(
     name: 'Col',
     internal: true,
     schema: Schema.object(
@@ -186,11 +190,18 @@ Component<Widget> colComponent() {
       },
       required: ['name'],
     ),
-    render: (ctx, props, renderNode, id) {
-      // Col is a definitional helper; in practice consumers build the
-      // columns list as object literals. If a `Col(...)` actually
-      // renders, surface its name as a single-line text fallback.
-      return Text('Col(${props['name'] ?? ''})');
-    },
   );
+}
+
+/// Renders `Col`.
+Widget renderCol(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  // Col is a definitional helper; in practice consumers build the
+  // columns list as object literals. If a `Col(...)` actually
+  // renders, surface its name as a single-line text fallback.
+  return Text('Col(${props['name'] ?? ''})');
 }

@@ -27,6 +27,8 @@ export 'src/errors/errors.dart'
         CyclicStateError,
         EvaluationError,
         McpToolError,
+        MissingRendererError,
+        MissingToolExecutorError,
         OpenUIError,
         ParseError,
         ToolNotFoundError,
@@ -34,14 +36,10 @@ export 'src/errors/errors.dart'
 export 'src/eval/builtins.dart' show functionalBuiltins;
 export 'src/eval/evaluator.dart'
     show BuiltinHandler, EvalContext, evaluate, isTruthyValue;
+export 'src/library/definitions.dart'
+    show ComponentDefinition, LibraryDefinition, ToolDefinition;
 export 'src/library/library.dart'
-    show
-        Component,
-        ComponentRender,
-        Library,
-        ReactiveAssign,
-        evaluateElementProps,
-        isReactiveAssign;
+    show ReactiveAssign, evaluateElementProps, isReactiveAssign;
 export 'src/merge/merge.dart' show mergeStatements;
 export 'src/parse/parse.dart'
     show
@@ -93,4 +91,4 @@ export 'src/parser/streaming.dart'
         createStreamingParser;
 export 'src/prompt/prompt.dart' show generatePrompt;
 export 'src/state/store.dart' show Store, StoreChangeOrigin;
-export 'src/tools/tools.dart' show Tool, ToolResult;
+export 'src/tools/tools.dart' show ToolResult;

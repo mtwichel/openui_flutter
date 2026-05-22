@@ -1,5 +1,8 @@
 ## 0.0.1-dev.2
 
+- **BREAKING**: Replace `openuiLibrary()` / `openuiChatLibrary()` with
+  `standardLibraryDefinition()` + `standardComponentRegistry()`. Each component
+  file exports a `*Definition()` factory and a `render*` function.
 - Point pubspec `repository`, `homepage`, and `issue_tracker` URLs at `github.com/mtwichel/openui_flutter`.
 
 ## 0.0.1-dev.1

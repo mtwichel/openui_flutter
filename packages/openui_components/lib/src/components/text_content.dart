@@ -57,9 +57,9 @@ class TextContentWidget extends StatelessWidget {
   }
 }
 
-/// Registration for the `TextContent` component.
-Component<Widget> textContentComponent() {
-  return Component<Widget>(
+/// Registration metadata for the `TextContent` component.
+ComponentDefinition textContentDefinition() {
+  return ComponentDefinition(
     name: 'TextContent',
     description: 'styled paragraph text',
     schema: Schema.object(
@@ -69,19 +69,26 @@ Component<Widget> textContentComponent() {
       },
       required: ['text'],
     ),
-    render: (ctx, props, renderNode, id) {
-      return Builder(
-        builder: (context) {
-          final scope = RendererScope.maybeFind(context);
-          final streaming =
-              scope?.isStreaming == true &&
-              (scope?.incomplete.contains(id) ?? false);
-          return TextContentWidget(
-            text: props['text']?.toString() ?? '',
-            size: props['size'] as String? ?? 'medium',
-            isStreaming: streaming,
-          );
-        },
+  );
+}
+
+/// Renders `TextContent`.
+Widget renderTextContent(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  return Builder(
+    builder: (context) {
+      final scope = RendererScope.maybeFind(context);
+      final streaming =
+          scope?.isStreaming == true &&
+          (scope?.incomplete.contains(statementId) ?? false);
+      return TextContentWidget(
+        text: props['text']?.toString() ?? '',
+        size: props['size'] as String? ?? 'medium',
+        isStreaming: streaming,
       );
     },
   );

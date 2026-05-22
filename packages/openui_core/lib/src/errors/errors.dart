@@ -211,6 +211,92 @@ final class UnknownComponentError extends OpenUIError {
   String get _typeName => 'UnknownComponentError';
 }
 
+/// A component definition exists in the active library but no renderer
+/// was registered for it in the component registry.
+///
+/// Marked `@experimental` per D12.
+@experimental
+final class MissingRendererError extends OpenUIError {
+  /// Creates a [MissingRendererError] for [component].
+  const MissingRendererError({
+    required this.component,
+    super.statementId,
+    super.hint,
+  }) : super(
+         code: 'missing_renderer',
+         message: 'No renderer registered for component: $component',
+       );
+
+  /// The component name that has a definition but no renderer.
+  final String component;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MissingRendererError &&
+          component == other.component &&
+          statementId == other.statementId &&
+          hint == other.hint;
+
+  @override
+  int get hashCode =>
+      Object.hash(MissingRendererError, component, statementId, hint);
+
+  @override
+  String toString() {
+    final parts = <String>['code: $code', 'component: $component'];
+    if (hint != null) parts.add('hint: $hint');
+    if (statementId != null) parts.add('statementId: $statementId');
+    return '$_typeName(${parts.join(', ')})';
+  }
+
+  @override
+  String get _typeName => 'MissingRendererError';
+}
+
+/// A tool definition exists in the active library but no executor was
+/// registered for it in the tool registry.
+///
+/// Marked `@experimental` per D12.
+@experimental
+final class MissingToolExecutorError extends OpenUIError {
+  /// Creates a [MissingToolExecutorError] for [toolName].
+  const MissingToolExecutorError({
+    required this.toolName,
+    super.statementId,
+    super.hint,
+  }) : super(
+         code: 'missing_tool_executor',
+         message: 'No executor registered for tool: $toolName',
+       );
+
+  /// The tool name that has a definition but no executor.
+  final String toolName;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MissingToolExecutorError &&
+          toolName == other.toolName &&
+          statementId == other.statementId &&
+          hint == other.hint;
+
+  @override
+  int get hashCode =>
+      Object.hash(MissingToolExecutorError, toolName, statementId, hint);
+
+  @override
+  String toString() {
+    final parts = <String>['code: $code', 'toolName: $toolName'];
+    if (hint != null) parts.add('hint: $hint');
+    if (statementId != null) parts.add('statementId: $statementId');
+    return '$_typeName(${parts.join(', ')})';
+  }
+
+  @override
+  String get _typeName => 'MissingToolExecutorError';
+}
+
 /// The MCP server reported a tool-execution failure
 /// (`CallToolResult.isError == true`). Thrown by `extractToolResult`
 /// in `openui_mcp` and caught by the query/mutation manager in

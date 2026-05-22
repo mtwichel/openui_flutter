@@ -43,9 +43,9 @@ class ButtonWidget extends StatelessWidget {
   }
 }
 
-/// Registration for `Button`.
-Component<Widget> buttonComponent() {
-  return Component<Widget>(
+/// Registration metadata for `Button`.
+ComponentDefinition buttonDefinition() {
+  return ComponentDefinition(
     name: 'Button',
     description: 'tappable button with action',
     schema: Schema.object(
@@ -56,29 +56,36 @@ Component<Widget> buttonComponent() {
       },
       required: ['label'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final label = props['label']?.toString() ?? '';
-      final variant = props['variant'] as String? ?? 'primary';
-      final hasOnClickProp = props.containsKey('onClick');
-      final rawOnClick = props['onClick'];
-      final explicit = rawOnClick is ActionPlan ? rawOnClick : null;
-      final disabled = hasOnClickProp && explicit == null;
-      final plan = explicit ?? implicitContinueConversationPlan(label);
-      return Builder(
-        builder: (context) {
-          final scope = RendererScope.maybeFind(context);
-          final onPressed = (scope == null || disabled)
-              ? null
-              : () => scope.triggerAction(
-                  label,
-                  action: plan,
-                );
-          return ButtonWidget(
-            label: label,
-            variant: variant,
-            onPressed: onPressed,
-          );
-        },
+  );
+}
+
+/// Renders `Button`.
+Widget renderButton(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final label = props['label']?.toString() ?? '';
+  final variant = props['variant'] as String? ?? 'primary';
+  final hasOnClickProp = props.containsKey('onClick');
+  final rawOnClick = props['onClick'];
+  final explicit = rawOnClick is ActionPlan ? rawOnClick : null;
+  final disabled = hasOnClickProp && explicit == null;
+  final plan = explicit ?? implicitContinueConversationPlan(label);
+  return Builder(
+    builder: (context) {
+      final scope = RendererScope.maybeFind(context);
+      final onPressed = (scope == null || disabled)
+          ? null
+          : () => scope.triggerAction(
+              label,
+              action: plan,
+            );
+      return ButtonWidget(
+        label: label,
+        variant: variant,
+        onPressed: onPressed,
       );
     },
   );

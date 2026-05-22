@@ -1,5 +1,12 @@
 ## 0.0.1-dev.2
 
+- **BREAKING**: Replace `Library<W>`, `Component<W>`, and `Tool` with serializable
+  `LibraryDefinition`, `ComponentDefinition`, and `ToolDefinition`. Render
+  callbacks and tool executors move to `openui`'s `ComponentRegistry` and
+  `ToolRegistry`.
+- **feat**: `LibraryDefinition.extend()`, `library.prompt()`, and JSON
+  round-trip via `dart_mappable`.
+- **feat**: `MissingRendererError` and `MissingToolExecutorError`.
 - Point pubspec `repository`, `homepage`, and `issue_tracker` URLs at `github.com/mtwichel/openui_flutter`.
 
 ## 0.0.1-dev.1

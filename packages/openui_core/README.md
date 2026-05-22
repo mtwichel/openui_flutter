@@ -5,9 +5,9 @@
 [![style: very_good_analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
 Pure-Dart language core for the [OpenUI Flutter](../../README.md) port. Lexer,
-parser, evaluator, reactive store, library DSL, action dispatcher, tool-provider
-interface, and JS-compatible integration entry — everything OpenUI Lang needs
-that does not touch Flutter.
+parser, evaluator, reactive store, serializable library definitions, action
+dispatcher, prompt generation, and JS-compatible integration entry — everything
+OpenUI Lang needs that does not touch Flutter.
 
 Runs in any Dart context — a Flutter app, a server, a Cloudflare Worker, a
 CLI. The `openui` (Flutter) and `openui_components` packages sit on top.
@@ -21,8 +21,7 @@ dependencies:
 
 ## Status
 
-v0.1 is in active development. Phase 1 is complete: 461 tests, 100% line
-coverage across 16 source files. All public symbols carry `@experimental` per
+v0.1 is in active development. All public symbols carry `@experimental` per
 Decision D12.
 
 ## Public API
@@ -141,48 +140,74 @@ final merged = mergeStatements(
 Strips Markdown fences, upserts patches, deletes `NullLiteral` statements,
 runs the orphan GC, re-emits with per-statement whitespace preserved.
 
-### Library and `defineComponent`
+### Library definitions
+
+Definitions are pure metadata — no render callbacks or executors:
 
 ```dart
-final lib = Library<MyWidget>([
-  defineComponent<MyWidget>(
-    name: 'Input',
-    schema: Schema.object(properties: {
-      'value': reactive(Schema.string()),  // marks as two-way bound
-      'placeholder': Schema.string(),
-    }),
-    render: (ctx, props, renderNode, statementId) => MyWidget.input(props),
-  ),
-]);
+final lib = LibraryDefinition(
+  components: [
+    ComponentDefinition(
+      name: 'Input',
+      schema: Schema.object(properties: {
+        'value': reactive(Schema.string()),  // marks as two-way bound
+        'placeholder': Schema.string(),
+      }),
+    ),
+  ],
+  tools: [
+    ToolDefinition(
+      name: 'fetch_products',
+      description: 'Returns products for a category',
+      input: Schema.object(properties: {'category': Schema.string()}),
+    ),
+  ],
+);
 
+// Extend with app-specific components/tools (last-write-wins by name)
+final extended = lib.extend(
+  components: [myCustomDefinition()],
+  tools: [myToolDefinition()],
+);
+
+// Generate an LLM system prompt from the library
+final prompt = extended.prompt();
+// or: generatePrompt(extended);
+```
+
+`LibraryDefinition`, `ComponentDefinition`, and `ToolDefinition` are JSON-
+serializable via `dart_mappable` (`toJson()` / `fromJson()`).
+
+Render callbacks live in `openui`'s `ComponentRegistry`; tool executors live
+in `ToolRegistry`. See [docs/architecture.md](../../docs/architecture.md).
+
+```dart
 final props = evaluateElementProps(
   call: compCall,
-  schema: lib['Input']!.schema,
+  schema: lib.component('Input')!.schema,
   context: ctx,
 );
 // Reactive props bound to `$state` arrive as `ReactiveAssign(target, value)`
 // markers; check via `isReactiveAssign(value)`.
 ```
 
-### Tool provider
+### Tool results
 
 ```dart
-class MyProvider implements ToolProvider {
-  @override
-  Future<Object?> callTool(String name, Map<String, Object?> args) async {
-    final raw = await transport.call(name, args);
-    return extractToolResult(
-      ToolResult(text: raw.body, isError: raw.statusCode >= 400),
-    );
-  }
-}
+final result = ToolResult(text: rawBody, isError: statusCode >= 400);
+final value = extractToolResult(result);
+// isError → throws McpToolError; structured content wins over text;
+// JSON-shaped text is decoded, otherwise the raw string.
 ```
+
+Executors are registered in `openui`'s `ToolRegistry`, not in core.
 
 ### Error vocabulary
 
 `OpenUIError` is sealed. Subclasses: `ParseError`, `EvaluationError`,
-`CyclicStateError`, `UnknownComponentError`, `McpToolError`,
-`ToolNotFoundError`, `AdapterMismatchError`. Each carries `code`, optional
+`CyclicStateError`, `UnknownComponentError`, `MissingRendererError`,
+`MissingToolExecutorError`, `McpToolError`, `ToolNotFoundError`,
+`AdapterMismatchError`. Each carries `code`, optional
 `message` / `hint` / `statementId`, and structural equality.
 
 ## Layout
@@ -193,11 +218,12 @@ lib/src/
 ├── parse/     integration entry, ResolvedElement, ParamMap
 ├── state/     reactive Store
 ├── eval/      evaluator + functional builtins
-├── library/   Component, Library, reactive, evaluateElementProps
+├── library/   definitions, ReactiveAssign, evaluateElementProps
 ├── actions/   ActionStep, ActionPlan, dispatcher
 ├── merge/     mergeStatements
+├── prompt/    generatePrompt, library.prompt()
 ├── errors/    sealed OpenUIError hierarchy
-└── tools/     ToolProvider, ToolResult, extractToolResult
+└── tools/     ToolResult, extractToolResult
 ```
 
 See [`docs/lang-reference.md`](../../docs/lang-reference.md) for the language

@@ -52,9 +52,9 @@ class CalloutWidget extends StatelessWidget {
   }
 }
 
-/// Registration for the `Callout` component.
-Component<Widget> calloutComponent() {
-  return Component<Widget>(
+/// Registration metadata for the `Callout` component.
+ComponentDefinition calloutDefinition() {
+  return ComponentDefinition(
     name: 'Callout',
     description: 'tinted banner for alerts and notices',
     schema: Schema.object(
@@ -64,11 +64,18 @@ Component<Widget> calloutComponent() {
       },
       required: const ['text'],
     ),
-    render: (ctx, props, renderNode, id) {
-      return CalloutWidget(
-        text: props['text']?.toString() ?? '',
-        variant: props['variant'] as String? ?? 'info',
-      );
-    },
+  );
+}
+
+/// Renders `Callout`.
+Widget renderCallout(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  return CalloutWidget(
+    text: props['text']?.toString() ?? '',
+    variant: props['variant'] as String? ?? 'info',
   );
 }

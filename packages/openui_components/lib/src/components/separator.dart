@@ -5,14 +5,21 @@
 import 'package:flutter/material.dart';
 import 'package:openui_core/openui_core.dart';
 
-/// Renders `Separator()` as a thin horizontal divider.
-Component<Widget> separatorComponent() {
-  return Component<Widget>(
+/// Registration metadata for `Separator`.
+ComponentDefinition separatorDefinition() {
+  return ComponentDefinition(
     name: 'Separator',
     description: 'horizontal divider line',
     schema: Schema.object(properties: {}),
-    render: (ctx, props, renderNode, id) {
-      return const Divider(height: 16);
-    },
   );
+}
+
+/// Renders `Separator`.
+Widget renderSeparator(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  return const Divider(height: 16);
 }

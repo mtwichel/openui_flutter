@@ -73,43 +73,26 @@ Schema _fetchProductsResponseSchema() => Schema.object(
   required: ['products', 'total', 'skip', 'limit'],
 );
 
-/// {@template snackbar_tool}
-/// A tool that shows a snackbar with the given message.
-/// {@endtemplate}
-class SnackbarTool implements Tool {
-  /// {@macro snackbar_tool}
-  SnackbarTool();
+/// Metadata for the snackbar demo tool.
+ToolDefinition snackbarToolDefinition() => ToolDefinition(
+  name: 'snackbar',
+  description: 'Show a snackbar with the given message',
+  input: Schema.object(properties: {'message': Schema.string()}),
+);
 
-  @override
-  String get name => 'snackbar';
-
-  @override
-  String get description => 'Show a snackbar with the given message';
-
-  @override
-  Schema? get input => Schema.object(properties: {'message': Schema.string()});
-
-  @override
-  Schema? get output => null;
-
-  @override
-  Future<ToolResult> callTool(Map<String, Object?> args) async {
-    debugPrint(args['message']! as String);
-    return const ToolResult(null);
-  }
+/// Shows a snackbar with the given message.
+Future<ToolResult> showSnackbar(Map<String, Object?> args) async {
+  debugPrint(args['message']! as String);
+  return const ToolResult(null);
 }
 
-class FetchProductsTool implements Tool {
-  @override
-  String get name => 'fetch_products';
-
-  @override
-  String get description =>
+/// Metadata for the DummyJSON product listing tool.
+ToolDefinition fetchProductsToolDefinition() => ToolDefinition(
+  name: 'fetch_products',
+  description:
       'Fetch product listings from the DummyJSON demo catalog '
-      '(https://dummyjson.com/products). Supports pagination via skip/limit.';
-
-  @override
-  Schema? get input => Schema.object(
+      '(https://dummyjson.com/products). Supports pagination via skip/limit.',
+  input: Schema.object(
     properties: {
       'limit': Schema.integer(
         description:
@@ -119,51 +102,49 @@ class FetchProductsTool implements Tool {
         description: 'Offset for pagination.',
       ),
     },
+  ),
+  output: _fetchProductsResponseSchema(),
+);
+
+/// Fetches product listings from DummyJSON (`GET /products`).
+Future<ToolResult> fetchProducts(Map<String, Object?> args) async {
+  final query = <String, String>{
+    if (args['limit'] != null) 'limit': '${args['limit']}',
+    if (args['skip'] != null) 'skip': '${args['skip']}',
+  };
+  final uri = Uri.parse('https://dummyjson.com/products').replace(
+    queryParameters: query.isEmpty ? null : query,
   );
 
-  @override
-  Schema? get output => _fetchProductsResponseSchema();
+  late final http.Response answer;
+  try {
+    answer = await http.get(uri);
+  } on Exception catch (e, st) {
+    debugPrint('$e\n$st');
+    return ToolResult('Failed to fetch products: $e', isError: true);
+  }
 
-  @override
-  Future<ToolResult> callTool(Map<String, Object?> args) async {
-    final query = <String, String>{
-      if (args['limit'] != null) 'limit': '${args['limit']}',
-      if (args['skip'] != null) 'skip': '${args['skip']}',
-    };
-    final uri = Uri.parse('https://dummyjson.com/products').replace(
-      queryParameters: query.isEmpty ? null : query,
+  if (answer.statusCode != 200) {
+    return ToolResult(
+      'Failed to fetch products: HTTP ${answer.statusCode}',
+      isError: true,
     );
+  }
 
-    late final http.Response answer;
-    try {
-      answer = await http.get(uri);
-    } on Exception catch (e, st) {
-      debugPrint('$e\n$st');
-      return ToolResult('Failed to fetch products: $e', isError: true);
-    }
-
-    if (answer.statusCode != 200) {
-      return ToolResult(
-        'Failed to fetch products: HTTP ${answer.statusCode}',
+  try {
+    final decoded = jsonDecode(answer.body);
+    if (decoded is! Map) {
+      return const ToolResult(
+        'Failed to fetch products: response was not a JSON object',
         isError: true,
       );
     }
-
-    try {
-      final decoded = jsonDecode(answer.body);
-      if (decoded is! Map) {
-        return const ToolResult(
-          'Failed to fetch products: response was not a JSON object',
-          isError: true,
-        );
-      }
-      return ToolResult(decoded);
-    } on FormatException catch (e) {
-      return ToolResult(
-        'Failed to fetch products: invalid JSON (${e.message})',
-        isError: true,
-      );
-    }
+    return ToolResult(decoded);
+  } on FormatException catch (e) {
+    return ToolResult(
+      'Failed to fetch products: invalid JSON (${e.message})',
+      isError: true,
+    );
   }
 }
 
@@ -176,68 +157,61 @@ int? _parseProductId(Object? raw) {
   };
 }
 
-/// Fetches one product by numeric id from DummyJSON (`GET /products/:id`).
-class FetchProductTool implements Tool {
-  @override
-  String get name => 'fetch_product';
-
-  @override
-  String get description =>
+/// Metadata for the DummyJSON single-product tool.
+ToolDefinition fetchProductToolDefinition() => ToolDefinition(
+  name: 'fetch_product',
+  description:
       'Fetch a single product by id from the DummyJSON demo catalog '
-      '(https://dummyjson.com/products/:id).';
-
-  @override
-  Schema? get input => Schema.object(
+      '(https://dummyjson.com/products/:id).',
+  input: Schema.object(
     properties: {
       'id': Schema.integer(description: 'DummyJSON product id.'),
     },
     required: ['id'],
-  );
+  ),
+  output: _productSchema(),
+);
 
-  @override
-  Schema? get output => _productSchema();
+/// Fetches one product by numeric id from DummyJSON (`GET /products/:id`).
+Future<ToolResult> fetchProduct(Map<String, Object?> args) async {
+  final id = _parseProductId(args['id']);
+  if (id == null || id < 1) {
+    return const ToolResult(
+      'fetch_product requires a positive integer id',
+      isError: true,
+    );
+  }
 
-  @override
-  Future<ToolResult> callTool(Map<String, Object?> args) async {
-    final id = _parseProductId(args['id']);
-    if (id == null || id < 1) {
+  final uri = Uri.parse('https://dummyjson.com/products/$id');
+
+  late final http.Response answer;
+  try {
+    answer = await http.get(uri);
+  } on Exception catch (e, st) {
+    debugPrint('$e\n$st');
+    return ToolResult('Failed to fetch product: $e', isError: true);
+  }
+
+  if (answer.statusCode != 200) {
+    return ToolResult(
+      'Failed to fetch product: HTTP ${answer.statusCode}',
+      isError: true,
+    );
+  }
+
+  try {
+    final decoded = jsonDecode(answer.body);
+    if (decoded is! Map) {
       return const ToolResult(
-        'fetch_product requires a positive integer id',
+        'Failed to fetch product: response was not a JSON object',
         isError: true,
       );
     }
-
-    final uri = Uri.parse('https://dummyjson.com/products/$id');
-
-    late final http.Response answer;
-    try {
-      answer = await http.get(uri);
-    } on Exception catch (e, st) {
-      debugPrint('$e\n$st');
-      return ToolResult('Failed to fetch product: $e', isError: true);
-    }
-
-    if (answer.statusCode != 200) {
-      return ToolResult(
-        'Failed to fetch product: HTTP ${answer.statusCode}',
-        isError: true,
-      );
-    }
-
-    try {
-      final decoded = jsonDecode(answer.body);
-      if (decoded is! Map) {
-        return const ToolResult(
-          'Failed to fetch product: response was not a JSON object',
-          isError: true,
-        );
-      }
-      return ToolResult(decoded);
-    } on FormatException catch (e) {
-      return ToolResult(
-        'Failed to fetch product: invalid JSON (${e.message})',
-        isError: true,
-      );
-    }
+    return ToolResult(decoded);
+  } on FormatException catch (e) {
+    return ToolResult(
+      'Failed to fetch product: invalid JSON (${e.message})',
+      isError: true,
+    );
   }
 }

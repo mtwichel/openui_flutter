@@ -119,9 +119,9 @@ class BarChartWidget extends StatelessWidget {
 
 int _max(int a, int b) => a > b ? a : b;
 
-/// Registration for `BarChart`.
-Component<Widget> barChartComponent() {
-  return Component<Widget>(
+/// Registration metadata for `BarChart`.
+ComponentDefinition barChartDefinition() {
+  return ComponentDefinition(
     name: 'BarChart',
     description: 'multi-series bar chart',
     schema: Schema.object(
@@ -137,22 +137,29 @@ Component<Widget> barChartComponent() {
       },
       required: ['series'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
-      final series = <({String name, List<num> values})>[
-        for (final s in raw)
-          if (_coerceSeriesMap(s) case final seriesMap?)
-            (
-              name: seriesMap['name']?.toString() ?? '',
-              values: _coerceNumList(seriesMap['values'] ?? seriesMap['data']),
-            ),
-      ];
-      final labels = (props['labels'] as List<Object?>?)
-          ?.whereType<String>()
-          .toList();
-      return BarChartWidget(series: series, labels: labels);
-    },
   );
+}
+
+/// Renders `BarChart`.
+Widget renderBarChart(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
+  final series = <({String name, List<num> values})>[
+    for (final s in raw)
+      if (_coerceSeriesMap(s) case final seriesMap?)
+        (
+          name: seriesMap['name']?.toString() ?? '',
+          values: _coerceNumList(seriesMap['values'] ?? seriesMap['data']),
+        ),
+  ];
+  final labels = (props['labels'] as List<Object?>?)
+      ?.whereType<String>()
+      .toList();
+  return BarChartWidget(series: series, labels: labels);
 }
 
 Map<String, Object?>? _coerceSeriesMap(Object? value) {

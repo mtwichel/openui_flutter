@@ -137,9 +137,9 @@ class LineChartWidget extends StatelessWidget {
   }
 }
 
-/// Registration for `LineChart`.
-Component<Widget> lineChartComponent() {
-  return Component<Widget>(
+/// Registration metadata for `LineChart`.
+ComponentDefinition lineChartDefinition() {
+  return ComponentDefinition(
     name: 'LineChart',
     description: 'multi-series line chart',
     schema: Schema.object(
@@ -156,22 +156,29 @@ Component<Widget> lineChartComponent() {
       },
       required: ['series'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
-      final series = <({String name, List<num> values})>[
-        for (final s in raw)
-          if (_coerceSeriesMap(s) case final seriesMap?)
-            (
-              name: seriesMap['name']?.toString() ?? '',
-              values: _coerceNumList(seriesMap['values'] ?? seriesMap['data']),
-            ),
-      ];
-      final labels = (props['labels'] as List<Object?>?)
-          ?.whereType<String>()
-          .toList();
-      return LineChartWidget(series: series, labels: labels);
-    },
   );
+}
+
+/// Renders `LineChart`.
+Widget renderLineChart(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final raw = (props['series'] as List<Object?>?) ?? const <Object?>[];
+  final series = <({String name, List<num> values})>[
+    for (final s in raw)
+      if (_coerceSeriesMap(s) case final seriesMap?)
+        (
+          name: seriesMap['name']?.toString() ?? '',
+          values: _coerceNumList(seriesMap['values'] ?? seriesMap['data']),
+        ),
+  ];
+  final labels = (props['labels'] as List<Object?>?)
+      ?.whereType<String>()
+      .toList();
+  return LineChartWidget(series: series, labels: labels);
 }
 
 Map<String, Object?>? _coerceSeriesMap(Object? value) {

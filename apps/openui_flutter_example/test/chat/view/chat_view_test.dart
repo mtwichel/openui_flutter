@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 import 'package:openui_flutter_example/chat/chat.dart';
@@ -21,15 +22,23 @@ class _NoopService implements DartanticChatService {
   void reset() {}
 }
 
-final Library<Widget> _testChatLibrary = standardLibrary().extend(
-  tools: [SnackbarTool()],
+final LibraryDefinition _testChatLibraryDefinition = standardLibraryDefinition()
+    .extend(
+      tools: [snackbarToolDefinition()],
+    );
+final ComponentRegistry _testChatComponentRegistry =
+    standardComponentRegistry();
+final ToolRegistry _testChatToolRegistry = ToolRegistry(
+  executors: {'snackbar': showSnackbar},
 );
 
 Widget _viewHarness(ChatBloc bloc) => MaterialApp(
   home: BlocProvider<ChatBloc>.value(
     value: bloc,
     child: ChatView(
-      library: _testChatLibrary,
+      library: _testChatLibraryDefinition,
+      componentRegistry: _testChatComponentRegistry,
+      toolRegistry: _testChatToolRegistry,
       systemPrompt: 'system prompt',
     ),
   ),

@@ -6,10 +6,10 @@ OpenUI Flutter is a four-package monorepo plus example app. The shape mirrors th
 
 | Package | Type | Purpose |
 |---|---|---|
-| `openui_core` | pure Dart | OpenUI Lang lexer, parser, AST, evaluator, reactive store, library DSL, action steps, mergeStatements, tool-provider interface |
-| `openui` | Flutter | `Renderer` widget, error boundary, form-state cache, query manager wiring |
+| `openui_core` | pure Dart | OpenUI Lang lexer, parser, AST, evaluator, reactive store, serializable library definitions (`LibraryDefinition`, `ComponentDefinition`, `ToolDefinition`), action steps, mergeStatements, prompt generation |
+| `openui` | Flutter | `Renderer` widget, error boundary, form-state cache, `ComponentRegistry` / `ToolRegistry`, query manager wiring |
 | `openui_components` | Flutter | ~15 builtin widgets (Stack, Card, Form, Tabs, Table, charts, ...) |
-| `openui_mcp` | pure Dart | `McpToolProvider` over `mcp_dart`; `extractToolResult` envelope |
+| `openui_mcp` | pure Dart | MCP adapter producing `OpenUIToolPair` (definition + executor) from `mcp_dart` |
 | `openui_test_helpers` | pure Dart, private (publish_to: none) | Shared mocks and fakes |
 | `openui_flutter_example` | Flutter app, private | Stubbed-LLM streaming chat demo |
 
@@ -51,13 +51,14 @@ flowchart TD
   LLM -->|cumulative response String| Renderer
   Renderer -->|response prop| Parser[StreamParser]
   Parser -->|ParseResult| Evaluator[evaluator + Store]
-  Evaluator -->|ElementNode tree| ComponentMap[Library component lookup]
-  ComponentMap -->|Widget| Tree[Flutter widget tree]
+  Evaluator -->|ElementNode tree| DefLookup[LibraryDefinition schema lookup]
+  DefLookup -->|name| RegLookup[ComponentRegistry render fn]
+  RegLookup -->|Widget| Tree[Flutter widget tree]
   Tree -->|user interaction| ActionPlan
   ActionPlan -->|Set/Reset| Store
   ActionPlan -->|Run| QueryManager
-  QueryManager -->|toolProvider.callTool| Tool[MCP / function map]
-  Tool -->|result| Evaluator
+  QueryManager -->|ToolRegistry executor lookup| ToolExec[MCP / function map]
+  ToolExec -->|result| Evaluator
   ActionPlan -->|OpenUrl| UrlLauncher[url_launcher]
   Renderer -->|onError| App
 ```
@@ -78,6 +79,16 @@ The dependency direction is strict. Concretely:
 4. **Application layer** (`openui_flutter_example`) is Flutter. It depends on everything; consumers replace it.
 
 A `Renderer` rendering output for an LLM that emits an unknown component name does not break — the unknown component falls into `meta.unresolved` and the renderer either shows nothing or a placeholder, depending on `onError` wiring.
+
+## Triple wiring
+
+Apps pass three aligned objects to `Renderer`:
+
+1. **`LibraryDefinition`** — component and tool metadata (names, schemas, descriptions). Used for schema validation, prompt generation (`library.prompt()`), and `@Query` / `@Run` definition lookup.
+2. **`ComponentRegistry`** — map of component name → Flutter render callback.
+3. **`ToolRegistry`** — map of tool name → async executor.
+
+When you call `library.extend(components: [...], tools: [...])`, you must register matching renderers and executors under the same names. Missing renderers throw `MissingRendererError`; missing executors throw `MissingToolExecutorError`. Test helpers in `openui` expose `assertLibraryWiring` to catch drift early.
 
 ## State management
 

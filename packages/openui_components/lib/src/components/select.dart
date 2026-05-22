@@ -42,9 +42,9 @@ class SelectWidget extends StatelessWidget {
   }
 }
 
-/// Registration for `Select`. `value` is reactive.
-Component<Widget> selectComponent() {
-  return Component<Widget>(
+/// Registration metadata for `Select`. `value` is reactive.
+ComponentDefinition selectDefinition() {
+  return ComponentDefinition(
     name: 'Select',
     description: 'dropdown bound to state variable',
     schema: Schema.object(
@@ -54,16 +54,23 @@ Component<Widget> selectComponent() {
       },
       required: const ['options', 'value'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final raw = props['options'];
-      final options = raw is List<Object?>
-          ? raw.whereType<String>().toList()
-          : const <String>[];
-      final value = props['value'];
-      return SelectWidget(
-        options: options,
-        binding: value is ReactiveAssign ? value : null,
-      );
-    },
+  );
+}
+
+/// Renders `Select`.
+Widget renderSelect(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final raw = props['options'];
+  final options = raw is List<Object?>
+      ? raw.whereType<String>().toList()
+      : const <String>[];
+  final value = props['value'];
+  return SelectWidget(
+    options: options,
+    binding: value is ReactiveAssign ? value : null,
   );
 }

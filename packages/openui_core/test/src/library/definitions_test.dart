@@ -1,4 +1,5 @@
 import 'package:openui_core/openui_core.dart';
+import 'package:openui_core/src/library/schema_mapper.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -67,6 +68,16 @@ void main() {
       expect(
         decoded.component('Button')!.description,
         'tappable button with action',
+      );
+    });
+  });
+
+  group('SchemaMappingHook', () {
+    test('beforeDecode throws when value is not a Map', () {
+      const hook = SchemaMappingHook();
+      expect(
+        () => hook.beforeDecode('not-a-map'),
+        throwsA(isA<StateError>()),
       );
     });
   });

@@ -281,6 +281,126 @@ void main() {
       });
     });
 
+    group('MissingRendererError', () {
+      const a = MissingRendererError(component: 'Button');
+
+      test('exposes component', () {
+        expect(a.code, 'missing_renderer');
+        expect(a.component, 'Button');
+        expect(a.message, contains('Button'));
+      });
+
+      test('equality includes component, statementId, hint', () {
+        expect(a == a, isTrue);
+        const a2 = MissingRendererError(component: 'Button');
+        expect(a, equals(a2));
+        expect(a.hashCode, a2.hashCode);
+        expect(
+          a,
+          isNot(equals(const MissingRendererError(component: 'Other'))),
+        );
+        expect(
+          a,
+          isNot(
+            equals(
+              const MissingRendererError(
+                component: 'Button',
+                statementId: 'x',
+              ),
+            ),
+          ),
+        );
+        expect(
+          a,
+          isNot(
+            equals(
+              const MissingRendererError(
+                component: 'Button',
+                hint: 'register renderer',
+              ),
+            ),
+          ),
+        );
+      });
+
+      test('toString includes the component name', () {
+        final s = a.toString();
+        expect(s, contains('MissingRendererError'));
+        expect(s, contains('component: Button'));
+      });
+
+      test('toString renders hint and statementId when set', () {
+        const e = MissingRendererError(
+          component: 'B',
+          hint: 'add to registry',
+          statementId: 'r',
+        );
+        final s = e.toString();
+        expect(s, contains('hint: add to registry'));
+        expect(s, contains('statementId: r'));
+      });
+    });
+
+    group('MissingToolExecutorError', () {
+      const a = MissingToolExecutorError(toolName: 'fetch_products');
+
+      test('exposes toolName', () {
+        expect(a.code, 'missing_tool_executor');
+        expect(a.toolName, 'fetch_products');
+        expect(a.message, contains('fetch_products'));
+      });
+
+      test('equality includes toolName, statementId, hint', () {
+        expect(a == a, isTrue);
+        const a2 = MissingToolExecutorError(toolName: 'fetch_products');
+        expect(a, equals(a2));
+        expect(a.hashCode, a2.hashCode);
+        expect(
+          a,
+          isNot(equals(const MissingToolExecutorError(toolName: 'other'))),
+        );
+        expect(
+          a,
+          isNot(
+            equals(
+              const MissingToolExecutorError(
+                toolName: 'fetch_products',
+                statementId: 'x',
+              ),
+            ),
+          ),
+        );
+        expect(
+          a,
+          isNot(
+            equals(
+              const MissingToolExecutorError(
+                toolName: 'fetch_products',
+                hint: 'register executor',
+              ),
+            ),
+          ),
+        );
+      });
+
+      test('toString includes the tool name', () {
+        final s = a.toString();
+        expect(s, contains('MissingToolExecutorError'));
+        expect(s, contains('toolName: fetch_products'));
+      });
+
+      test('toString renders hint and statementId when set', () {
+        const e = MissingToolExecutorError(
+          toolName: 't',
+          hint: 'add to registry',
+          statementId: 'r',
+        );
+        final s = e.toString();
+        expect(s, contains('hint: add to registry'));
+        expect(s, contains('statementId: r'));
+      });
+    });
+
     group('McpToolError', () {
       const a = McpToolError(message: 'permission denied');
 

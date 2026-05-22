@@ -25,3 +25,6 @@ jobs:
       min_coverage: 0
       flutter_channel: stable
       flutter_version: 3.41.9
+      setup: |
+        bash "${{ github.workspace }}/tool/ci_pubspec_overrides.sh" apps/openui_flutter_example
+        flutter pub get

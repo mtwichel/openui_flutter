@@ -17,7 +17,7 @@ final LibraryDefinition _chatLibraryDefinition = standardLibraryDefinition()
       ],
     );
 final ComponentRegistry _chatComponentRegistry = standardComponentRegistry();
-final ToolRegistry _chatToolRegistry = ToolRegistry(
+const _chatToolRegistry = ToolRegistry(
   executors: {
     'snackbar': showSnackbar,
     'fetch_products': fetchProducts,

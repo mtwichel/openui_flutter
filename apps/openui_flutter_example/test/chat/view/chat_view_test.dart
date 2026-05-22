@@ -28,7 +28,7 @@ final LibraryDefinition _testChatLibraryDefinition = standardLibraryDefinition()
     );
 final ComponentRegistry _testChatComponentRegistry =
     standardComponentRegistry();
-final ToolRegistry _testChatToolRegistry = ToolRegistry(
+const _testChatToolRegistry = ToolRegistry(
   executors: {'snackbar': showSnackbar},
 );
 

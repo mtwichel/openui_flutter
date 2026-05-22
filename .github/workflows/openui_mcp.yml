@@ -27,5 +27,5 @@ jobs:
       flutter_channel: stable
       flutter_version: 3.41.9
       setup: |
-        bash "${{ github.workspace }}/tool/ci_pubspec_overrides.sh" packages/openui_mcp
+        bash ../../tool/ci_pubspec_overrides.sh packages/openui_mcp
         dart pub get

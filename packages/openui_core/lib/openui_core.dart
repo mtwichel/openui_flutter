@@ -39,7 +39,12 @@ export 'src/eval/evaluator.dart'
 export 'src/library/definitions.dart'
     show ComponentDefinition, LibraryDefinition, ToolDefinition;
 export 'src/library/library.dart'
-    show ReactiveAssign, evaluateElementProps, isReactiveAssign;
+    show
+        ReactiveAssign,
+        bindPositionalProps,
+        evaluateElementProps,
+        isReactiveAssign,
+        orderedPropertyNames;
 export 'src/merge/merge.dart' show mergeStatements;
 export 'src/parse/parse.dart'
     show
@@ -48,6 +53,7 @@ export 'src/parse/parse.dart'
         ParamMap,
         ParamSpec,
         ResolvedElement,
+        paramMapFromLibrary,
         parse;
 export 'src/parser/lexer.dart' show LexException, Token, TokenKind, tokenize;
 export 'src/parser/materialize.dart'

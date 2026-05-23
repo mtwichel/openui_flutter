@@ -87,10 +87,10 @@ ComponentDefinition cardDefinition() {
     description: 'elevated surface container',
     schema: Schema.object(
       properties: {
+        'children': Schema.list(items: Schema.any()),
         'variant': Schema.string(
           enumValues: ['card', 'sunk', 'clear'],
         ),
-        'children': Schema.list(items: Schema.any()),
       },
       required: ['children'],
     ),

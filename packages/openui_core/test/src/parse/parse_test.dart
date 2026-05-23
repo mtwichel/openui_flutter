@@ -61,26 +61,28 @@ void main() {
   });
 
   group('excess-args', () {
-    test('reports excess-args but still renders with valid args', () {
+    test('ignores extra positionals and still renders with valid args', () {
       final result = _parse('root = Title("hello", "extra")');
       expect(
         _errors('root = Title("hello", "extra")')
             .whereType<EvaluationError>()
             .where((e) => e.message?.contains('excess dropped') ?? false),
-        isNotEmpty,
+        isEmpty,
       );
       expect(result.root, isNotNull);
       expect(result.root!.props['text'], 'hello');
     });
 
-    test('excess-args message lists the count', () {
+    test('does not report excess when many extra positionals are passed', () {
       final errs = _errors('root = Title("hello", "extra", "more")');
-      final excess = errs.firstWhere(
-        (e) =>
-            e is EvaluationError &&
-            (e.message?.contains('excess dropped') ?? false),
+      expect(
+        errs.where(
+          (e) =>
+              e is EvaluationError &&
+              (e.message?.contains('excess dropped') ?? false),
+        ),
+        isEmpty,
       );
-      expect((excess as EvaluationError).message, contains('2 excess dropped'));
     });
 
     test('does not report when arg count matches param count', () {
@@ -406,7 +408,7 @@ void main() {
         final result = _parse(
           r'$q = @Query(x)'
           '\n'
-          r'root = Title(text: $q)'
+          r'root = Title($q)'
           '\n',
         );
         expect(result.root, isNotNull);

@@ -92,24 +92,28 @@ Widget renderTabs(
   if (expression is! CompCall) {
     return const SizedBox.shrink();
   }
-  final childrenArg = expression.args.firstWhere(
-    (a) => a.name == 'children',
-    orElse: () => const Argument(value: NullLiteral(offset: 0), offset: 0),
-  );
-  final list = childrenArg.value;
+  final positional = <Argument>[
+    for (final a in expression.args)
+      if (a.name == null) a,
+  ];
+  if (positional.isEmpty) return const SizedBox.shrink();
+  final list = positional.first.value;
   if (list is! ArrayLit) return const SizedBox.shrink();
   final items = <TabItemDescription>[];
   for (final element in list.elements) {
     if (element is! CompCall || element.type != 'TabItem') continue;
     var label = '';
     AstNode? body;
-    for (final arg in element.args) {
-      if (arg.name == 'label') {
-        final v = arg.value;
-        if (v is Literal && v.value is String) label = v.value! as String;
-      } else if (arg.name == 'content') {
-        body = arg.value;
-      }
+    final tabPositionals = <Argument>[
+      for (final a in element.args)
+        if (a.name == null) a,
+    ];
+    if (tabPositionals.isNotEmpty) {
+      final v = tabPositionals.first.value;
+      if (v is Literal && v.value is String) label = v.value! as String;
+    }
+    if (tabPositionals.length > 1) {
+      body = tabPositionals[1].value;
     }
     items.add(
       TabItemDescription(

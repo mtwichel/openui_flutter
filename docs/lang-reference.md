@@ -53,6 +53,8 @@ arg           ::= expression | named_arg
 named_arg     ::= IDENT ":" expression
 ```
 
+**Component calls** (`TYPE(...)`) use **positional arguments only**, mapped to schema property order. Named `prop: expr` in component arg lists is a parse error. Builtins (`@Query`, `@Each`, …), `Mutation(...)`, and object literals still use `named_arg` where noted.
+
 Operator precedence (highest to lowest):
 
 1. Member/index access (`.`, `[]`)

@@ -542,29 +542,29 @@ class _RendererState extends State<Renderer> {
     final properties =
         (schema.value['properties'] as Map<String, Object?>?) ??
         const <String, Object?>{};
-    final props = <String, Object?>{};
-    for (final arg in call.args) {
-      final propName = arg.name;
-      if (propName == null) continue;
-      final value = arg.value;
-      final isReactive = _isReactivePropName(properties, propName);
-      final isAction = _isActionPropName(properties, propName);
-      if (isReactive && value is StateRef) {
-        final fullName = '\$${value.name}';
-        props[propName] = ReactiveAssign(
-          target: fullName,
-          value: _store.get(fullName),
+    final propNames = orderedPropertyNames(schema);
+    return bindPositionalProps(
+      call: call,
+      propNames: propNames,
+      resolveArg: (arg, propName) {
+        final value = arg.value;
+        final isReactive = _isReactivePropName(properties, propName);
+        final isAction = _isActionPropName(properties, propName);
+        if (isReactive && value is StateRef) {
+          final fullName = '\$${value.name}';
+          return ReactiveAssign(
+            target: fullName,
+            value: _store.get(fullName),
+          );
+        }
+        return _resolvePropValue(
+          value,
+          ctx,
+          statementId,
+          allowAction: isAction,
         );
-        continue;
-      }
-      props[propName] = _resolvePropValue(
-        value,
-        ctx,
-        statementId,
-        allowAction: isAction,
-      );
-    }
-    return props;
+      },
+    );
   }
 
   Object? _resolvePropValue(

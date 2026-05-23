@@ -55,7 +55,7 @@ void main() {
     testWidgets('renders a Stack of TextContent', (tester) async {
       await tester.pumpWidget(
         _app(
-          'root = Stack(children: [TextContent(text: "hello")])',
+          'root = Stack([TextContent("hello")])',
         ),
       );
       expect(find.text('hello'), findsOneWidget);
@@ -64,9 +64,9 @@ void main() {
     testWidgets('renders a Card with header and body', (tester) async {
       await tester.pumpWidget(
         _app('''
-root = Card(children: [
-  CardHeader(title: "Title", subtitle: "Subtitle"),
-  TextContent(text: "Body")
+root = Card([
+  CardHeader("Title", "Subtitle"),
+  TextContent("Body")
 ])
 '''),
       );
@@ -78,7 +78,7 @@ root = Card(children: [
 
     testWidgets('renders a Callout with the requested variant', (tester) async {
       await tester.pumpWidget(
-        _app('root = Callout(text: "watch out", variant: "warning")'),
+        _app('root = Callout("watch out", "warning")'),
       );
       expect(find.text('watch out'), findsOneWidget);
       expect(find.byIcon(Icons.warning_amber_outlined), findsOneWidget);
@@ -103,7 +103,7 @@ root = Card(children: [
             home: Scaffold(
               body: Renderer(
                 response: r'''$count = 0
-root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
+root = Button("Click", [@Set($count, $count + 1)])
 ''',
                 library: standardLibraryDefinition(),
                 componentRegistry: standardComponentRegistry(),
@@ -135,7 +135,7 @@ root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
             home: Scaffold(
               body: Renderer(
                 response:
-                    'root = Button(label: "Retry", onClick: [@ToAssistant("retry")])',
+                    'root = Button("Retry", [@ToAssistant("retry")])',
                 library: standardLibraryDefinition(),
                 componentRegistry: standardComponentRegistry(),
                 toolRegistry: const ToolRegistry(executors: {}),
@@ -161,7 +161,7 @@ root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
         final events = <ActionEvent>[];
         await tester.pumpWidget(
           _app(
-            'root = Button(label: "Retry", onClick: Mystery())\n',
+            'root = Button("Retry", Mystery())\n',
             onAction: events.add,
           ),
         );
@@ -178,7 +178,7 @@ root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
         final calls = <_ContinueConversationCall>[];
         await tester.pumpWidget(
           _app(
-            'root = Button(label: "Retry")\n',
+            'root = Button("Retry")\n',
             onContinueConversation: (message) {
               calls.add(
                 _ContinueConversationCall(
@@ -205,7 +205,7 @@ root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
             body: Renderer(
               response: '''
 \$name = ""
-root = Input(name: "field", value: \$name)
+root = Input("field", \$name)
 ''',
               library: standardLibraryDefinition(),
               componentRegistry: standardComponentRegistry(),
@@ -232,9 +232,9 @@ root = Input(name: "field", value: \$name)
             body: Renderer(
               response: r'''
 $name = "before"
-root = Stack(children: [
-  Input(name: "field", value: $name),
-  Button(label: "Go", onClick: [@Set($name, "after")])
+root = Stack([
+  Input("field", $name),
+  Button("Go", [@Set($name, "after")])
 ])
 
 ''',
@@ -263,9 +263,9 @@ root = Stack(children: [
     testWidgets('Tabs renders one Tab per inline TabItem', (tester) async {
       await tester.pumpWidget(
         _app('''
-root = Tabs(children: [
-  TabItem(label: "One", content: TextContent(text: "1")),
-  TabItem(label: "Two", content: TextContent(text: "2"))
+root = Tabs([
+  TabItem("One", TextContent("1")),
+  TabItem("Two", TextContent("2"))
 ])
 '''),
       );
@@ -284,8 +284,8 @@ root = Tabs(children: [
       await tester.pumpWidget(
         _app('''
 root = Table(
-  columns: [{name: "name", label: "Name"}, {name: "value", label: "Value"}],
-  rows: [$rows]
+  [{name: "name", label: "Name"}, {name: "value", label: "Value"}],
+  [$rows]
 )
 '''),
       );
@@ -301,8 +301,8 @@ root = Table(
       await tester.pumpWidget(
         _app('''
 root = Table(
-  columns: ["State", "Abbr"],
-  rows: [["Alabama", "AL"], ["Alaska", "AK"]]
+  ["State", "Abbr"],
+  [["Alabama", "AL"], ["Alaska", "AK"]]
 )
 '''),
       );
@@ -318,7 +318,7 @@ root = Table(
       tester,
     ) async {
       await tester.pumpWidget(
-        _app('root = Table(columns: [], rows: [])'),
+        _app('root = Table([], [])'),
       );
       expect(find.byType(CalloutWidget), findsOneWidget);
       expect(
@@ -329,7 +329,7 @@ root = Table(
 
     testWidgets('Image shows fallback when URL is broken', (tester) async {
       await tester.pumpWidget(
-        _app('root = Image(src: "http://invalid.test/x.png", alt: "x")'),
+        _app('root = Image("http://invalid.test/x.png", "x")'),
       );
       // Network error fires synchronously in tests because the
       // http overrides return an empty response by default.
@@ -342,7 +342,7 @@ root = Table(
     testWidgets('BarChart renders without crashing for empty series', (
       tester,
     ) async {
-      await tester.pumpWidget(_app('root = BarChart(series: [])'));
+      await tester.pumpWidget(_app('root = BarChart([])'));
       expect(find.byType(BarChartWidget), findsOneWidget);
     });
 
@@ -350,8 +350,8 @@ root = Table(
       await tester.pumpWidget(
         _app('''
 root = LineChart(
-  series: [{name: "y", values: [1, 2, 3]}],
-  labels: ["a", "b", "c"]
+  [{name: "y", values: [1, 2, 3]}],
+  ["a", "b", "c"]
 )
 '''),
       );
@@ -362,8 +362,8 @@ root = LineChart(
       await tester.pumpWidget(
         _app('''
 root = LineChart(
-  series: [{name: "y", values: [1, 2, 3]}],
-  labels: ["a", "b", "c"]
+  [{name: "y", values: [1, 2, 3]}],
+  ["a", "b", "c"]
 )
 '''),
       );
@@ -384,8 +384,8 @@ root = LineChart(
       await tester.pumpWidget(
         _app('''
 root = LineChart(
-  series: [{name: "y", data: [1, 2, 3]}],
-  labels: ["a", "b", "c"]
+  [{name: "y", data: [1, 2, 3]}],
+  ["a", "b", "c"]
 )
 '''),
       );
@@ -402,11 +402,11 @@ root = LineChart(
       await tester.pumpWidget(
         _app('''
 root = LineChart(
-  series: [
+  [
     {name: "CA", values: [0.5, 0.7, 0.6]},
     {name: "TX", values: [1.8, 1.82, 1.75]}
   ],
-  labels: ["2014", "2015", "2016"]
+  ["2014", "2015", "2016"]
 )
 '''),
       );
@@ -419,8 +419,8 @@ root = LineChart(
       await tester.pumpWidget(
         _app('''
 root = LineChart(
-  series: [{name: "y", values: [1, 2, 3]}],
-  labels: ["2014", "2015", "2016"]
+  [{name: "y", values: [1, 2, 3]}],
+  ["2014", "2015", "2016"]
 )
 '''),
       );
@@ -433,7 +433,7 @@ root = LineChart(
       tester,
     ) async {
       await tester.pumpWidget(
-        _app('root = MarkDownRenderer(source: "**bold**")'),
+        _app('root = MarkDownRenderer("**bold**")'),
       );
       expect(find.byType(MarkDownRendererWidget), findsOneWidget);
     });
@@ -442,8 +442,8 @@ root = LineChart(
       await tester.pumpWidget(
         _app('''
 root = BarChart(
-  series: [{name: "y", values: [1, 2, 3]}],
-  labels: ["a", "b", "c"]
+  [{name: "y", values: [1, 2, 3]}],
+  ["a", "b", "c"]
 )
 '''),
       );
@@ -462,7 +462,7 @@ root = BarChart(
       'TextContent uses display-heavy size variant on request',
       (tester) async {
         await tester.pumpWidget(
-          _app('root = TextContent(text: "hero", size: "display-heavy")'),
+          _app('root = TextContent("hero", "display-heavy")'),
         );
         expect(find.text('hero'), findsOneWidget);
       },
@@ -474,7 +474,7 @@ root = BarChart(
       await tester.pumpWidget(
         _app('''
 \$count = 7
-root = TextContent(text: \$count)
+root = TextContent(\$count)
 '''),
       );
       expect(find.text('7'), findsOneWidget);

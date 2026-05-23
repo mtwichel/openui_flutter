@@ -127,6 +127,7 @@ ComponentDefinition stackDefinition() {
     description: 'vertical or horizontal layout container',
     schema: Schema.object(
       properties: {
+        'children': Schema.list(items: Schema.any()),
         'direction': Schema.string(enumValues: ['row', 'column']),
         'gap': Schema.string(enumValues: ['xs', 's', 'm', 'l', 'xl']),
         'align': Schema.string(
@@ -136,7 +137,6 @@ ComponentDefinition stackDefinition() {
           enumValues: ['start', 'center', 'end', 'between', 'around', 'evenly'],
         ),
         'wrap': Schema.boolean(),
-        'children': Schema.list(items: Schema.any()),
       },
       required: ['children'],
     ),

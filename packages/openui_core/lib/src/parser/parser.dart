@@ -95,7 +95,8 @@ Program parseProgram(
     for (final s in statements) {
       errors
         ..addAll(validateEachShape(s))
-        ..addAll(validateQueryShape(s));
+        ..addAll(validateQueryShape(s))
+        ..addAll(validateComponentArgShape(s));
     }
   }
   return Program(statements: statements, errors: errors);
@@ -169,6 +170,82 @@ void _collectEachShapeErrors(AstNode node, List<ParseException> out) {
       _collectEachShapeErrors(index, out);
     case StateAssign(:final value):
       _collectEachShapeErrors(value, out);
+    case Literal():
+    case NullLiteral():
+    case Reference():
+    case StateRef():
+      break;
+  }
+}
+
+/// Walks [statement] for component calls with named arguments.
+///
+/// OpenUI Lang v0.5 uses positional-only component args. Named args
+/// (`prop: expr`) are rejected with a clear parse error.
+///
+/// When [committedOffsetBoundary] is non-null, statements at or beyond
+/// the boundary are skipped (streaming parser).
+@internal
+List<ParseException> validateComponentArgShape(
+  Statement statement, {
+  int? committedOffsetBoundary,
+}) {
+  if (committedOffsetBoundary != null &&
+      statement.offset >= committedOffsetBoundary) {
+    return const <ParseException>[];
+  }
+  final errors = <ParseException>[];
+  _collectComponentArgShapeErrors(statement.expression, errors);
+  return errors;
+}
+
+void _collectComponentArgShapeErrors(AstNode node, List<ParseException> out) {
+  switch (node) {
+    case CompCall(:final args):
+      for (final arg in args) {
+        if (arg.name != null) {
+          out.add(
+            ParseException(
+              'component arguments must be positional; '
+              'named arguments are not supported',
+              arg.offset,
+            ),
+          );
+        }
+        _collectComponentArgShapeErrors(arg.value, out);
+      }
+    case BuiltinCall(:final args):
+      for (final arg in args) {
+        _collectComponentArgShapeErrors(arg.value, out);
+      }
+    case MutationCall(:final args):
+      for (final arg in args) {
+        _collectComponentArgShapeErrors(arg.value, out);
+      }
+    case ArrayLit(:final elements):
+      for (final e in elements) {
+        _collectComponentArgShapeErrors(e, out);
+      }
+    case ObjectLit(:final entries):
+      for (final e in entries) {
+        _collectComponentArgShapeErrors(e.value, out);
+      }
+    case BinaryOp(:final left, :final right):
+      _collectComponentArgShapeErrors(left, out);
+      _collectComponentArgShapeErrors(right, out);
+    case UnaryOp(:final operand):
+      _collectComponentArgShapeErrors(operand, out);
+    case Ternary(:final condition, :final then, :final otherwise):
+      _collectComponentArgShapeErrors(condition, out);
+      _collectComponentArgShapeErrors(then, out);
+      _collectComponentArgShapeErrors(otherwise, out);
+    case MemberAccess(:final target):
+      _collectComponentArgShapeErrors(target, out);
+    case IndexAccess(:final target, :final index):
+      _collectComponentArgShapeErrors(target, out);
+      _collectComponentArgShapeErrors(index, out);
+    case StateAssign(:final value):
+      _collectComponentArgShapeErrors(value, out);
     case Literal():
     case NullLiteral():
     case Reference():

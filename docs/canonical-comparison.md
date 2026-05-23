@@ -29,7 +29,7 @@ This document compares **OpenUI Lang** as defined by the canonical reference imp
 
 | Gap | Impact |
 |-----|--------|
-| **Positional vs named component args** | **High** — canonical LLM output uses positional-only; renderer drops positional args |
+| **Positional vs named component args** | **Partial** — positional-only syntax + render-path mapping shipped; canonical Zod **property order** still differs for some components (`Stack`, `Button`, …) until schema reorder |
 | **`Query(...)` vs `$var = @Query(...)`** | **High** — different statement form, loading semantics, defaults |
 | **`Action([...])` / `action` prop vs `onClick: [...]`** | **High** — canonical buttons use `action`, not bare arrays on `onClick` |
 | **Array pluck** (`data.rows.title`) | **High** — breaks canonical Table/Chart column idioms |
@@ -55,7 +55,7 @@ Restoring strict 1:1 parity requires a product decision on whether to support ca
 
 | Topic | Canonical (v0.5) | Flutter port | Parity |
 |-------|------------------|--------------|--------|
-| Component arguments | **Positional only** — mapped to props by Zod/schema key order ([spec core rules](https://www.openui.com/docs/openui-lang/specification-v05)) | **Named-first** in examples and prompts; renderer **drops positional** args | **No** |
+| Component arguments | **Positional only** — mapped to props by Zod/schema key order ([spec core rules](https://www.openui.com/docs/openui-lang/specification-v05)) | **Positional-only**; named component args rejected at parse; mapped by Dart schema property order | **Partial** (order) |
 | Query statements | `data = Query("tool", {args}, {defaults}, refreshSec?)` | `$var = @Query(toolName, named: value, …)` only; `Query(...)` rejected at parse | **No** |
 | Mutation | `result = Mutation("tool", {args})` positional | `Mutation(name: "...", args: {...})` named | **Partial** |
 | Button actions | `Button("Label", Action([@Set(...)]))` — prop **`action`** | `Button(label: "...", onClick: [@Set(...)])` — prop **`onClick`**; `Action(...)` rejected | **No** |

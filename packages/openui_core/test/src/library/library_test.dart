@@ -164,13 +164,13 @@ void main() {
       return program.statements.single.expression as CompCall;
     }
 
-    test('evaluates every named arg through the evaluator', () {
+    test('evaluates positional args through the evaluator', () {
       final schema = Schema.object(
         properties: {'label': Schema.string(), 'count': Schema.integer()},
       );
       final ctx = EvalContext(statements: const [], store: Store());
       final props = evaluateElementProps(
-        call: callFor('a = Button(label: "Click", count: 1 + 2)'),
+        call: callFor('a = Button("Click", 1 + 2)'),
         schema: schema,
         context: ctx,
       );
@@ -187,7 +187,7 @@ void main() {
       final store = Store()..set(r'$name', 'alice');
       final ctx = EvalContext(statements: const [], store: store);
       final props = evaluateElementProps(
-        call: callFor(r'a = Input(value: $name)'),
+        call: callFor(r'a = Input($name)'),
         schema: schema,
         context: ctx,
       );
@@ -204,7 +204,7 @@ void main() {
         final schema = Schema.object(properties: {'value': Schema.string()});
         final ctx = EvalContext(statements: const [], store: Store());
         final props = evaluateElementProps(
-          call: callFor('a = Input(value: "static")'),
+          call: callFor('a = Input("static")'),
           schema: schema,
           context: ctx,
         );
@@ -220,7 +220,7 @@ void main() {
         final store = Store()..set(r'$msg', 'hi');
         final ctx = EvalContext(statements: const [], store: store);
         final props = evaluateElementProps(
-          call: callFor(r'a = Display(value: $msg)'),
+          call: callFor(r'a = Display($msg)'),
           schema: schema,
           context: ctx,
         );
@@ -229,37 +229,39 @@ void main() {
       },
     );
 
-    test('positional args are dropped', () {
-      final schema = Schema.object();
+    test('positional args bind by schema property order', () {
+      final schema = Schema.object(
+        properties: {'first': Schema.string(), 'second': Schema.integer()},
+      );
       final ctx = EvalContext(statements: const [], store: Store());
       final props = evaluateElementProps(
-        call: callFor('a = Stack("positional", named: 1)'),
+        call: callFor('a = Stack("hello", 42)'),
         schema: schema,
         context: ctx,
       );
-      expect(props.keys, ['named']);
+      expect(props, {'first': 'hello', 'second': 42});
     });
 
-    test('args matching no schema prop are still included', () {
+    test('extra positional args beyond schema are ignored', () {
       final schema = Schema.object(properties: {'a': Schema.string()});
       final ctx = EvalContext(statements: const [], store: Store());
       final props = evaluateElementProps(
-        call: callFor('x = Comp(a: "hi", extra: 42)'),
+        call: callFor('x = Comp("hi", 42)'),
         schema: schema,
         context: ctx,
       );
-      expect(props, {'a': 'hi', 'extra': 42});
+      expect(props, {'a': 'hi'});
     });
 
-    test('a schema with no properties key evaluates every arg normally', () {
+    test('a schema with no properties key yields an empty props map', () {
       final schema = Schema.fromMap(const {'type': 'object'});
       final ctx = EvalContext(statements: const [], store: Store());
       final props = evaluateElementProps(
-        call: callFor('a = X(label: "hi")'),
+        call: callFor('a = X("hi")'),
         schema: schema,
         context: ctx,
       );
-      expect(props, {'label': 'hi'});
+      expect(props, isEmpty);
     });
 
     test('a properties entry that is not a map is treated as non-reactive', () {
@@ -270,7 +272,7 @@ void main() {
       final store = Store()..set(r'$x', 'live');
       final ctx = EvalContext(statements: const [], store: store);
       final props = evaluateElementProps(
-        call: callFor(r'a = X(value: $x)'),
+        call: callFor(r'a = X($x)'),
         schema: schema,
         context: ctx,
       );
@@ -288,14 +290,14 @@ void main() {
       final store = Store()..set(r'$name', 'before');
       final ctx = EvalContext(statements: const [], store: store);
       final first = evaluateElementProps(
-        call: callFor(r'a = Input(value: $name)'),
+        call: callFor(r'a = Input($name)'),
         schema: schema,
         context: ctx,
       );
       expect((first['value']! as ReactiveAssign).value, 'before');
       store.set(r'$name', 'after');
       final second = evaluateElementProps(
-        call: callFor(r'a = Input(value: $name)'),
+        call: callFor(r'a = Input($name)'),
         schema: schema,
         context: ctx,
       );

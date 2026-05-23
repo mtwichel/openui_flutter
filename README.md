@@ -12,7 +12,7 @@ There is no separate “codegen” step: **valid OpenUI Lang is just a string** 
 
 ## How the pieces fit together
 
-1. **OpenUI Lang source** — A growing `String` (cumulative assistant output). Usually from an LLM constrained by a **system prompt** derived from your `LibraryDefinition` via `library.prompt()` (or `generatePrompt(library)` from `openui_core`). See [Authoring the system prompt](#3-authoring-the-system-prompt) below and [docs/lang-reference.md](docs/lang-reference.md) for grammar and builtins.
+1. **OpenUI Lang source** — A growing `String` (cumulative assistant output). Usually from an LLM constrained by a **system prompt** derived from your `LibraryDefinition` via `library.prompt()` (or `generatePrompt(library)` from `openui_core`). See [Authoring the system prompt](#3-authoring-the-system-prompt) below and [docs/lang-reference.md](docs/lang-reference.md) for grammar and builtins. For gaps vs the canonical [thesysdev/openui](https://github.com/thesysdev/openui) language and component set, see [docs/canonical-comparison.md](docs/canonical-comparison.md).
 2. **Triple wiring** — `LibraryDefinition` (schemas + tool metadata), `ComponentRegistry` (render callbacks), and `ToolRegistry` (executors). For most apps, use `standardLibraryDefinition()` + `standardComponentRegistry()` from **`openui_components`**.
 3. **`Renderer`** (from **`openui`**) — Takes `library`, `componentRegistry`, `toolRegistry`, the full `response` string so far, and `isStreaming`. On each update it re-parses and rebuilds the tree; set `isStreaming: true` while chunks are still arriving.
 

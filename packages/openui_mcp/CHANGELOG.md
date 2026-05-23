@@ -1,5 +1,7 @@
 ## 0.0.1-dev.2
 
+- **BREAKING**: Replace `McpToolProvider` with `McpToolExtension.asOpenUIToolPairs()`
+  producing `OpenUIToolPair` (definition + executor) for `ToolRegistry` wiring.
 - Point pubspec `repository`, `homepage`, and `issue_tracker` URLs at `github.com/mtwichel/openui_flutter`.
 
 ## 0.0.1-dev.1

@@ -10,7 +10,7 @@ import 'package:openui_core/openui_core.dart';
 void main() {
   group('openuiLibrary', () {
     test('registers every v0.1 component', () {
-      final lib = standardLibrary();
+      final lib = standardLibraryDefinition();
       const expected = <String>{
         'Stack',
         'Card',
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('each registration carries a non-empty schema', () {
-      final lib = standardLibrary();
+      final lib = standardLibraryDefinition();
       for (final name in lib.components.map((c) => c.name)) {
         final component = lib.component(name)!;
         expect(component.schema, isNotNull);
@@ -43,7 +43,7 @@ void main() {
     });
 
     test('prompt excludes Col and TabItem, includes all other components', () {
-      final result = standardLibrary().prompt();
+      final result = standardLibraryDefinition().prompt();
       // Internal components must not appear.
       expect(result, isNot(contains('Col(')));
       expect(result, isNot(contains('TabItem(')));
@@ -73,11 +73,24 @@ void main() {
         );
       }
     });
+
+    test('standardComponentRegistry registers every definition', () {
+      final lib = standardLibraryDefinition();
+      final registry = standardComponentRegistry();
+      for (final component in lib.components) {
+        expect(
+          registry[component.name],
+          isNotNull,
+          reason: 'missing renderer for ${component.name}',
+        );
+      }
+    });
   });
 
   group('component render type', () {
     test('renders return Widget', () {
-      final lib = standardLibrary();
+      final lib = standardLibraryDefinition();
+      final registry = standardComponentRegistry();
       final ctx = EvalContext(
         statements: const <Statement>[],
         store: Store(),
@@ -88,15 +101,15 @@ void main() {
       Widget stubRender(AstNode _, EvalContext _) => const SizedBox.shrink();
 
       // Smoke test: call render with empty props and a stub renderNode.
-      for (final name in lib.components.map((c) => c.name)) {
-        final component = lib.component(name)!;
-        final widget = component.render(
+      for (final component in lib.components) {
+        final render = registry[component.name]!;
+        final widget = render(
           ctx,
           const <String, Object?>{},
           stubRender,
-          name,
+          component.name,
         );
-        expect(widget, isA<Widget>(), reason: 'component $name');
+        expect(widget, isA<Widget>(), reason: 'component ${component.name}');
       }
     });
   });

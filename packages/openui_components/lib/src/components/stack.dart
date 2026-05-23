@@ -120,9 +120,9 @@ WrapCrossAlignment _wrapAlign(String? value) {
   }
 }
 
-/// Registration for the `Stack` component.
-Component<Widget> stackComponent() {
-  return Component<Widget>(
+/// Registration metadata for the `Stack` component.
+ComponentDefinition stackDefinition() {
+  return ComponentDefinition(
     name: 'Stack',
     description: 'vertical or horizontal layout container',
     schema: Schema.object(
@@ -140,18 +140,25 @@ Component<Widget> stackComponent() {
       },
       required: ['children'],
     ),
-    render: (ctx, props, renderNode, id) {
-      final children =
-          (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??
-          const <Widget>[];
-      return StackWidget(
-        direction: props['direction'] as String? ?? 'column',
-        gap: props['gap'] as String?,
-        align: props['align'] as String?,
-        justify: props['justify'] as String?,
-        wrap: props['wrap'] as bool? ?? false,
-        children: children,
-      );
-    },
+  );
+}
+
+/// Renders `Stack`.
+Widget renderStack(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  final children =
+      (props['children'] as List<Object?>?)?.whereType<Widget>().toList() ??
+      const <Widget>[];
+  return StackWidget(
+    direction: props['direction'] as String? ?? 'column',
+    gap: props['gap'] as String?,
+    align: props['align'] as String?,
+    justify: props['justify'] as String?,
+    wrap: props['wrap'] as bool? ?? false,
+    children: children,
   );
 }

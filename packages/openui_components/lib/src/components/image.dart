@@ -36,9 +36,9 @@ class ImageWidget extends StatelessWidget {
   }
 }
 
-/// Registration for the `Image` component.
-Component<Widget> imageComponent() {
-  return Component<Widget>(
+/// Registration metadata for the `Image` component.
+ComponentDefinition imageDefinition() {
+  return ComponentDefinition(
     name: 'Image',
     description: 'network image with fallback',
     schema: Schema.object(
@@ -48,11 +48,18 @@ Component<Widget> imageComponent() {
       },
       required: const ['src'],
     ),
-    render: (ctx, props, renderNode, id) {
-      return ImageWidget(
-        src: props['src'] as String? ?? '',
-        alt: props['alt'] as String?,
-      );
-    },
+  );
+}
+
+/// Renders `Image`.
+Widget renderImage(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  return ImageWidget(
+    src: props['src'] as String? ?? '',
+    alt: props['alt'] as String?,
   );
 }

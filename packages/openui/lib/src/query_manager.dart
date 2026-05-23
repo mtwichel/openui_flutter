@@ -4,8 +4,8 @@
 
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
+import 'package:openui/src/tool_registry.dart';
 import 'package:openui_core/openui_core.dart';
 
 /// Per-renderer gate that turns `@Query` declarations into one-shot
@@ -33,13 +33,16 @@ class QueryManager {
   /// Creates a [QueryManager].
   QueryManager({
     required this.library,
+    required this.toolRegistry,
     required this.store,
     required void Function(OpenUIError) onError,
   }) : _onError = onError;
 
-  /// The library of components and tools to use for dispatching
-  /// queries and mutations.
-  final Library<Widget> library;
+  /// Component and tool definitions used for dispatch lookup.
+  final LibraryDefinition library;
+
+  /// Tool executors keyed by tool name.
+  final ToolRegistry toolRegistry;
 
   /// The reactive store that receives resolved query values.
   final Store store;
@@ -70,8 +73,8 @@ class QueryManager {
     // dispatching a duplicate tool call.
     _fired[decl.statementId] = evaluatedArgs;
 
-    final tool = library.tool(decl.toolName);
-    if (tool == null) {
+    final toolDef = library.tool(decl.toolName);
+    if (toolDef == null) {
       _onError(
         EvaluationError(
           message: 'Unknown tool: ${decl.toolName}',
@@ -80,9 +83,18 @@ class QueryManager {
       );
       return;
     }
+    final executor = toolRegistry[decl.toolName];
+    if (executor == null) {
+      _onError(
+        MissingToolExecutorError(
+          toolName: decl.toolName,
+          statementId: decl.statementId,
+        ),
+      );
+      return;
+    }
     unawaited(
-      tool
-          .callTool(evaluatedArgs)
+      executor(evaluatedArgs)
           .then((value) {
             if (_disposed) return;
             if (value.isError) {
@@ -159,13 +171,19 @@ class QueryManager {
       );
     }
     final toolArgs = _mapArg(args, 'args') ?? const <String, Object?>{};
-    final tool = library.tool(toolName);
-    if (tool == null) {
+    final toolDef = library.tool(toolName);
+    if (toolDef == null) {
       return Future<Object?>.error(
         ToolNotFoundError(toolName: toolName, statementId: statementId),
       );
     }
-    return tool.callTool(toolArgs);
+    final executor = toolRegistry[toolName];
+    if (executor == null) {
+      return Future<Object?>.error(
+        MissingToolExecutorError(toolName: toolName, statementId: statementId),
+      );
+    }
+    return executor(toolArgs);
   }
 }
 

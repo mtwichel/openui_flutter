@@ -4,18 +4,13 @@
 
 import 'package:flutter/widgets.dart';
 import 'package:meta/meta.dart';
+import 'package:openui/src/component_registry.dart';
 import 'package:openui/src/error_boundary.dart';
 import 'package:openui/src/form_state_cache.dart';
 import 'package:openui/src/query_manager.dart';
 import 'package:openui/src/renderer_scope.dart';
+import 'package:openui/src/tool_registry.dart';
 import 'package:openui_core/openui_core.dart';
-
-/// Render callback alias for the Flutter renderer's library.
-///
-/// `Renderer.library` is a `Library<Widget>`; component definitions
-/// against this library use [ComponentWidgetRenderer] as their render
-/// signature.
-typedef ComponentWidgetRenderer = ComponentRender<Widget>;
 
 /// Callback fired when a continue-conversation action occurs.
 typedef ContinueConversationCallback = void Function(String message);
@@ -33,6 +28,8 @@ class Renderer extends StatefulWidget {
   /// Creates a [Renderer].
   const Renderer({
     required this.library,
+    required this.componentRegistry,
+    required this.toolRegistry,
     this.response,
     this.isStreaming = false,
     this.onAction,
@@ -49,8 +46,14 @@ class Renderer extends StatefulWidget {
   /// parse pass (`StreamParser.set`).
   final String? response;
 
-  /// Component and tool library used to dispatch each `CompCall` and `Query` / `Mutation`.
-  final Library<Widget> library;
+  /// Component and tool definitions used for schema lookup and prompts.
+  final LibraryDefinition library;
+
+  /// Render callbacks keyed by component name.
+  final ComponentRegistry componentRegistry;
+
+  /// Tool executors keyed by tool name.
+  final ToolRegistry toolRegistry;
 
   /// Whether `response` is still being appended to by the upstream
   /// stream. Propagated to component implementations via
@@ -125,7 +128,10 @@ class _RendererState extends State<Renderer> {
   @override
   void didUpdateWidget(Renderer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final libraryChanged = widget.library != oldWidget.library;
+    final libraryChanged =
+        widget.library != oldWidget.library ||
+        widget.componentRegistry != oldWidget.componentRegistry ||
+        widget.toolRegistry != oldWidget.toolRegistry;
     if (libraryChanged) {
       _queryManager?.dispose();
       _queryManager = _buildQueryManager();
@@ -153,6 +159,7 @@ class _RendererState extends State<Renderer> {
   QueryManager _buildQueryManager() {
     return QueryManager(
       library: widget.library,
+      toolRegistry: widget.toolRegistry,
       store: _store,
       onError: _reportError,
     );
@@ -302,9 +309,15 @@ class _RendererState extends State<Renderer> {
         return;
       }
     }
-    final directTool = widget.library.tool(id);
-    if (directTool != null) {
-      await directTool.callTool(args);
+    final toolDef = widget.library.tool(id);
+    if (toolDef != null) {
+      final executor = widget.toolRegistry[id];
+      if (executor == null) {
+        final error = MissingToolExecutorError(toolName: id, statementId: id);
+        _reportError(error);
+        throw error;
+      }
+      await executor(args);
       return;
     }
     throw EvaluationError(
@@ -427,10 +440,19 @@ class _RendererState extends State<Renderer> {
     EvalContext ctx, {
     String? statementHint,
   }) {
-    final component = widget.library.component(call.type);
-    if (component == null) {
+    final definition = widget.library.component(call.type);
+    if (definition == null) {
       return _errorPlaceholder(
         UnknownComponentError(
+          component: call.type,
+          statementId: statementHint,
+        ),
+      );
+    }
+    final render = widget.componentRegistry[call.type];
+    if (render == null) {
+      return _errorPlaceholder(
+        MissingRendererError(
           component: call.type,
           statementId: statementHint,
         ),
@@ -445,8 +467,8 @@ class _RendererState extends State<Renderer> {
       statementId: id,
       onError: _reportError,
       builder: (context) {
-        final props = _resolveProps(call, component.schema, ctx, id);
-        return component.render(ctx, props, _renderAst, id);
+        final props = _resolveProps(call, definition.schema, ctx, id);
+        return render(ctx, props, _renderAst, id);
       },
     );
   }

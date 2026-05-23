@@ -26,3 +26,6 @@ jobs:
       min_coverage: 0
       flutter_channel: stable
       flutter_version: 3.41.9
+      setup: |
+        bash ../../tool/ci_pubspec_overrides.sh packages/openui_mcp
+        dart pub get

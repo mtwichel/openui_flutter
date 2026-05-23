@@ -4,16 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![style: very_good_analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
-MCP `ToolProvider` for OpenUI Flutter.
+MCP adapter for OpenUI Flutter.
 
-Wraps `mcp_dart`'s `McpClient` and exposes a `ToolProvider` to the
-OpenUI Lang runtime. The `extractToolResult` envelope unwrap from
-`openui_core` mirrors the JS reference:
-
-1. `result.isError` → throw `McpToolError(messageJoinedFromTextContent)`
-2. `result.structuredContent != null` → return it
-3. otherwise join `TextContent.text`, attempt `jsonDecode`, fall back
-   to the raw string
+Wraps `mcp_dart`'s `McpClient` and produces `OpenUIToolPair` values — each
+pair bundles a `ToolDefinition` (metadata for the library and prompt) with
+an async executor that forwards to MCP and returns a `ToolResult`.
 
 ## Status
 
@@ -24,6 +19,8 @@ v0.1, Phase 4 complete.
 ```yaml
 dependencies:
   openui_mcp: ^0.1.0
+  openui: ^0.1.0
+  openui_components: ^0.1.0
 ```
 
 ## Quick start
@@ -34,21 +31,28 @@ import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_mcp/openui_mcp.dart';
 
-final client = McpClient(...);                  // connect your transport
+final client = McpClient(...);
 await client.connect();
-final provider = McpToolProvider.from(client);
+
+final pairs = await client.asOpenUIToolPairs();
+final library = standardLibraryDefinition().extend(
+  tools: pairs.map((p) => p.definition).toList(),
+);
+final componentRegistry = standardComponentRegistry();
+final toolRegistry = ToolRegistry(executors: {
+  for (final p in pairs) p.definition.name: p.execute,
+});
 
 Renderer(
   response: response,
-  library: openuiLibrary(),
-  toolProvider: provider,                       // → Query / Mutation calls
+  library: library,
+  componentRegistry: componentRegistry,
+  toolRegistry: toolRegistry,
 );
 ```
 
-The renderer routes `Query(name: "...", args: {...})` statements
-through `provider.callTool`, which forwards to `mcp.McpClient.callTool`
-and runs the result through `extractToolResult` before caching the
-value under the statement id.
+The renderer routes `@Query` declarations through `ToolRegistry` lookup after
+confirming the tool exists on the `LibraryDefinition`.
 
 ## License
 

@@ -73,9 +73,9 @@ class _MarkDownRendererState extends State<MarkDownRendererWidget> {
   }
 }
 
-/// Registration for the `MarkDownRenderer` component.
-Component<Widget> markdownComponent() {
-  return Component<Widget>(
+/// Registration metadata for the `MarkDownRenderer` component.
+ComponentDefinition markdownDefinition() {
+  return ComponentDefinition(
     name: 'MarkDownRenderer',
     description: 'renders Markdown source text',
     schema: Schema.object(
@@ -84,18 +84,25 @@ Component<Widget> markdownComponent() {
       },
       required: ['source'],
     ),
-    render: (ctx, props, renderNode, id) {
-      return Builder(
-        builder: (context) {
-          final scope = RendererScope.maybeFind(context);
-          final streaming =
-              scope?.isStreaming == true &&
-              (scope?.incomplete.contains(id) ?? false);
-          return MarkDownRendererWidget(
-            source: props['source']?.toString() ?? '',
-            isStreaming: streaming,
-          );
-        },
+  );
+}
+
+/// Renders `MarkDownRenderer`.
+Widget renderMarkdown(
+  EvalContext ctx,
+  Map<String, Object?> props,
+  Widget Function(AstNode node, EvalContext context) renderNode,
+  String statementId,
+) {
+  return Builder(
+    builder: (context) {
+      final scope = RendererScope.maybeFind(context);
+      final streaming =
+          scope?.isStreaming == true &&
+          (scope?.incomplete.contains(statementId) ?? false);
+      return MarkDownRendererWidget(
+        source: props['source']?.toString() ?? '',
+        isStreaming: streaming,
       );
     },
   );

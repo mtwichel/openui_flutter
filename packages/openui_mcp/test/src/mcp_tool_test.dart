@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('McpToolExtension', () {
-    test('asOpenUITools maps every listed MCP tool', () async {
+    test('asOpenUIToolPairs maps every listed MCP tool', () async {
       final client = _FakeMcpClient(
         listToolsResult: mcp.ListToolsResult(
           tools: [
@@ -18,71 +18,81 @@ void main() {
         callToolResult: const mcp.CallToolResult(content: []),
       );
 
-      final tools = await client.asOpenUITools();
+      final pairs = await client.asOpenUIToolPairs();
 
-      expect(tools, hasLength(2));
-      expect(tools.first, isA<McpTool>());
-      expect(tools.map((t) => t.name), ['echo', 'sum']);
-      expect(tools.map((t) => t.description), ['Echo text', '']);
-    });
-  });
-
-  group('McpTool', () {
-    test('maps name, description, input, and output schemas', () {
-      final mcpTool = _buildMcpTool(
-        name: 'weather_lookup',
-        description: 'Look up current weather.',
-        inputSchema: const {
-          'type': 'object',
-          'properties': {
-            'city': {'type': 'string'},
-          },
-        },
-        outputSchema: const {
-          'type': 'object',
-          'properties': {
-            'temperature': {'type': 'number'},
-          },
-        },
-      );
-
-      final tool = McpTool(
-        mcpTool,
-        _FakeMcpClient(
-          listToolsResult: const mcp.ListToolsResult(tools: []),
-          callToolResult: const mcp.CallToolResult(content: []),
-        ),
-      );
-
-      expect(tool.name, 'weather_lookup');
-      expect(tool.description, 'Look up current weather.');
-      expect(tool.input?.value['type'], 'object');
-      expect((tool.input!.value['properties']! as Map)['city'], isNotNull);
-      expect(tool.output?.value['type'], 'object');
+      expect(pairs, hasLength(2));
+      expect(pairs.map((p) => p.definition.name), ['echo', 'sum']);
       expect(
-        (tool.output!.value['properties']! as Map)['temperature'],
+        pairs.map((p) => p.definition.description),
+        ['Echo text', ''],
+      );
+    });
+
+    test('pair definition maps input and output schemas', () async {
+      final client = _FakeMcpClient(
+        listToolsResult: mcp.ListToolsResult(
+          tools: [
+            _buildMcpTool(
+              name: 'weather_lookup',
+              description: 'Look up current weather.',
+              inputSchema: const {
+                'type': 'object',
+                'properties': {
+                  'city': {'type': 'string'},
+                },
+              },
+              outputSchema: const {
+                'type': 'object',
+                'properties': {
+                  'temperature': {'type': 'number'},
+                },
+              },
+            ),
+          ],
+        ),
+        callToolResult: const mcp.CallToolResult(content: []),
+      );
+
+      final pair = (await client.asOpenUIToolPairs()).single;
+
+      expect(pair.definition.name, 'weather_lookup');
+      expect(pair.definition.description, 'Look up current weather.');
+      expect(pair.definition.input?.value['type'], 'object');
+      expect(
+        (pair.definition.input!.value['properties']! as Map)['city'],
+        isNotNull,
+      );
+      expect(pair.definition.output?.value['type'], 'object');
+      expect(
+        (pair.definition.output!.value['properties']! as Map)['temperature'],
         isNotNull,
       );
     });
 
-    test('returns null output schema when MCP output schema is absent', () {
-      final tool = McpTool(
-        _buildMcpTool(name: 'ping'),
-        _FakeMcpClient(
-          listToolsResult: const mcp.ListToolsResult(tools: []),
-          callToolResult: const mcp.CallToolResult(content: []),
-        ),
-      );
-
-      expect(tool.output, isNull);
-      expect(tool.description, isEmpty);
-    });
-
     test(
-      'callTool forwards args and flattens MCP content to ToolResult',
+      'returns null output schema when MCP output schema is absent',
       () async {
         final client = _FakeMcpClient(
-          listToolsResult: const mcp.ListToolsResult(tools: []),
+          listToolsResult: mcp.ListToolsResult(
+            tools: [_buildMcpTool(name: 'ping')],
+          ),
+          callToolResult: const mcp.CallToolResult(content: []),
+        );
+
+        final pair = (await client.asOpenUIToolPairs()).single;
+
+        expect(pair.definition.output, isNull);
+        expect(pair.definition.description, isEmpty);
+      },
+    );
+
+    test(
+      'execute forwards args and flattens MCP content to ToolResult',
+      () async {
+        final client = _FakeMcpClient(
+          listToolsResult: mcp.ListToolsResult(
+            tools: [_buildMcpTool(name: 'do_work')],
+          ),
           callToolResult: const mcp.CallToolResult(
             isError: true,
             structuredContent: {'ok': false},
@@ -93,9 +103,9 @@ void main() {
             ],
           ),
         );
-        final tool = McpTool(_buildMcpTool(name: 'do_work'), client);
+        final pair = (await client.asOpenUIToolPairs()).single;
 
-        final result = await tool.callTool(const {
+        final result = await pair.execute(const {
           'count': 3,
           'nested': {'mode': 'safe'},
         });
@@ -112,21 +122,21 @@ void main() {
     );
 
     test(
-      'callTool returns empty string when no text content is present',
+      'execute returns empty string when no text content is present',
       () async {
-        final tool = McpTool(
-          _buildMcpTool(name: 'image_only'),
-          _FakeMcpClient(
-            listToolsResult: const mcp.ListToolsResult(tools: []),
-            callToolResult: const mcp.CallToolResult(
-              content: [
-                mcp.ImageContent(data: 'AA==', mimeType: 'image/png'),
-              ],
-            ),
+        final client = _FakeMcpClient(
+          listToolsResult: mcp.ListToolsResult(
+            tools: [_buildMcpTool(name: 'image_only')],
+          ),
+          callToolResult: const mcp.CallToolResult(
+            content: [
+              mcp.ImageContent(data: 'AA==', mimeType: 'image/png'),
+            ],
           ),
         );
+        final pair = (await client.asOpenUIToolPairs()).single;
 
-        final result = await tool.callTool(const {'id': 1});
+        final result = await pair.execute(const {'id': 1});
 
         expect(result.result, isEmpty);
         expect(result.isError, isFalse);
@@ -134,22 +144,21 @@ void main() {
     );
 
     test(
-      'callTool stringifies structuredContent entries into the result text',
+      'execute stringifies structuredContent entries into the result text',
       () async {
-        final tool = McpTool(
-          _buildMcpTool(name: 'structured_only'),
-          _FakeMcpClient(
-            listToolsResult: const mcp.ListToolsResult(tools: []),
-            callToolResult: const mcp.CallToolResult(
-              structuredContent: {'count': 3, 'ok': true},
-              content: [],
-            ),
+        final client = _FakeMcpClient(
+          listToolsResult: mcp.ListToolsResult(
+            tools: [_buildMcpTool(name: 'structured_only')],
+          ),
+          callToolResult: const mcp.CallToolResult(
+            structuredContent: {'count': 3, 'ok': true},
+            content: [],
           ),
         );
+        final pair = (await client.asOpenUIToolPairs()).single;
 
-        final result = await tool.callTool(const {'id': 1});
+        final result = await pair.execute(const {'id': 1});
 
-        // Structured entries are appended as "key: value" text chunks.
         expect(result.result, 'count: 3ok: true');
         expect(result.isError, isFalse);
       },

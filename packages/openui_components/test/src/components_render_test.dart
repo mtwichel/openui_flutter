@@ -23,14 +23,20 @@ Widget _app(
   String response, {
   void Function(ActionEvent)? onAction,
   void Function(String message)? onContinueConversation,
+  void Function(Map<String, Object?> snapshot)? onStateUpdate,
+  bool isStreaming = false,
 }) {
   return MaterialApp(
     home: Scaffold(
       body: Renderer(
         response: response,
-        library: standardLibrary(),
+        library: standardLibraryDefinition(),
+        componentRegistry: standardComponentRegistry(),
+        toolRegistry: const ToolRegistry(executors: {}),
+        isStreaming: isStreaming,
         onAction: onAction,
         onContinueConversation: onContinueConversation,
+        onStateUpdate: onStateUpdate,
       ),
     ),
   );
@@ -39,7 +45,7 @@ Widget _app(
 void main() {
   group('Renderer + openuiLibrary', () {
     test('Button schema marks onClick as action-capable', () {
-      final button = standardLibrary().component('Button');
+      final button = standardLibraryDefinition().component('Button');
       expect(button, isNotNull);
       final props = button!.schema.value['properties']! as Map<String, Object?>;
       final onClick = props['onClick']! as Map<String, Object?>;
@@ -99,7 +105,9 @@ root = Card(children: [
                 response: r'''$count = 0
 root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
 ''',
-                library: standardLibrary(),
+                library: standardLibraryDefinition(),
+                componentRegistry: standardComponentRegistry(),
+                toolRegistry: const ToolRegistry(executors: {}),
                 onAction: events.add,
                 onStateUpdate: updates.add,
               ),
@@ -128,7 +136,9 @@ root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
               body: Renderer(
                 response:
                     'root = Button(label: "Retry", onClick: [@ToAssistant("retry")])',
-                library: standardLibrary(),
+                library: standardLibraryDefinition(),
+                componentRegistry: standardComponentRegistry(),
+                toolRegistry: const ToolRegistry(executors: {}),
                 isStreaming: true,
                 onAction: events.add,
               ),
@@ -197,7 +207,9 @@ root = Button(label: "Click", onClick: [@Set($count, $count + 1)])
 \$name = ""
 root = Input(name: "field", value: \$name)
 ''',
-              library: standardLibrary(),
+              library: standardLibraryDefinition(),
+              componentRegistry: standardComponentRegistry(),
+              toolRegistry: const ToolRegistry(executors: {}),
               onStateUpdate: updates.add,
             ),
           ),
@@ -226,7 +238,9 @@ root = Stack(children: [
 ])
 
 ''',
-              library: standardLibrary(),
+              library: standardLibraryDefinition(),
+              componentRegistry: standardComponentRegistry(),
+              toolRegistry: const ToolRegistry(executors: {}),
             ),
           ),
         ),

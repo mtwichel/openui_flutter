@@ -42,6 +42,10 @@ void main() => runApp(const MaterialApp(home: MyPage()));
 class MyPage extends StatelessWidget {
   const MyPage({super.key});
 
+  static final _library = standardLibraryDefinition();
+  static final _componentRegistry = standardComponentRegistry();
+  static final _toolRegistry = ToolRegistry(executors: {});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,19 +58,25 @@ root = Stack(children: [
   TextContent(text: $count)
 ])
 ''',
-        library: openuiLibrary(),
+        library: _library,
+        componentRegistry: _componentRegistry,
+        toolRegistry: _toolRegistry,
       ),
     );
   }
 }
 ```
 
-## Two libraries
+## Standard library factories
 
-| Factory | Behavior |
+| Factory | Returns |
 | --- | --- |
-| `openuiLibrary()` | All 21 components, no root wrapper. |
-| `openuiChatLibrary()` | Same component set — drop-in for chat surfaces. |
+| `standardLibraryDefinition()` | `LibraryDefinition` with all 21 component schemas (and no tools). Use `.prompt()` for LLM system prompts. |
+| `standardComponentRegistry()` | `ComponentRegistry` with render callbacks for every public component. |
+
+Each component file exports a `*Definition()` factory and a `render*` function.
+When extending the library with custom components, keep definition names aligned
+with registry keys (see `packages/openui/README.md`).
 
 ## License
 

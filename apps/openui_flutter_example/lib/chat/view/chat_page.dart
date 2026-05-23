@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:openui/openui.dart';
 import 'package:openui_components/openui_components.dart';
 import 'package:openui_core/openui_core.dart';
 import 'package:openui_flutter_example/chat/bloc/chat_bloc.dart';
@@ -7,14 +8,23 @@ import 'package:openui_flutter_example/chat/dartantic_chat_service.dart';
 import 'package:openui_flutter_example/chat/tools.dart';
 import 'package:openui_flutter_example/chat/view/chat_view.dart';
 
-final Library<Widget> _chatOpenUiLibrary = standardLibrary().extend(
-  tools: [
-    SnackbarTool(),
-    FetchProductsTool(),
-    FetchProductTool(),
-  ],
+final LibraryDefinition _chatLibraryDefinition = standardLibraryDefinition()
+    .extend(
+      tools: [
+        snackbarToolDefinition(),
+        fetchProductsToolDefinition(),
+        fetchProductToolDefinition(),
+      ],
+    );
+final ComponentRegistry _chatComponentRegistry = standardComponentRegistry();
+const _chatToolRegistry = ToolRegistry(
+  executors: {
+    'snackbar': showSnackbar,
+    'fetch_products': fetchProducts,
+    'fetch_product': fetchProduct,
+  },
 );
-final String _chatSystemPrompt = _chatOpenUiLibrary.prompt();
+final String _chatSystemPrompt = _chatLibraryDefinition.prompt();
 
 /// Live chat route: provides [ChatBloc] and builds [ChatView].
 class ChatPage extends StatelessWidget {
@@ -48,7 +58,9 @@ class ChatPage extends StatelessWidget {
         skipGeminiAuth: chatServiceFactory != null,
       ),
       child: ChatView(
-        library: _chatOpenUiLibrary,
+        library: _chatLibraryDefinition,
+        componentRegistry: _chatComponentRegistry,
+        toolRegistry: _chatToolRegistry,
         systemPrompt: _chatSystemPrompt,
         onMenuTap: onMenuTap,
       ),

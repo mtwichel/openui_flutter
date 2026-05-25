@@ -74,9 +74,7 @@ const List<String> _kDefaultRules = [
   'Use only components from the list above. Do not invent new component names.',
   r'Use `$variables` for any state the user interacts with.',
   'Keep responses focused — render only the UI the user asked for.',
-  'For every `x-action` prop (for example `action` on `Button`), use '
-      '`Action([@steps...])` with at least one builtin step — never a bare '
-      '`@Set(...)` or bare `[@Set(...)]` array.',
+  r'For every `x-action` prop (for example `action` on `Button`), use `Action([@steps...])` with at least one builtin step — never a bare `@Set(...)` or bare `[@Set(...)]` array.',
 ];
 
 String _jsonTypeKeyword(Map<String, Object?> propSchema) {

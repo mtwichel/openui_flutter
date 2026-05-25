@@ -68,13 +68,18 @@ const String _kGrammarPrimer =
     '- `@ToAssistant("message", "context?")` emits a continue-conversation '
     'action event.';
 
+const _kXActionRule =
+    'For every `x-action` prop (for example `action` on `Button`), use '
+    '`Action([@steps...])` with at least one builtin step — never a bare '
+    '`@Set(...)` or bare `[@Set(...)]` array.';
+
 const List<String> _kDefaultRules = [
   'Respond with OpenUI Lang source only. No prose, no Markdown, no fences.',
   'Always declare a `root = ...` statement.',
   'Use only components from the list above. Do not invent new component names.',
   r'Use `$variables` for any state the user interacts with.',
   'Keep responses focused — render only the UI the user asked for.',
-  r'For every `x-action` prop (for example `action` on `Button`), use `Action([@steps...])` with at least one builtin step — never a bare `@Set(...)` or bare `[@Set(...)]` array.',
+  _kXActionRule,
 ];
 
 String _jsonTypeKeyword(Map<String, Object?> propSchema) {

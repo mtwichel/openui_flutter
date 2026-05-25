@@ -602,15 +602,18 @@ void main() {
       expect(ast.args.first.value, equals(const Reference('child', offset: 6)));
     });
 
-    test('comp call with named arg', () {
+    test('comp call with named arg parses at expression level', () {
       final ast = parseExpression('Stack(child: foo)') as CompCall;
       expect(ast.args.single.name, 'child');
     });
 
-    test('comp call with mixed args + trailing comma', () {
-      final ast = parseExpression('Stack(a, b: 1, c: 2,)') as CompCall;
-      expect(ast.args.map((a) => a.name).toList(), [null, 'b', 'c']);
-    });
+    test(
+      'comp call with mixed args + trailing comma parses at expression level',
+      () {
+        final ast = parseExpression('Stack(a, b: 1, c: 2,)') as CompCall;
+        expect(ast.args.map((a) => a.name).toList(), [null, 'b', 'c']);
+      },
+    );
 
     test('builtin call: @Each(list, "name", template) parses with 3 args', () {
       final ast = parseExpression('@Each(items, "t", t.name)') as BuiltinCall;
@@ -951,6 +954,18 @@ void main() {
       final program = parseProgram('Card = Stack()');
       expect(program.errors, isEmpty);
       expect(program.statements.single.name, 'Card');
+    });
+
+    test('named component args record ParseException', () {
+      final program = parseProgram('root = Button(label: "x")');
+      expect(program.errors, hasLength(1));
+      expect(program.errors.single.message, contains('positional'));
+    });
+
+    test('mixed positional and named component args record ParseException', () {
+      final program = parseProgram('root = Stack([], direction: "row")');
+      expect(program.errors, hasLength(1));
+      expect(program.errors.single.message, contains('positional'));
     });
 
     test('@Each shape: 3-arg form parses cleanly', () {

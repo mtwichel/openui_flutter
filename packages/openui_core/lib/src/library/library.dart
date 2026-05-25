@@ -41,7 +41,42 @@ class ReactiveAssign {
 @experimental
 bool isReactiveAssign(Object? value) => value is ReactiveAssign;
 
-/// Walks the named args of [call], evaluates each value against
+/// Ordered prop names from a component [Schema] (`properties` key order).
+///
+/// Marked `@experimental` per D12.
+@experimental
+List<String> orderedPropertyNames(Schema schema) {
+  final properties = schema.value['properties'];
+  if (properties is! Map<String, Object?>) return const [];
+  return properties.keys.toList(growable: false);
+}
+
+/// Maps positional [CompCall] args to prop names by index.
+///
+/// Extra positionals beyond [propNames].length are ignored (lenient).
+///
+/// Marked `@experimental` per D12.
+@experimental
+Map<String, Object?> bindPositionalProps({
+  required CompCall call,
+  required List<String> propNames,
+  required Object? Function(Argument arg, String propName) resolveArg,
+}) {
+  final positional = <Argument>[
+    for (final a in call.args)
+      if (a.name == null) a,
+  ];
+  final props = <String, Object?>{};
+  final bound = propNames.length < positional.length
+      ? propNames.length
+      : positional.length;
+  for (var i = 0; i < bound; i++) {
+    props[propNames[i]] = resolveArg(positional[i], propNames[i]);
+  }
+  return props;
+}
+
+/// Walks the positional args of [call], evaluates each value against
 /// [context], and returns a map of prop name to resolved value.
 ///
 /// Special-case: when a prop is marked reactive in [schema]
@@ -51,8 +86,8 @@ bool isReactiveAssign(Object? value) => value is ReactiveAssign;
 /// renders [ReactiveAssign.value] and writes user edits back to
 /// [ReactiveAssign.target].
 ///
-/// Positional args (no `name`) are dropped — v0.1 components only
-/// accept named props.
+/// Component calls must use positional args only; named args are
+/// rejected at parse time.
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -62,23 +97,22 @@ Map<String, Object?> evaluateElementProps({
   required EvalContext context,
 }) {
   final properties = schema.value['properties'];
-  final props = <String, Object?>{};
-  for (final arg in call.args) {
-    final propName = arg.name;
-    if (propName == null) continue;
-
-    final value = arg.value;
-    if (_isReactiveProp(properties, propName) && value is StateRef) {
-      final fullName = '\$${value.name}';
-      props[propName] = ReactiveAssign(
-        target: fullName,
-        value: context.store.get(fullName),
-      );
-    } else {
-      props[propName] = evaluate(value, context);
-    }
-  }
-  return props;
+  final propNames = orderedPropertyNames(schema);
+  return bindPositionalProps(
+    call: call,
+    propNames: propNames,
+    resolveArg: (arg, propName) {
+      final value = arg.value;
+      if (_isReactiveProp(properties, propName) && value is StateRef) {
+        final fullName = '\$${value.name}';
+        return ReactiveAssign(
+          target: fullName,
+          value: context.store.get(fullName),
+        );
+      }
+      return evaluate(value, context);
+    },
+  );
 }
 
 bool _isReactiveProp(Object? properties, String propName) {

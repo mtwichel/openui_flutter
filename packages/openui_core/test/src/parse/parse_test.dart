@@ -29,6 +29,26 @@ final ParamMap _schema = <String, List<ParamSpec>>{
 CompiledProgram _parse(String input) => parse(input, _schema);
 List<OpenUIError> _errors(String input) => _parse(input).meta.errors;
 
+ComponentDefinition _paramMapTestComponent(
+  String name, {
+  Map<String, Object?> properties = const {},
+  List<String>? required,
+  Object? propertiesOverride,
+}) {
+  final schemaMap = <String, Object?>{
+    'type': 'object',
+    if (propertiesOverride != null)
+      'properties': propertiesOverride
+    else
+      'properties': properties,
+    if (required != null && required.isNotEmpty) 'required': required,
+  };
+  return ComponentDefinition(
+    name: name,
+    schema: Schema.fromMap(schemaMap),
+  );
+}
+
 void main() {
   group('unknown-component', () {
     test('reports when component name is not in schema', () {
@@ -61,26 +81,28 @@ void main() {
   });
 
   group('excess-args', () {
-    test('reports excess-args but still renders with valid args', () {
+    test('ignores extra positionals and still renders with valid args', () {
       final result = _parse('root = Title("hello", "extra")');
       expect(
         _errors('root = Title("hello", "extra")')
             .whereType<EvaluationError>()
             .where((e) => e.message?.contains('excess dropped') ?? false),
-        isNotEmpty,
+        isEmpty,
       );
       expect(result.root, isNotNull);
       expect(result.root!.props['text'], 'hello');
     });
 
-    test('excess-args message lists the count', () {
+    test('does not report excess when many extra positionals are passed', () {
       final errs = _errors('root = Title("hello", "extra", "more")');
-      final excess = errs.firstWhere(
-        (e) =>
-            e is EvaluationError &&
-            (e.message?.contains('excess dropped') ?? false),
+      expect(
+        errs.where(
+          (e) =>
+              e is EvaluationError &&
+              (e.message?.contains('excess dropped') ?? false),
+        ),
+        isEmpty,
       );
-      expect((excess as EvaluationError).message, contains('2 excess dropped'));
     });
 
     test('does not report when arg count matches param count', () {
@@ -406,7 +428,7 @@ void main() {
         final result = _parse(
           r'$q = @Query(x)'
           '\n'
-          r'root = Title(text: $q)'
+          r'root = Title($q)'
           '\n',
         );
         expect(result.root, isNotNull);
@@ -485,6 +507,55 @@ void main() {
     test('props map is unmodifiable', () {
       final r = ResolvedElement(typeName: 'X', props: const {'a': 1});
       expect(() => r.props['a'] = 2, throwsUnsupportedError);
+    });
+  });
+
+  group('paramMapFromLibrary', () {
+    test('maps property order and required flags from schemas', () {
+      final lib = LibraryDefinition(
+        components: [
+          _paramMapTestComponent(
+            'Button',
+            properties: {
+              'label': {'type': 'string'},
+              'count': {'type': 'integer'},
+            },
+            required: ['label'],
+          ),
+        ],
+      );
+
+      final map = paramMapFromLibrary(lib);
+
+      expect(map.keys, ['Button']);
+      final specs = map['Button']!;
+      expect(specs, hasLength(2));
+      expect(specs[0].name, 'label');
+      expect(specs[0].required, isTrue);
+      expect(specs[1].name, 'count');
+      expect(specs[1].required, isFalse);
+    });
+
+    test('skips components whose properties value is not a map', () {
+      final lib = LibraryDefinition(
+        components: [
+          _paramMapTestComponent('Bad', propertiesOverride: 'not-a-map'),
+          _paramMapTestComponent(
+            'Good',
+            properties: {
+              'text': {'type': 'string'},
+            },
+          ),
+        ],
+      );
+
+      final map = paramMapFromLibrary(lib);
+
+      expect(map.containsKey('Bad'), isFalse);
+      final specs = map['Good']!;
+      expect(specs, hasLength(1));
+      expect(specs.single.name, 'text');
+      expect(specs.single.required, isFalse);
     });
   });
 }

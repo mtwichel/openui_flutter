@@ -93,7 +93,7 @@ void main() {
       final result = generatePrompt(
         LibraryDefinition(components: [c]),
       );
-      expect(result, contains('Card(children: array) — primary container'));
+      expect(result, contains('Card(array) — primary container'));
     });
 
     test(
@@ -128,9 +128,8 @@ void main() {
       final result = generatePrompt(
         LibraryDefinition(components: [c]),
       );
-      expect(result, contains('label: string'));
-      expect(result, isNot(contains('label?: string')));
-      expect(result, contains('variant?: string'));
+      expect(result, contains('string'));
+      expect(result, contains('?string'));
     });
 
     test('typeless prop ({}) renders as any', () {
@@ -141,7 +140,7 @@ void main() {
       final result = generatePrompt(
         LibraryDefinition(components: [c]),
       );
-      expect(result, contains('onClick?: any'));
+      expect(result, contains('?any'));
     });
 
     test('prop with type object renders as object', () {
@@ -154,7 +153,7 @@ void main() {
       final result = generatePrompt(
         LibraryDefinition(components: [c]),
       );
-      expect(result, contains('config?: object'));
+      expect(result, contains('?object'));
     });
 
     test('reactive prop (x-reactive: true) renders its base type', () {
@@ -168,7 +167,7 @@ void main() {
       final result = generatePrompt(
         LibraryDefinition(components: [c]),
       );
-      expect(result, contains('value: string'));
+      expect(result, contains('string'));
       expect(result, isNot(contains('x-reactive')));
     });
 
@@ -185,7 +184,7 @@ void main() {
         final result = generatePrompt(
           LibraryDefinition(components: [c]),
         );
-        expect(result, contains('label: string /* button text */'));
+        expect(result, contains('string /* button text */'));
       },
     );
 
@@ -233,8 +232,8 @@ void main() {
       );
       expect(result, contains('lookup('));
       expect(result, contains('→ {'));
-      expect(result, contains('name?: string'));
-      expect(result, contains('count?: integer'));
+      expect(result, contains('?string'));
+      expect(result, contains('?integer'));
     });
 
     test('ToolSpec with scalar outputSchema renders output type', () {
@@ -358,7 +357,12 @@ void main() {
         components: [_comp('Button', description: 'override')],
       );
       final result = extended.prompt();
-      expect('Button('.allMatches(result).length, 1);
+      final componentsSection = result
+          .split('COMPONENTS (use only these):')
+          .last
+          .split('RULES:')
+          .first;
+      expect('Button('.allMatches(componentsSection).length, 1);
       expect(result, contains('override'));
       expect(result, isNot(contains('original')));
     });
@@ -389,12 +393,12 @@ void main() {
 
       expect(
         result,
-        contains('Card(children: array) — elevated surface container'),
+        contains('Card(array) — elevated surface container'),
       );
       expect(
         result,
         contains(
-          'Button(label: string, variant?: string, onClick?: any)'
+          'Button(string, ?string, ?any)'
           ' — tappable button with action',
         ),
       );

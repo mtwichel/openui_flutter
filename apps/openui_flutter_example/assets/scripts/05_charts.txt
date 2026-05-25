@@ -1,17 +1,17 @@
-root = Card(children: [
-  CardHeader(title: "Weekly metrics"),
+root = Card([
+  CardHeader("Weekly metrics"),
   BarChart(
-    series: [
+    [
       {name: "signups", values: [12, 18, 22, 15, 30, 27, 24]},
       {name: "churn", values: [4, 3, 6, 5, 2, 4, 3]}
     ],
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
   ),
   Separator(),
   LineChart(
-    series: [
+    [
       {name: "latency_p95", values: [120, 115, 130, 125, 110, 105, 100]}
     ],
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
   )
 ])

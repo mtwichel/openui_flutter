@@ -57,7 +57,7 @@ void main() {
     testWidgets('cold renders a static program', (tester) async {
       final harness = TestOpenUiHarness();
       await tester.pumpWidget(
-        _renderer(harness, response: 'root = Text(text: "hello")'),
+        _renderer(harness, response: 'root = Text("hello")'),
       );
       expect(find.text('hello'), findsOneWidget);
     });
@@ -74,7 +74,7 @@ void main() {
         await tester.pumpWidget(
           _renderer(
             harness,
-            response: 'root = Text(text: "first")',
+            response: 'root = Text("first")',
             isStreaming: true,
           ),
         );
@@ -85,9 +85,9 @@ void main() {
             harness,
             response:
                 '\n'
-                'root = Column(children: [a, b])\n'
-                'a = Text(text: "first")\n'
-                'b = Text(text: "second")\n',
+                'root = Column([a, b])\n'
+                'a = Text("first")\n'
+                'b = Text("second")\n',
             isStreaming: true,
           ),
         );
@@ -108,7 +108,7 @@ void main() {
               '\n'
               r'$name = ""'
               '\n'
-              r'root = Input(name: "field", value: $name)'
+              r'root = Input("field", $name)'
               '\n',
           onStateUpdate: updates.add,
         ),
@@ -135,7 +135,7 @@ void main() {
             '\n'
             r'$name = ""'
             '\n'
-            r'root = Input(name: "field", value: $name)'
+            r'root = Input("field", $name)'
             '\n',
           ),
         );
@@ -150,7 +150,7 @@ void main() {
 
 \$name = ""
 \$other = ""
-root = Column(children: [Input(name: "field", value: \$name), Input(name: "second", value: \$other)])
+root = Column([Input("field", \$name), Input("second", \$other)])
 ''';
         await tester.pumpWidget(app(expanded));
         await tester.pump();
@@ -172,7 +172,7 @@ root = Column(children: [Input(name: "field", value: \$name), Input(name: "secon
       (tester) async {
         final events = <ActionEvent>[];
         const program = '''\$count = 0
-root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
+root = Counter( \$count, [@Set(\$count, \$count + 1)])
 ''';
         await tester.pumpWidget(
           _renderer(
@@ -199,7 +199,7 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
         const program =
             r'$count = 0'
             '\n'
-            r'root = Counter(value: $count, onIncrement: [@Set($count, $count + 1)])';
+            r'root = Counter( $count, [@Set($count, $count + 1)])';
         await tester.pumpWidget(
           _renderer(
             TestOpenUiHarness(),
@@ -221,9 +221,9 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
       'Reset step writes the declared default back to the store',
       (tester) async {
         const program = '''\$count = 7
-root = Column(children: [
-  Counter(value: \$count, onIncrement: [@Set(\$count, \$count - 1)]),
-  Counter(value: 0, onIncrement: [@Reset(\$count)])
+root = Column([
+  Counter( \$count, [@Set(\$count, \$count - 1)]),
+  Counter( 0, [@Reset(\$count)])
 ])
 ''';
         await tester.pumpWidget(
@@ -266,7 +266,7 @@ root = Column(children: [
       );
       const program = '''\$data = @Query(lookup)
 refresh = Mutation(name: "refresh")
-root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
+root = Counter( \$tick, [@Run(\$data)])
 ''';
       await tester.pumpWidget(_renderer(harness, response: program));
 
@@ -296,7 +296,7 @@ root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
             ),
           ],
         );
-        const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
+        const program = '\$products = @Query(fetch)\nroot = Text("x")\n';
         await tester.pumpWidget(
           _renderer(
             harness,
@@ -329,7 +329,7 @@ root = Counter(value: \$tick, onIncrement: [@Run(\$data)])
           ],
         );
         const program = '''\$products = @Query(fetch)
-root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
+root = \$products == null ? Text("Loading...") : Text("loaded")
 ''';
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
@@ -366,7 +366,7 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
         );
         const program =
             '\$products = @Query(fetch)\n'
-            'root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")';
+            'root = \$products == null ? Text("Loading...") : Text("loaded")';
         await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
         expect(calls, 1);
@@ -387,7 +387,7 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
             ),
           ],
         );
-        const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
+        const program = '\$products = @Query(fetch)\nroot = Text("x")\n';
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
           _renderer(
@@ -419,7 +419,7 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
             ),
           ],
         );
-        const program = '\$products = @Query(fetch)\nroot = Text(text: "x")\n';
+        const program = '\$products = @Query(fetch)\nroot = Text("x")\n';
         final notifier = ValueNotifier<String>(program);
         await tester.pumpWidget(
           _TestRoot(
@@ -460,7 +460,7 @@ root = \$products == null ? Text(text: "Loading...") : Text(text: "loaded")
         );
         const program = '''\$category = "shoes"
 \$products = @Query(fetch, category: \$category)
-root = Counter(value: 0, onIncrement: [@Set(\$category, "hats"), @Run(\$products)])
+root = Counter( 0, [@Set(\$category, "hats"), @Run(\$products)])
 ''';
         await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
@@ -489,7 +489,7 @@ root = Counter(value: 0, onIncrement: [@Set(\$category, "hats"), @Run(\$products
           ],
         );
         const program = '''\$products = @Query(fetch)
-root = Counter(value: 0, onIncrement: [@Reset(\$products)])
+root = Counter( 0, [@Reset(\$products)])
 ''';
         final events = <ActionEvent>[];
         var snapshot = const <String, Object?>{};
@@ -536,7 +536,7 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
           ],
         );
         const program =
-            'root = Counter(value: 0, onIncrement: [@Run(snackbar, message: "Hello")])';
+            'root = Counter( 0, [@Run(snackbar, message: "Hello")])';
         await tester.pumpWidget(_renderer(harness, response: program));
 
         await tester.tap(find.byType(GestureDetector));
@@ -569,7 +569,7 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
       await tester.pumpWidget(
         _renderer(
           TestOpenUiHarness(),
-          response: 'root = Text(text: "x")',
+          response: 'root = Text("x")',
           onParseResult: (r) => captured = r,
         ),
       );
@@ -585,7 +585,7 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
       await tester.pumpWidget(
         _renderer(
           TestOpenUiHarness(),
-          response: '\$count = 0\nroot = Text(text: "")',
+          response: '\$count = 0\nroot = Text("")',
           initialState: const <String, Object?>{r'$count': 42},
           onStateUpdate: snapshots.add,
         ),
@@ -595,7 +595,7 @@ root = Counter(value: 0, onIncrement: [@Reset(\$products)])
         _renderer(
           TestOpenUiHarness(),
           response: '''\$count = 0
-root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
+root = Counter( \$count, [@Set(\$count, \$count + 1)])
 ''',
           initialState: const <String, Object?>{r'$count': 42},
           onStateUpdate: snapshots.add,
@@ -635,7 +635,7 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
         await tester.pumpWidget(
           _renderer(
             harness,
-            response: 'root = Text(text: "hello")',
+            response: 'root = Text("hello")',
             componentRegistry: const ComponentRegistry(renderers: {}),
             onError: errors.addAll,
           ),
@@ -672,8 +672,7 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
       'evaluated message',
       (tester) async {
         final messages = <String>[];
-        const program =
-            '''root = Counter(value: 0, onIncrement: [@ToAssistant("retry")])
+        const program = '''root = Counter( 0, [@ToAssistant("retry")])
 ''';
         await tester.pumpWidget(
           _renderer(
@@ -704,7 +703,7 @@ root = Counter(value: \$count, onIncrement: [@Set(\$count, \$count + 1)])
         );
         const program = '''refresh = Mutation(name: "fail")
 \$flag = 0
-root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
+root = Counter( \$flag, [@Run(refresh), @Set(\$flag, 999)])
 ''';
         final stateUpdates = <Map<String, Object?>>[];
         await tester.pumpWidget(
@@ -738,7 +737,7 @@ root = Counter(value: \$flag, onIncrement: [@Run(refresh), @Set(\$flag, 999)])
           ],
         );
         const program = '''refresh = Mutation(name: "fail")
-root = Counter(value: 0, onIncrement: [@Run(refresh)])
+root = Counter( 0, [@Run(refresh)])
 ''';
         var lastSnapshot = const <OpenUIError>[];
         await tester.pumpWidget(
@@ -770,7 +769,7 @@ root = Counter(value: 0, onIncrement: [@Run(refresh)])
           isStreaming: true,
         );
 
-        await tester.pumpWidget(tree('root = Text(text: "kept")\n'));
+        await tester.pumpWidget(tree('root = Text("kept")\n'));
         await tester.pumpAndSettle();
         expect(find.text('kept'), findsOneWidget);
 
@@ -789,9 +788,9 @@ root = Counter(value: 0, onIncrement: [@Run(refresh)])
       'ternary in children array renders chosen CompCall branch',
       (tester) async {
         const program = '''\$saved = ""
-root = Column(children: [
-  Counter(value: 0, onIncrement: [@Set(\$saved, "hi")]),
-  \$saved == "" ? Text(text: "empty") : Text(text: \$saved)
+root = Column([
+  Counter( 0, [@Set(\$saved, "hi")]),
+  \$saved == "" ? Text("empty") : Text(\$saved)
 ])
 ''';
         await tester.pumpWidget(
@@ -815,8 +814,8 @@ root = Column(children: [
       'Ternary)',
       (tester) async {
         const program = '''\$saved = "x"
-root = Column(children: [
-  \$saved == "" ? Text(text: "empty") : Text(text: "filled")
+root = Column([
+  \$saved == "" ? Text("empty") : Text("filled")
 ])
 ''';
         await tester.pumpWidget(
@@ -833,7 +832,7 @@ root = Column(children: [
       '@Each with the new 3-arg form renders one widget per item',
       (tester) async {
         const program = '''items = ["alpha", "beta", "gamma"]
-root = @Each(items, "row", Text(text: row))
+root = @Each(items, "row", Text(row))
 ''';
         await tester.pumpWidget(
           _renderer(TestOpenUiHarness(), response: program),
@@ -849,7 +848,7 @@ root = @Each(items, "row", Text(text: row))
       'component prop set to @Each resolves through the prop-iteration branch',
       (tester) async {
         const program = '''items = ["one", "two"]
-root = Column(children: @Each(items, "row", Text(text: row)))
+root = Column([@Each(items, "row", Text(row))])
 ''';
         await tester.pumpWidget(
           _renderer(TestOpenUiHarness(), response: program),
@@ -870,7 +869,7 @@ root = Column(children: @Each(items, "row", Text(text: row)))
           isStreaming: streaming,
         );
 
-        await tester.pumpWidget(tree('root = Text(text: "alpha")\n'));
+        await tester.pumpWidget(tree('root = Text("alpha")\n'));
         await tester.pumpAndSettle();
         expect(find.text('alpha'), findsOneWidget);
 

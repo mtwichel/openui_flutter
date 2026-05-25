@@ -20,14 +20,15 @@ const String _kGrammarPrimer =
     r'- `$varName` is a store variable. Declare at top-level (for example '
     r'`$count = 0`) and read it in expressions (for example `$count + 1`).'
     '\n'
-    '- Component calls use `Type(named: value, ...)`. '
+    '- Component calls use positional arguments only: `Type(arg1, arg2, ...)`. '
+    'Args map to each component schema property in order. '
     'Type names are capitalized.'
     '\n'
     '- All `@Name(...)` calls are built-ins.'
     '\n'
     '- Iterate with `@Each(list, "name", template)` — the second arg '
     'is a string literal naming the loop variable, used bare inside '
-    'the template (e.g. `@Each(items, "row", Card(title: row.name))`). '
+    'the template (e.g. `@Each(items, "row", Card(row.name))`). '
     r'`$index` is also in scope.'
     '\n'
     '- Strings are double-quoted; numbers are bare; '
@@ -37,9 +38,9 @@ const String _kGrammarPrimer =
     ' `>=`, `&&`, `||`, `!`, ternary `a ? b : c`.'
     '\n'
     '- If a prop has `x-action: true` (for example `onClick`), pass a '
-    'literal array of action steps only, for example '
-    r'`onClick: [@Set($count, $count + 1)]` or '
-    r'`onClick: [@Run(refresh), @Set($flag, 1)]`.'
+    'literal array of action steps in that positional slot, for example '
+    r'`Button("OK", [@Set($count, $count + 1)])` or '
+    r'`Button("Run", [@Run(refresh), @Set($flag, 1)])`.'
     '\n'
     '- Do not use a bare `@Step(...)` for `x-action` props; do not wrap '
     'steps in `Action(...)`. A single-step handler is still a '
@@ -110,13 +111,13 @@ String _formatObjectPropertyList(Schema schema) {
     final raw = props[name];
     if (raw is! Map<String, Object?>) {
       final opt = !required.contains(name);
-      segments.add('$name${opt ? '?' : ''}: any');
+      segments.add('${opt ? '?' : ''}any');
       continue;
     }
     final opt = !required.contains(name);
     final typeName = _jsonTypeKeyword(raw);
     final desc = raw['description'];
-    var piece = '$name${opt ? '?' : ''}: $typeName';
+    var piece = '${opt ? '?' : ''}$typeName';
     if (desc is String && desc.isNotEmpty) {
       piece = '$piece /* $desc */';
     }

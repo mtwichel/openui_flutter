@@ -30,3 +30,7 @@ tools/spikes/*/build/
 tools/spikes/*/pubspec.lock
 
 .cursor/
+
+# Agent brainstorm and implementation plans (local-only)
+docs/brainstorm/
+docs/plan/

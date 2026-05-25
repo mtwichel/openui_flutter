@@ -222,6 +222,10 @@ class StreamParser {
           s,
           committedOffsetBoundary: split.prefix.length,
         ),
+        ...validateComponentArgShape(
+          s,
+          committedOffsetBoundary: split.prefix.length,
+        ),
       ],
     ];
 

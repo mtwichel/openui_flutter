@@ -51,8 +51,8 @@ ComponentDefinition buttonDefinition() {
     schema: Schema.object(
       properties: {
         'label': Schema.string(),
-        'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
         'onClick': Schema.any().xAction(),
+        'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
       },
       required: ['label'],
     ),

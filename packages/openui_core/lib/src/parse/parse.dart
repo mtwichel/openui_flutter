@@ -1,5 +1,7 @@
 import 'package:meta/meta.dart';
 import 'package:openui_core/src/errors/errors.dart';
+import 'package:openui_core/src/library/definitions.dart';
+import 'package:openui_core/src/library/library.dart';
 import 'package:openui_core/src/parser/parser.dart';
 
 /// One parameter slot in a component's [ParamMap] entry.
@@ -37,6 +39,33 @@ class ParamSpec {
 /// Marked `@experimental` per D12.
 @experimental
 typedef ParamMap = Map<String, List<ParamSpec>>;
+
+/// Builds a [ParamMap] from [library] component schemas.
+///
+/// Positional slot order matches each schema's `properties` key order.
+///
+/// Marked `@experimental` per D12.
+@experimental
+ParamMap paramMapFromLibrary(LibraryDefinition library) {
+  final map = <String, List<ParamSpec>>{};
+  for (final component in library.components) {
+    final root = component.schema.value;
+    final properties = root['properties'];
+    if (properties is! Map<String, Object?>) continue;
+    final requiredRaw = root['required'];
+    final required = <String>{};
+    if (requiredRaw is List) {
+      for (final entry in requiredRaw) {
+        required.add(entry.toString());
+      }
+    }
+    map[component.name] = [
+      for (final name in properties.keys)
+        ParamSpec(name: name, required: required.contains(name)),
+    ];
+  }
+  return map;
+}
 
 /// A fully-resolved element node from the integration-style [parse].
 ///
@@ -437,32 +466,12 @@ ResolvedElement? _materializeComp(CompCall node, _MatCtx ctx) {
     return null;
   }
 
-  final props = <String, Object?>{};
-  final positional = <Argument>[
-    for (final a in node.args)
-      if (a.name == null) a,
-  ];
-  for (var i = 0; i < params.length && i < positional.length; i++) {
-    props[params[i].name] = _materializeValue(positional[i].value, ctx);
-  }
-
-  if (positional.length > params.length) {
-    final excess = positional.length - params.length;
-    ctx.errors.add(
-      EvaluationError(
-        message:
-            '$name takes ${params.length} arg(s), '
-            'got ${positional.length} ($excess excess dropped)',
-        statementId: ctx.currentStatementId,
-      ),
-    );
-  }
-
-  // Named args layer on top of positional mappings; allows callers to
-  // mix `Stack(name: "...", children: [...])` style.
-  for (final a in node.args) {
-    if (a.name != null) props[a.name!] = _materializeValue(a.value, ctx);
-  }
+  final propNames = [for (final p in params) p.name];
+  final props = bindPositionalProps(
+    call: node,
+    propNames: propNames,
+    resolveArg: (arg, _) => _materializeValue(arg.value, ctx),
+  );
 
   // Required-prop validation. Try defaultValue before erroring.
   var hasFatal = false;

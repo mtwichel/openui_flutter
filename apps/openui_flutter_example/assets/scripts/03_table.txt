@@ -1,12 +1,12 @@
-root = Card(children: [
-  CardHeader(title: "Top issues", subtitle: "Static fixture; no live query"),
+root = Card([
+  CardHeader("Top issues", "Static fixture; no live query"),
   Table(
-    columns: [
+    [
       {name: "id", label: "ID"},
       {name: "title", label: "Title"},
       {name: "priority", label: "Priority"}
     ],
-    rows: [
+    [
       {id: "OPEN-1", title: "Renderer not preserving focus", priority: "high"},
       {id: "OPEN-2", title: "Markdown debounce too aggressive", priority: "med"},
       {id: "OPEN-3", title: "Tabs height collapses on iPad", priority: "low"},

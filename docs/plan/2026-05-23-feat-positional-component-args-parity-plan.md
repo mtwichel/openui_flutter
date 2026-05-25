@@ -151,7 +151,7 @@ None.
 - [ ] **C5** Renderer test: positional `onClick` slot + `[@Set(...)]`; streaming incomplete disables action (A6).
 - [ ] **C6** `prompt_test.dart`: positional grammar, positional signatures, no `Card(title: row.name)` in `@Each` example.
 - [ ] **C7** Example/widget test: positional `02_counter`-style script (use **verified** arg order per `button.dart` — see migration hazards).
-- [ ] **~~C5 canonical golden~~** — **Deferred to phase 2** (canonical paste mis-binds until schema reorder).
+- [ ] **~~C5 canonical golden~~** — **Deferred to phase 2** (canonical paste mismatches bindings until schema reorder).
 
 ### Phase D — Migration surface
 

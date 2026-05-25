@@ -607,10 +607,13 @@ void main() {
       expect(ast.args.single.name, 'child');
     });
 
-    test('comp call with mixed args + trailing comma parses at expression level', () {
-      final ast = parseExpression('Stack(a, b: 1, c: 2,)') as CompCall;
-      expect(ast.args.map((a) => a.name).toList(), [null, 'b', 'c']);
-    });
+    test(
+      'comp call with mixed args + trailing comma parses at expression level',
+      () {
+        final ast = parseExpression('Stack(a, b: 1, c: 2,)') as CompCall;
+        expect(ast.args.map((a) => a.name).toList(), [null, 'b', 'c']);
+      },
+    );
 
     test('builtin call: @Each(list, "name", template) parses with 3 args', () {
       final ast = parseExpression('@Each(items, "t", t.name)') as BuiltinCall;

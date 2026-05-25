@@ -70,7 +70,7 @@ const _streamingTwoMessages = ChatState(
     UiMessage(
       id: 'a1',
       role: UiMessageRole.assistant,
-      text: 'root = Card(children: [])',
+      text: 'root = Card([])',
     ),
   ],
 );
@@ -91,7 +91,7 @@ const _streamingPartialRender = ChatState(
     UiMessage(
       id: 'a1',
       role: UiMessageRole.assistant,
-      text: 'root = Stack(children: [TextContent(text: "Partial")])',
+      text: 'root = Stack([TextContent("Partial")])',
     ),
   ],
 );
@@ -102,7 +102,7 @@ const _idleFinalRender = ChatState(
     UiMessage(
       id: 'a1',
       role: UiMessageRole.assistant,
-      text: 'root = Stack(children: [TextContent(text: "Final")])',
+      text: 'root = Stack([TextContent("Final")])',
     ),
   ],
 );
@@ -199,7 +199,7 @@ void main() {
       await tester.pumpWidget(_viewHarness(bloc));
 
       expect(find.text('hi'), findsOneWidget);
-      expect(find.text('root = Card(children: [])'), findsOneWidget);
+      expect(find.text('root = Card([])'), findsOneWidget);
     });
 
     testWidgets('shows collapsible generated code, store, and action panels', (
@@ -268,7 +268,7 @@ void main() {
             UiMessage(
               id: 'a1',
               role: UiMessageRole.assistant,
-              text: 'root = Text(text: "hi")',
+              text: 'root = TextContent("hi")',
             ),
           ],
           renderStoreSnapshot: <String, Object?>{r'$count': 3},
@@ -293,7 +293,7 @@ void main() {
             UiMessage(
               id: 'a1',
               role: UiMessageRole.assistant,
-              text: 'root = Text(text: "hi")',
+              text: 'root = TextContent("hi")',
             ),
           ],
           actionLog: [

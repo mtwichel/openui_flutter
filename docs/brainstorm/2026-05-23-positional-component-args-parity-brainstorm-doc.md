@@ -103,7 +103,7 @@ Explicit ordered param list per component; single source of truth; golden tests 
 
 5. **Shared resolver in `library.dart`** — `parse()` `_materializeComp` delegates to the same helper to avoid dual behavior (fixes the split where `parse()` maps positionals but `Renderer` does not).
 
-6. **Param order phase 1 = Dart schema insertion order** — Accept that canonical programs using canonical Zod order may mis-bind until schemas are reordered (documented follow-up). Add a checklist test or table in plan phase comparing canonical vs Dart order per shipped component.
+6. **Param order phase 1 = Dart schema insertion order** — Accept that canonical programs using canonical Zod order may mismatch bindings until schemas are reordered (documented follow-up). Add a checklist test or table in plan phase comparing canonical vs Dart order per shipped component.
 
 7. **Builtins and actions unchanged** — `@Query`, `@Each`, `@Run`, etc. keep their existing positional/named rules. Only **`CompCall` / component** arg lists are positional-only; `ident: expr` remains valid inside builtin calls, object literals, and `Mutation` args.
 

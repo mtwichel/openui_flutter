@@ -672,8 +672,7 @@ root = Counter( \$count, [@Set(\$count, \$count + 1)])
       'evaluated message',
       (tester) async {
         final messages = <String>[];
-        const program =
-            '''root = Counter( 0, [@ToAssistant("retry")])
+        const program = '''root = Counter( 0, [@ToAssistant("retry")])
 ''';
         await tester.pumpWidget(
           _renderer(

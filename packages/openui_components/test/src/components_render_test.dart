@@ -134,8 +134,7 @@ root = Button("Click", [@Set($count, $count + 1)])
           MaterialApp(
             home: Scaffold(
               body: Renderer(
-                response:
-                    'root = Button("Retry", [@ToAssistant("retry")])',
+                response: 'root = Button("Retry", [@ToAssistant("retry")])',
                 library: standardLibraryDefinition(),
                 componentRegistry: standardComponentRegistry(),
                 toolRegistry: const ToolRegistry(executors: {}),

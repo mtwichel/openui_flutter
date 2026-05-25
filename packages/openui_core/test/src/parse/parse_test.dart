@@ -29,6 +29,26 @@ final ParamMap _schema = <String, List<ParamSpec>>{
 CompiledProgram _parse(String input) => parse(input, _schema);
 List<OpenUIError> _errors(String input) => _parse(input).meta.errors;
 
+ComponentDefinition _paramMapTestComponent(
+  String name, {
+  Map<String, Object?> properties = const {},
+  List<String>? required,
+  Object? propertiesOverride,
+}) {
+  final schemaMap = <String, Object?>{
+    'type': 'object',
+    if (propertiesOverride != null)
+      'properties': propertiesOverride
+    else
+      'properties': properties,
+    if (required != null && required.isNotEmpty) 'required': required,
+  };
+  return ComponentDefinition(
+    name: name,
+    schema: Schema.fromMap(schemaMap),
+  );
+}
+
 void main() {
   group('unknown-component', () {
     test('reports when component name is not in schema', () {
@@ -491,30 +511,10 @@ void main() {
   });
 
   group('paramMapFromLibrary', () {
-    ComponentDefinition _component(
-      String name, {
-      Map<String, Object?> properties = const {},
-      List<String>? required,
-      Object? propertiesOverride,
-    }) {
-      final schemaMap = <String, Object?>{
-        'type': 'object',
-        if (propertiesOverride != null)
-          'properties': propertiesOverride
-        else
-          'properties': properties,
-        if (required != null && required.isNotEmpty) 'required': required,
-      };
-      return ComponentDefinition(
-        name: name,
-        schema: Schema.fromMap(schemaMap),
-      );
-    }
-
     test('maps property order and required flags from schemas', () {
       final lib = LibraryDefinition(
         components: [
-          _component(
+          _paramMapTestComponent(
             'Button',
             properties: {
               'label': {'type': 'string'},
@@ -539,8 +539,8 @@ void main() {
     test('skips components whose properties value is not a map', () {
       final lib = LibraryDefinition(
         components: [
-          _component('Bad', propertiesOverride: 'not-a-map'),
-          _component(
+          _paramMapTestComponent('Bad', propertiesOverride: 'not-a-map'),
+          _paramMapTestComponent(
             'Good',
             properties: {
               'text': {'type': 'string'},

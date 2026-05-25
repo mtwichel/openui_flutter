@@ -44,12 +44,17 @@ Widget _app(
 
 void main() {
   group('Renderer + openuiLibrary', () {
-    test('Button schema marks onClick as action-capable', () {
+    test('Button schema marks action as action-capable in canonical order', () {
       final button = standardLibraryDefinition().component('Button');
       expect(button, isNotNull);
       final props = button!.schema.value['properties']! as Map<String, Object?>;
-      final onClick = props['onClick']! as Map<String, Object?>;
-      expect(onClick['x-action'], isTrue);
+      expect(orderedPropertyNames(button.schema), [
+        'label',
+        'action',
+        'variant',
+      ]);
+      final action = props['action']! as Map<String, Object?>;
+      expect(action['x-action'], isTrue);
     });
 
     testWidgets('renders a Stack of TextContent', (tester) async {
@@ -90,7 +95,7 @@ root = Card([
     });
 
     testWidgets(
-      'Button onClick @Set dispatches to the store and emits a set '
+      'Button action Action([@Set]) dispatches to the store and emits a set '
       'ActionEvent',
       (tester) async {
         final events = <ActionEvent>[];
@@ -103,7 +108,7 @@ root = Card([
             home: Scaffold(
               body: Renderer(
                 response: r'''$count = 0
-root = Button("Click", [@Set($count, $count + 1)])
+root = Button("Click", Action([@Set($count, $count + 1)]), "primary")
 ''',
                 library: standardLibraryDefinition(),
                 componentRegistry: standardComponentRegistry(),
@@ -123,18 +128,19 @@ root = Button("Click", [@Set($count, $count + 1)])
     );
 
     testWidgets(
-      'Button with onClick AST disabled mid-stream does NOT fire the '
+      'Button with action AST disabled mid-stream does NOT fire the '
       'implicit @ToAssistant path',
       (tester) async {
         final events = <ActionEvent>[];
-        // No trailing newline + isStreaming: true puts the onClick AST in
+        // No trailing newline + isStreaming: true puts the action AST in
         // meta.incomplete, so the renderer disables the action. The Button
         // must stay tap-inert — not silently send the label to the LLM.
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
               body: Renderer(
-                response: 'root = Button("Retry", [@ToAssistant("retry")])',
+                response:
+                    'root = Button("Retry", Action([@ToAssistant("retry")]))',
                 library: standardLibraryDefinition(),
                 componentRegistry: standardComponentRegistry(),
                 toolRegistry: const ToolRegistry(executors: {}),
@@ -155,7 +161,7 @@ root = Button("Click", [@Set($count, $count + 1)])
     );
 
     testWidgets(
-      'Button with invalid onClick payload stays inert and does not throw',
+      'Button with invalid action payload stays inert and does not throw',
       (tester) async {
         final events = <ActionEvent>[];
         await tester.pumpWidget(
@@ -172,7 +178,7 @@ root = Button("Click", [@Set($count, $count + 1)])
     );
 
     testWidgets(
-      'Button without onClick fires implicit @ToAssistant with its label',
+      'Button without action fires implicit @ToAssistant with its label',
       (tester) async {
         final calls = <_ContinueConversationCall>[];
         await tester.pumpWidget(
@@ -233,7 +239,7 @@ root = Input("field", \$name)
 $name = "before"
 root = Stack([
   Input("field", $name),
-  Button("Go", [@Set($name, "after")])
+  Button("Go", Action([@Set($name, "after")]))
 ])
 
 ''',

@@ -41,7 +41,7 @@ class RendererScope extends InheritedWidget {
   /// Single public seam for components to dispatch an action.
   ///
   /// The `action` argument is always required. For an implicit
-  /// continue-conversation (for example a `Button` with no `onClick`),
+  /// continue-conversation (for example a `Button` with no `action`),
   /// pass `implicitContinueConversationPlan` built from the user-facing
   /// label.
   /// Each step invokes `onAction` once (including failed `@Run`, skipped

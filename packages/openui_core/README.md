@@ -112,7 +112,7 @@ ctx.errors;                        // CyclicStateError + EvaluationError
 ### Action plan + dispatcher
 
 ```dart
-final plan = actionPlanFromAst(rhs)!;  // null unless rhs is a non-empty
+final plan = actionPlanFromActionCall(rhs)!;  // Action([...]) CompCall
                                       // [...] of action builtins only
 await dispatchAction(
   plan: plan,

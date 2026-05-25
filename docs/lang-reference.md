@@ -90,7 +90,7 @@ Every statement is classified at parse time as one of:
 | `@Map` | `@Map(list, transformRef)` | Maps each element through a comp ref |
 | `@Query` | `@Query(toolName, named: value, ...)` | Only valid as the entire RHS of `$var = @Query(...)`. Runs the named tool exactly once per `(statementId, evaluated-args)` tuple after streaming completes; writes the result through the store. `null` while loading. Errors surface via `Renderer.onError`. Re-fire with `@Run($var)` |
 
-Action-step builtins (only as elements of a **non-empty array literal** on props marked `x-action: true` in the component schema, for example `onClick: [@Set($count, $count + 1)]` or `onClick: [@Run(refresh), @Set($flag, 1)]`. Bare `@Step(...)`, empty `[]`, `Action(...)`, and arrays containing non-action expressions are rejected.)
+Action-step builtins (only inside **`Action([...])`** on props marked `x-action: true` in the component schema, for example `Button("OK", Action([@Set($count, $count + 1)]), "primary")`. Bare `@Step(...)`, bare `[@Set(...)]` arrays, empty `Action([])`, and invalid step expressions are rejected.)
 
 | Builtin | Signature | Semantics |
 |---|---|---|

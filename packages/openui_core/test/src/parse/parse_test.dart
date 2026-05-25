@@ -489,4 +489,73 @@ void main() {
       expect(() => r.props['a'] = 2, throwsUnsupportedError);
     });
   });
+
+  group('paramMapFromLibrary', () {
+    ComponentDefinition _component(
+      String name, {
+      Map<String, Object?> properties = const {},
+      List<String>? required,
+      Object? propertiesOverride,
+    }) {
+      final schemaMap = <String, Object?>{
+        'type': 'object',
+        if (propertiesOverride != null)
+          'properties': propertiesOverride
+        else
+          'properties': properties,
+        if (required != null && required.isNotEmpty) 'required': required,
+      };
+      return ComponentDefinition(
+        name: name,
+        schema: Schema.fromMap(schemaMap),
+      );
+    }
+
+    test('maps property order and required flags from schemas', () {
+      final lib = LibraryDefinition(
+        components: [
+          _component(
+            'Button',
+            properties: {
+              'label': {'type': 'string'},
+              'count': {'type': 'integer'},
+            },
+            required: ['label'],
+          ),
+        ],
+      );
+
+      final map = paramMapFromLibrary(lib);
+
+      expect(map.keys, ['Button']);
+      final specs = map['Button']!;
+      expect(specs, hasLength(2));
+      expect(specs[0].name, 'label');
+      expect(specs[0].required, isTrue);
+      expect(specs[1].name, 'count');
+      expect(specs[1].required, isFalse);
+    });
+
+    test('skips components whose properties value is not a map', () {
+      final lib = LibraryDefinition(
+        components: [
+          _component('Bad', propertiesOverride: 'not-a-map'),
+          _component(
+            'Good',
+            properties: {
+              'text': {'type': 'string'},
+            },
+          ),
+        ],
+      );
+
+      final map = paramMapFromLibrary(lib);
+
+      expect(map.containsKey('Bad'), isFalse);
+      final specs = map['Good']!;
+      expect(specs, hasLength(1));
+      expect(specs.single.name, 'text');
+      expect(specs.single.required, isFalse);
+    });
+  });
 }

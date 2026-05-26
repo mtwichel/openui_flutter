@@ -18,7 +18,7 @@ export 'src/actions/actions.dart'
         ResetStep,
         RunStep,
         SetStep,
-        actionPlanFromAst,
+        actionPlanFromActionCall,
         dispatchAction,
         implicitContinueConversationPlan;
 export 'src/errors/errors.dart'

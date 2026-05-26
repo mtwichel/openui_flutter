@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'package:openui_core/src/actions/actions.dart';
 import 'package:openui_core/src/errors/errors.dart';
 import 'package:openui_core/src/parser/parser.dart';
 import 'package:openui_core/src/state/store.dart';
@@ -145,6 +146,9 @@ Object? evaluate(AstNode node, EvalContext context) {
       );
       return null;
     case CompCall(:final type):
+      if (type == 'Action') {
+        return actionPlanFromActionCall(node);
+      }
       context.errors.add(
         EvaluationError(
           message: 'cannot evaluate component call $type as a value',

@@ -220,25 +220,24 @@ abstract final class BuiltinActionType {
   static const String run = 'run';
 }
 
-/// Converts an [AstNode] into an [ActionPlan].
+/// Converts `Action([@Set(...), ...])` into an [ActionPlan].
 ///
-/// Only a non-empty [ArrayLit] of action builtins is accepted — each
-/// element must be `@Set`, `@Reset`, `@Run`, or `@ToAssistant` with valid
-/// arguments. A single-step handler must still be written as a
-/// one-element array (for example `[@Set($count, 1)]`). Bare builtins,
-/// `Action(...)`, empty arrays, and arrays containing any non-action
-/// element yield `null` (the renderer treats that as no action handler).
+/// Steps are built from unevaluated AST via [_stepFromAst] so `@Set`
+/// values re-evaluate at click time (Decision D3). Invalid step ASTs are
+/// filtered (canonical JS parity). An empty step list after filtering
+/// yields an [ActionPlan] with no steps (renderer treats as disabled).
 ///
 /// Marked `@experimental` per D12.
 @experimental
-ActionPlan? actionPlanFromAst(AstNode node) {
-  if (node is! ArrayLit) return null;
-  if (node.elements.isEmpty) return null;
+ActionPlan? actionPlanFromActionCall(AstNode node) {
+  if (node is! CompCall || node.type != 'Action') return null;
+  if (node.args.isEmpty) return const ActionPlan(steps: []);
+  final stepsArg = node.args.first.value;
+  if (stepsArg is! ArrayLit) return null;
   final steps = <ActionStep>[];
-  for (final e in node.elements) {
+  for (final e in stepsArg.elements) {
     final s = _stepFromAst(e);
-    if (s == null) return null;
-    steps.add(s);
+    if (s != null) steps.add(s);
   }
   return ActionPlan(steps: steps);
 }
@@ -246,7 +245,7 @@ ActionPlan? actionPlanFromAst(AstNode node) {
 /// A one-step [ActionPlan] that sends [message] to the assistant, same
 /// outcome as `[@ToAssistant("...")]` after evaluation.
 ///
-/// Use when a component (for example `Button` without `onClick`) must call
+/// Use when a component (for example `Button` without `action`) must call
 /// `RendererScope.triggerAction` with a non-null plan per the renderer API.
 ActionPlan implicitContinueConversationPlan(String message) {
   return ActionPlan(

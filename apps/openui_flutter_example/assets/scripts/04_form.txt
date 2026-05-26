@@ -8,6 +8,6 @@ root = Card([
   ]),
   TextContent("Hello, " + $name + " (" + $role + ")"),
   Stack([
-    Button("Reset", [@Reset($name, $role)], "secondary")
+    Button("Reset", Action([@Reset($name, $role)]), "secondary")
   ], "row")
 ])

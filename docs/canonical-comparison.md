@@ -31,7 +31,7 @@ This document compares **OpenUI Lang** as defined by the canonical reference imp
 |-----|--------|
 | **Positional vs named component args** | **Partial** — positional-only syntax + render-path mapping shipped; canonical Zod **property order** still differs for some components (`Stack`, `Button`, …) until schema reorder |
 | **`Query(...)` vs `$var = @Query(...)`** | **High** — different statement form, loading semantics, defaults |
-| **`Action([...])` / `action` prop vs `onClick: [...]`** | **High** — canonical buttons use `action`, not bare arrays on `onClick` |
+| **`Action([...])` / `action` prop vs `onClick: [...]`** | **Resolved** — `action` + `Action([...])`; bare arrays rejected |
 | **Array pluck** (`data.rows.title`) | **High** — breaks canonical Table/Chart column idioms |
 | **Builtin set** (`@Sum`, `@Filter` shape, etc.) | **High** for data-heavy UIs |
 | **Query lifecycle** (auto re-fetch, refresh interval, defaults object) | **High** for reactive dashboards |
@@ -58,7 +58,7 @@ Restoring strict 1:1 parity requires a product decision on whether to support ca
 | Component arguments | **Positional only** — mapped to props by Zod/schema key order ([spec core rules](https://www.openui.com/docs/openui-lang/specification-v05)) | **Positional-only**; named component args rejected at parse; mapped by Dart schema property order | **Partial** (order) |
 | Query statements | `data = Query("tool", {args}, {defaults}, refreshSec?)` | `$var = @Query(toolName, named: value, …)` only; `Query(...)` rejected at parse | **No** |
 | Mutation | `result = Mutation("tool", {args})` positional | `Mutation(name: "...", args: {...})` named | **Partial** |
-| Button actions | `Button("Label", Action([@Set(...)]))` — prop **`action`** | `Button(label: "...", onClick: [@Set(...)])` — prop **`onClick`**; `Action(...)` rejected | **No** |
+| Button actions | `Button("Label", Action([@Set(...)]))` — prop **`action`** | `Button("Label", Action([@Set(...)]))` — prop **`action`**; bare arrays rejected | **Yes** |
 | `@OpenUrl` | Spec + `ACTION_STEPS` in lang-core | Not in `actions.dart` dispatcher | **No** |
 | `@Map` | Not in canonical | In `functionalBuiltins` | Flutter-only |
 | Comments | Not in language | Not in v0.1 | **Yes** |
@@ -347,7 +347,7 @@ Status key: **Shipped** = in `standardLibraryDefinition()` + `standardComponentR
 
 | Component | openuiLibrary | Flutter | Notes |
 |-----------|---------------|---------|-------|
-| `Button` | Yes | **Shipped** | `action` vs `onClick`; variant enum differs |
+| `Button` | Yes | **Shipped** | `action` + `Action([...])`; `text` variant aliases tertiary |
 | `Buttons` | Yes | Missing | Documented in CHANGELOG, not registered |
 
 #### Data display
@@ -374,7 +374,7 @@ Status key: **Shipped** = in `standardLibraryDefinition()` + `standardComponentR
 
 | Component | Canonical (Zod / positional order) | Flutter schema |
 |-----------|-----------------------------------|----------------|
-| `Button` | `label`, `action?`, `variant?` (`primary` \| `secondary` \| `tertiary`), `type?`, `size?` | `label`, `onClick` (`x-action`), `variant` (`primary` \| `secondary` \| `text`) |
+| `Button` | `label`, `action?`, `variant?` (`primary` \| `secondary` \| `tertiary`), `type?`, `size?` | `label`, `action` (`x-action`), `variant` (`primary` \| `secondary` \| `text` → tertiary) |
 | `Callout` | `(variant, title, body, $show?)` | `text`, `variant` |
 | `Stack` | `(children, direction?, gap?, align?, justify?, wrap?)` | Named `children`, `direction`, … |
 | `Card` | Varies | Named `children` |

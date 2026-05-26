@@ -534,6 +534,39 @@ void main() {
     });
   });
 
+  group('Action expression', () {
+    test('Action([@Set(...), @Run(...)]) evaluates to ActionPlan', () {
+      final ctx = _ctxFor('load = Mutation(name: "x", args: {})\n');
+      final plan = evaluate(
+        _rhsOf(r'a = Action([@Set($count, 1), @Run(load)])', 'a'),
+        ctx,
+      );
+      expect(plan, isA<ActionPlan>());
+      final actionPlan = plan! as ActionPlan;
+      expect(actionPlan.steps, hasLength(2));
+      expect(actionPlan.steps[0], isA<SetStep>());
+      expect(actionPlan.steps[1], isA<RunStep>());
+    });
+
+    test('bare array literal does not evaluate to ActionPlan', () {
+      final ctx = _ctxFor('');
+      expect(
+        evaluate(_rhsOf(r'a = [@Set($count, 1)]', 'a'), ctx),
+        isA<List<Object?>>(),
+      );
+    });
+
+    test('submit = Action([...]) resolves through Reference', () {
+      final ctx = _ctxFor(
+        r'submit = Action([@Set($count, 1)])'
+        '\n'
+        'btn = submit\n',
+      );
+      final plan = evaluate(_rhsOf('x = btn', 'x'), ctx);
+      expect(plan, isA<ActionPlan>());
+    });
+  });
+
   group('non-value AST nodes in expression position', () {
     test('CompCall emits an error and returns null', () {
       final ctx = _ctxFor('');

@@ -16,7 +16,7 @@ void main() {
                 'variant': Schema.string(
                   enumValues: ['primary', 'secondary', 'text'],
                 ),
-                'onClick': Schema.any(),
+                'action': Schema.any(),
               },
               required: ['label'],
             ),

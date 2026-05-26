@@ -7,8 +7,8 @@ import 'package:openui/openui.dart';
 import 'package:openui_components/src/internal/schemas.dart';
 import 'package:openui_core/openui_core.dart';
 
-/// `Button(label, onClick, variant?)` — a Material button wired to an
-/// action plan via the `onClick` prop.
+/// `Button(label, action, variant?)` — a Material button wired to an
+/// action plan via the `action` prop (`Action([@Set(...), ...])`).
 class ButtonWidget extends StatelessWidget {
   /// Creates a [ButtonWidget].
   const ButtonWidget({
@@ -35,6 +35,7 @@ class ButtonWidget extends StatelessWidget {
       case 'secondary':
         return OutlinedButton(onPressed: onPressed, child: Text(label));
       case 'text':
+        // Canonical `tertiary`; Flutter schema keeps `text` as alias.
         return TextButton(onPressed: onPressed, child: Text(label));
       case 'primary':
       default:
@@ -51,7 +52,7 @@ ComponentDefinition buttonDefinition() {
     schema: Schema.object(
       properties: {
         'label': Schema.string(),
-        'onClick': Schema.any().xAction(),
+        'action': Schema.any().xAction(),
         'variant': Schema.string(enumValues: ['primary', 'secondary', 'text']),
       },
       required: ['label'],
@@ -68,10 +69,10 @@ Widget renderButton(
 ) {
   final label = props['label']?.toString() ?? '';
   final variant = props['variant'] as String? ?? 'primary';
-  final hasOnClickProp = props.containsKey('onClick');
-  final rawOnClick = props['onClick'];
-  final explicit = rawOnClick is ActionPlan ? rawOnClick : null;
-  final disabled = hasOnClickProp && explicit == null;
+  final hasActionProp = props.containsKey('action');
+  final rawAction = props['action'];
+  final explicit = rawAction is ActionPlan ? rawAction : null;
+  final disabled = hasActionProp && explicit == null;
   final plan = explicit ?? implicitContinueConversationPlan(label);
   return Builder(
     builder: (context) {

@@ -41,13 +41,13 @@ void main() {
       expect(result, contains('Programs are a sequence of statements'));
     });
 
-    test('grammar primer explains x-action requires array of builtins', () {
+    test('grammar primer explains x-action requires Action([...])', () {
       final result = generatePrompt(const LibraryDefinition());
       expect(result, contains('x-action: true'));
+      expect(result, contains('Action(['));
       expect(result, contains('[@Set('));
       expect(result, contains('Do not use a bare `@Step(...)`'));
-      expect(result, contains('do not wrap'));
-      expect(result, contains('Action(...)'));
+      expect(result, contains('bare `[...]` array'));
     });
 
     test('grammar primer is explicit about valid built-in action calls', () {
@@ -135,7 +135,7 @@ void main() {
     test('typeless prop ({}) renders as any', () {
       final c = _comp(
         'Button',
-        properties: {'onClick': const {}},
+        properties: {'action': const {}},
       );
       final result = generatePrompt(
         LibraryDefinition(components: [c]),
@@ -381,7 +381,7 @@ void main() {
         properties: {
           'label': const {'type': 'string'},
           'variant': const {'type': 'string'},
-          'onClick': const {},
+          'action': const {},
         },
         required: ['label'],
         description: 'tappable button with action',

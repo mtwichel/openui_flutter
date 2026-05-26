@@ -573,16 +573,29 @@ class _RendererState extends State<Renderer> {
     String statementId, {
     bool allowAction = false,
   }) {
-    final asAction = allowAction ? actionPlanFromAst(value) : null;
-    if (asAction != null && asAction.steps.isNotEmpty) {
-      // Disable interactivity while the containing statement is still
-      // being streamed (Acceptance Gap A6).
-      final result = _lastResult;
-      final disabled =
-          widget.isStreaming &&
-          (result?.meta.incomplete.contains(statementId) ?? false);
-      if (disabled) return null;
-      return asAction;
+    if (allowAction) {
+      if (value is ArrayLit) {
+        ctx.errors.add(
+          const EvaluationError(
+            message:
+                'x-action props require Action([...]); bare arrays are not '
+                'supported',
+          ),
+        );
+        return null;
+      }
+      final evaluated = evaluate(value, ctx);
+      if (evaluated is ActionPlan && evaluated.steps.isNotEmpty) {
+        // Disable interactivity while the containing statement is still
+        // being streamed (Acceptance Gap A6).
+        final result = _lastResult;
+        final disabled =
+            widget.isStreaming &&
+            (result?.meta.incomplete.contains(statementId) ?? false);
+        if (disabled) return null;
+        return evaluated;
+      }
+      return null;
     }
     if (value is CompCall) {
       return _renderAst(value, ctx, statementHint: statementId);

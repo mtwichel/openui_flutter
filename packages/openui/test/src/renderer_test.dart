@@ -172,7 +172,7 @@ root = Column([Input("field", \$name), Input("second", \$other)])
       (tester) async {
         final events = <ActionEvent>[];
         const program = '''\$count = 0
-root = Counter( \$count, [@Set(\$count, \$count + 1)])
+root = Counter( \$count, Action([@Set(\$count, \$count + 1)]))
 ''';
         await tester.pumpWidget(
           _renderer(
@@ -199,7 +199,7 @@ root = Counter( \$count, [@Set(\$count, \$count + 1)])
         const program =
             r'$count = 0'
             '\n'
-            r'root = Counter( $count, [@Set($count, $count + 1)])';
+            r'root = Counter( $count, Action([@Set($count, $count + 1)]))';
         await tester.pumpWidget(
           _renderer(
             TestOpenUiHarness(),
@@ -222,8 +222,8 @@ root = Counter( \$count, [@Set(\$count, \$count + 1)])
       (tester) async {
         const program = '''\$count = 7
 root = Column([
-  Counter( \$count, [@Set(\$count, \$count - 1)]),
-  Counter( 0, [@Reset(\$count)])
+  Counter( \$count, Action([@Set(\$count, \$count - 1)])),
+  Counter( 0, Action([@Reset(\$count)]))
 ])
 ''';
         await tester.pumpWidget(
@@ -266,7 +266,7 @@ root = Column([
       );
       const program = '''\$data = @Query(lookup)
 refresh = Mutation(name: "refresh")
-root = Counter( \$tick, [@Run(\$data)])
+root = Counter( \$tick, Action([@Run(\$data)]))
 ''';
       await tester.pumpWidget(_renderer(harness, response: program));
 
@@ -460,7 +460,7 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
         );
         const program = '''\$category = "shoes"
 \$products = @Query(fetch, category: \$category)
-root = Counter( 0, [@Set(\$category, "hats"), @Run(\$products)])
+root = Counter( 0, Action([@Set(\$category, "hats"), @Run(\$products)]))
 ''';
         await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
@@ -489,7 +489,7 @@ root = Counter( 0, [@Set(\$category, "hats"), @Run(\$products)])
           ],
         );
         const program = '''\$products = @Query(fetch)
-root = Counter( 0, [@Reset(\$products)])
+root = Counter( 0, Action([@Reset(\$products)]))
 ''';
         final events = <ActionEvent>[];
         var snapshot = const <String, Object?>{};
@@ -536,7 +536,7 @@ root = Counter( 0, [@Reset(\$products)])
           ],
         );
         const program =
-            'root = Counter( 0, [@Run(snackbar, message: "Hello")])';
+            'root = Counter( 0, Action([@Run(snackbar, message: "Hello")]))';
         await tester.pumpWidget(_renderer(harness, response: program));
 
         await tester.tap(find.byType(GestureDetector));
@@ -595,7 +595,7 @@ root = Counter( 0, [@Reset(\$products)])
         _renderer(
           TestOpenUiHarness(),
           response: '''\$count = 0
-root = Counter( \$count, [@Set(\$count, \$count + 1)])
+root = Counter( \$count, Action([@Set(\$count, \$count + 1)]))
 ''',
           initialState: const <String, Object?>{r'$count': 42},
           onStateUpdate: snapshots.add,
@@ -672,7 +672,7 @@ root = Counter( \$count, [@Set(\$count, \$count + 1)])
       'evaluated message',
       (tester) async {
         final messages = <String>[];
-        const program = '''root = Counter( 0, [@ToAssistant("retry")])
+        const program = '''root = Counter( 0, Action([@ToAssistant("retry")]))
 ''';
         await tester.pumpWidget(
           _renderer(
@@ -703,7 +703,7 @@ root = Counter( \$count, [@Set(\$count, \$count + 1)])
         );
         const program = '''refresh = Mutation(name: "fail")
 \$flag = 0
-root = Counter( \$flag, [@Run(refresh), @Set(\$flag, 999)])
+root = Counter( \$flag, Action([@Run(refresh), @Set(\$flag, 999)]))
 ''';
         final stateUpdates = <Map<String, Object?>>[];
         await tester.pumpWidget(
@@ -737,7 +737,7 @@ root = Counter( \$flag, [@Run(refresh), @Set(\$flag, 999)])
           ],
         );
         const program = '''refresh = Mutation(name: "fail")
-root = Counter( 0, [@Run(refresh)])
+root = Counter( 0, Action([@Run(refresh)]))
 ''';
         var lastSnapshot = const <OpenUIError>[];
         await tester.pumpWidget(
@@ -789,7 +789,7 @@ root = Counter( 0, [@Run(refresh)])
       (tester) async {
         const program = '''\$saved = ""
 root = Column([
-  Counter( 0, [@Set(\$saved, "hi")]),
+  Counter( 0, Action([@Set(\$saved, "hi")])),
   \$saved == "" ? Text("empty") : Text(\$saved)
 ])
 ''';

@@ -208,6 +208,9 @@ void main() {
         isNot(equals(QueryCall(const <Argument>[], offset: 0))),
       );
       expect(QueryCall(args, offset: 0).toString(), contains('QueryCall'));
+      final qc = QueryCall(args, offset: 0);
+      final qc2 = QueryCall(args, offset: 9);
+      expect(qc.hashCode, qc2.hashCode);
     });
 
     test('Argument named vs positional equality and toString', () {
@@ -878,6 +881,44 @@ void main() {
       expect(collectQueryDeps(argsObject), containsAll(['days', 'by']));
     });
 
+    test('collectQueryDeps walks builtin calls and literal-only fields', () {
+      final ast = ObjectLit(
+        [
+          ObjectEntry('k', const Literal(1, offset: 0), offset: 0),
+          ObjectEntry(
+            'n',
+            BuiltinCall(
+              '@Count',
+              [
+                Argument(
+                  value: StateRef('items', offset: 0),
+                  offset: 0,
+                ),
+              ],
+              offset: 0,
+            ),
+            offset: 0,
+          ),
+        ],
+        offset: 0,
+      );
+      expect(collectQueryDeps(ast), ['items']);
+      expect(collectQueryDeps(const Literal(1, offset: 0)), isEmpty);
+    });
+
+    test('collectQueryDeps walks state assignment values', () {
+      expect(
+        collectQueryDeps(
+          StateAssign(
+            'x',
+            StateRef('y', offset: 0),
+            offset: 0,
+          ),
+        ),
+        ['y'],
+      );
+    });
+
     test('collectQueryDeps walks refs inside complex arg expressions', () {
       final program = parseProgram(
         r'data = Query("t", {a: $x ? $y : $z, b: -$n, c: $row.field, '
@@ -894,6 +935,14 @@ void main() {
       final program = parseProgram(
         'root = Stack([@Filter([1], @Query(tool))])',
       );
+      expect(
+        program.errors.any((e) => e.message.contains('no longer supported')),
+        isTrue,
+      );
+    });
+
+    test('nested @Query inside a component arg is rejected', () {
+      final program = parseProgram('root = Stack([@Query(tool)])');
       expect(
         program.errors.any((e) => e.message.contains('no longer supported')),
         isTrue,

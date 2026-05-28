@@ -919,6 +919,35 @@ void main() {
       );
     });
 
+    test('collectQueryDeps walks array and binary nodes', () {
+      expect(
+        collectQueryDeps(
+          ArrayLit(const [StateRef('x', offset: 0)], offset: 0),
+        ),
+        ['x'],
+      );
+      expect(
+        collectQueryDeps(
+          const BinaryOp(
+            '+',
+            StateRef('a', offset: 0),
+            StateRef('b', offset: 0),
+            offset: 0,
+          ),
+        ),
+        containsAll(['a', 'b']),
+      );
+      expect(collectQueryDeps(const NullLiteral(offset: 0)), isEmpty);
+    });
+
+    test('top-level @Query expression is rejected', () {
+      final program = parseProgram('greeting = @Query(foo)');
+      expect(
+        program.errors.any((e) => e.message.contains('no longer supported')),
+        isTrue,
+      );
+    });
+
     test('collectQueryDeps walks refs inside complex arg expressions', () {
       final program = parseProgram(
         r'data = Query("t", {a: $x ? $y : $z, b: -$n, c: $row.field, '

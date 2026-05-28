@@ -582,6 +582,17 @@ void main() {
       expect(evaluate(ast, ctx), [null]);
       expect(ctx.errors.single, isA<EvaluationError>());
     });
+
+    test('QueryCall in expression position emits an error', () {
+      final ctx = _ctxFor('');
+      final ast = _rhsOf('a = [Query("tool", {}, {rows: []})]', 'a');
+      expect(evaluate(ast, ctx), [null]);
+      expect(ctx.errors.single, isA<EvaluationError>());
+      expect(
+        (ctx.errors.single as EvaluationError).message,
+        contains('cannot evaluate Query'),
+      );
+    });
   });
 
   group('truthiness rules drive ! and short-circuiting', () {

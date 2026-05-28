@@ -257,6 +257,21 @@ void main() {
       );
     });
 
+    test('inline Query in a component tree emits a materialize error', () {
+      final result = _parse(
+        'root = Stack([Query("tool", {}, {rows: []})])',
+      );
+      expect(
+        result.meta.errors.any(
+          (e) =>
+              e is EvaluationError &&
+              (e.message?.contains('Query() must be a top-level statement') ??
+                  false),
+        ),
+        isTrue,
+      );
+    });
+
     test('cycle in references resolves without infinite recursion', () {
       // `a = b\nb = a` — when resolving `a` we visit `b` which tries
       // to visit `a` (in-progress). The cycle short-circuits to null

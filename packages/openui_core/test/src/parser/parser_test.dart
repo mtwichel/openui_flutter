@@ -199,6 +199,15 @@ void main() {
         MutationCall(args, offset: 0),
         isNot(equals(MutationCall(const <Argument>[], offset: 0))),
       );
+      expect(
+        QueryCall(args, offset: 0),
+        equals(QueryCall(args, offset: 9)),
+      );
+      expect(
+        QueryCall(args, offset: 0),
+        isNot(equals(QueryCall(const <Argument>[], offset: 0))),
+      );
+      expect(QueryCall(args, offset: 0).toString(), contains('QueryCall'));
     });
 
     test('Argument named vs positional equality and toString', () {
@@ -867,6 +876,49 @@ void main() {
       final call = program.statements.single.expression as QueryCall;
       final argsObject = call.args[1].value;
       expect(collectQueryDeps(argsObject), containsAll(['days', 'by']));
+    });
+
+    test('collectQueryDeps walks refs inside complex arg expressions', () {
+      final program = parseProgram(
+        r'data = Query("t", {'
+        r'a: $x ? $y : $z, '
+        r'b: -$n, '
+        r'c: $row.field, '
+        r'd: $items[$i]'
+        r'}, {rows: []})',
+      );
+      final call = program.statements.single.expression as QueryCall;
+      expect(
+        collectQueryDeps(call.args[1].value),
+        containsAll(['x', 'y', 'z', 'n', 'row', 'items', 'i']),
+      );
+    });
+
+    test('nested @Query in a builtin arg is rejected', () {
+      final program = parseProgram(
+        r'root = Stack([@Filter([1], @Query(tool))])',
+      );
+      expect(
+        program.errors.any((e) => e.message.contains('no longer supported')),
+        isTrue,
+      );
+    });
+
+    test('Query with more than four positional args records an error', () {
+      final program = parseProgram(
+        'data = Query("tool", {}, {}, 1, 2)',
+      );
+      expect(program.errors, hasLength(1));
+      expect(program.errors.single.message, contains('at most 4'));
+    });
+
+    test('Query with non-string tool name records an error', () {
+      final program = parseProgram('data = Query(foo, {}, {})');
+      expect(program.errors, hasLength(1));
+      expect(
+        program.errors.single.message,
+        contains('string literal tool name'),
+      );
     });
 
     test(r'$data = Query(...) is rejected', () {

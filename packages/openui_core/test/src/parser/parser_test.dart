@@ -9,7 +9,8 @@
 // own contract suites in subsequent tasks.
 
 import 'package:openui_core/openui_core.dart';
-import 'package:openui_core/src/parser/parser.dart' show collectQueryDeps;
+import 'package:openui_core/src/parser/parser.dart'
+    show collectQueryDeps, validateQueryShape;
 import 'package:test/test.dart';
 
 void main() {
@@ -938,14 +939,20 @@ void main() {
         containsAll(['a', 'b']),
       );
       expect(collectQueryDeps(const NullLiteral(offset: 0)), isEmpty);
+      expect(collectQueryDeps(const Reference('data', offset: 0)), isEmpty);
     });
 
-    test('top-level @Query expression is rejected', () {
-      final program = parseProgram('greeting = @Query(foo)');
-      expect(
-        program.errors.any((e) => e.message.contains('no longer supported')),
-        isTrue,
+    test('validateQueryShape flags nested @Query builtin nodes', () {
+      final errors = validateQueryShape(
+        Statement(
+          name: 'greeting',
+          expression: BuiltinCall('@Query', const [], offset: 0),
+          kind: StatementKind.value,
+          offset: 0,
+        ),
       );
+      expect(errors, hasLength(1));
+      expect(errors.single.message, contains('no longer supported'));
     });
 
     test('collectQueryDeps walks refs inside complex arg expressions', () {

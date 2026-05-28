@@ -884,12 +884,12 @@ void main() {
     test('collectQueryDeps walks builtin calls and literal-only fields', () {
       final ast = ObjectLit(
         [
-          ObjectEntry('k', const Literal(1, offset: 0), offset: 0),
+          const ObjectEntry('k', Literal(1, offset: 0), offset: 0),
           ObjectEntry(
             'n',
             BuiltinCall(
               '@Count',
-              [
+              const [
                 Argument(
                   value: StateRef('items', offset: 0),
                   offset: 0,
@@ -909,7 +909,7 @@ void main() {
     test('collectQueryDeps walks state assignment values', () {
       expect(
         collectQueryDeps(
-          StateAssign(
+          const StateAssign(
             'x',
             StateRef('y', offset: 0),
             offset: 0,

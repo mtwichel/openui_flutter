@@ -880,12 +880,8 @@ void main() {
 
     test('collectQueryDeps walks refs inside complex arg expressions', () {
       final program = parseProgram(
-        r'data = Query("t", {'
-        r'a: $x ? $y : $z, '
-        r'b: -$n, '
-        r'c: $row.field, '
-        r'd: $items[$i]'
-        r'}, {rows: []})',
+        r'data = Query("t", {a: $x ? $y : $z, b: -$n, c: $row.field, '
+        r'd: $items[$i]}, {rows: []})',
       );
       final call = program.statements.single.expression as QueryCall;
       expect(
@@ -896,7 +892,7 @@ void main() {
 
     test('nested @Query in a builtin arg is rejected', () {
       final program = parseProgram(
-        r'root = Stack([@Filter([1], @Query(tool))])',
+        'root = Stack([@Filter([1], @Query(tool))])',
       );
       expect(
         program.errors.any((e) => e.message.contains('no longer supported')),

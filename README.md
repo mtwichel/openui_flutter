@@ -141,7 +141,7 @@ Wire `_onLlmTextDelta` / `_onLlmStreamFinished` to your provider (`dartantic`, `
 
 ### 6. Queries, mutations, and actions (when you need them)
 
-If the OpenUI Lang program uses `@Query` / `@Run` or action steps (`@Set`, `@Run`, …), register executors on **`ToolRegistry`** and handle **`onAction`** / **`onStateUpdate`** as needed. Details are in [packages/openui/README.md](packages/openui/README.md) and [docs/architecture.md](docs/architecture.md).
+If the OpenUI Lang program uses `Query(...)` / `@Run` or action steps (`@Set`, `@Run`, …), register executors on **`ToolRegistry`** and handle **`onAction`** / **`onStateUpdate`** as needed. Query results are read via `QueryManager.getResult`, not the store. Details are in [packages/openui/README.md](packages/openui/README.md) and [docs/architecture.md](docs/architecture.md).
 
 ---
 

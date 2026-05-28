@@ -57,8 +57,9 @@ flowchart TD
   Tree -->|user interaction| ActionPlan
   ActionPlan -->|Set/Reset| Store
   ActionPlan -->|Run| QueryManager
+  QueryManager -->|getResult| Evaluator
   QueryManager -->|ToolRegistry executor lookup| ToolExec[MCP / function map]
-  ToolExec -->|result| Evaluator
+  Store -->|state only| Evaluator
   ActionPlan -->|OpenUrl| UrlLauncher[url_launcher]
   Renderer -->|onError| App
 ```
@@ -84,7 +85,7 @@ A `Renderer` rendering output for an LLM that emits an unknown component name do
 
 Apps pass three aligned objects to `Renderer`:
 
-1. **`LibraryDefinition`** — component and tool metadata (names, schemas, descriptions). Used for schema validation, prompt generation (`library.prompt()`), and `@Query` / `@Run` definition lookup.
+1. **`LibraryDefinition`** — component and tool metadata (names, schemas, descriptions). Used for schema validation, prompt generation (`library.prompt()`), and `Query(...)` / `@Run` definition lookup.
 2. **`ComponentRegistry`** — map of component name → Flutter render callback.
 3. **`ToolRegistry`** — map of tool name → async executor.
 
@@ -93,6 +94,10 @@ When you call `library.extend(components: [...], tools: [...])`, you must regist
 ## State management
 
 Per Decision D4, one `Store` instance per `Renderer`. The store is backed by `ChangeNotifier` and lives inside `_RendererState`. Dispose is automatic.
+
+**Store holds `$` state only.** Query bindings (`data = Query(...)`) live in `QueryManager`. `EvalContext.resolveRef` reads query ids via `getResult`; `onStateUpdate` snapshots contain only `$`-prefixed keys. Host apps must not persist query results from store snapshots.
+
+The renderer subscribes to both `Store` and `QueryManager` so query fetches trigger rebuilds without writing into the store.
 
 Chat/state management is app-owned. The example app wires `dartantic` streaming into Bloc and forwards cumulative text into `Renderer`.
 

@@ -53,7 +53,7 @@ arg           ::= expression | named_arg
 named_arg     ::= IDENT ":" expression
 ```
 
-**Component calls** (`TYPE(...)`) use **positional arguments only**, mapped to schema property order. Named `prop: expr` in component arg lists is a parse error. Builtins (`@Query`, `@Each`, …), `Mutation(...)`, and object literals still use `named_arg` where noted.
+**Component calls** (`TYPE(...)`) use **positional arguments only**, mapped to schema property order. Named `prop: expr` in component arg lists is a parse error. `Query(...)` is a dedicated `TYPE` call (not a builtin). Other builtins (`@Each`, …), `Mutation(...)`, and object literals still use `named_arg` where noted.
 
 Operator precedence (highest to lowest):
 
@@ -74,11 +74,13 @@ Every statement is classified at parse time as one of:
 | Kind | Trigger | Example |
 |---|---|---|
 | `value` | RHS is a literal, reference, member access, or comp call without state semantics | `greeting = "Hello"` |
-| `state` | LHS is a `$IDENT` and RHS is not `@Query(...)` or a `Mutation(...)` call | `$count = 0` |
-| `query` | LHS is a `$IDENT` and RHS is `@Query(...)` | `$users = @Query(list_users)` |
+| `state` | LHS is a `$IDENT` and RHS is not `Query(...)` or a `Mutation(...)` call | `$count = 0` |
+| `query` | RHS is `Query(...)` (LHS must **not** be `$IDENT`) | `data = Query("analytics", {days: $days}, {rows: []})` |
 | `mutation` | RHS is `Mutation(...)` | `delete_user = Mutation(name: "delete", args: { id: 1 })` |
 
-**Order of checks matters.** `mutation` is checked before `query`, and `query` is checked before `state` so that `$users = @Query(...)` classifies as a query rather than a plain state binding.
+**Order of checks matters.** `mutation` is checked before `query`, and `query` is checked before `state` so that `$data = Query(...)` does not classify as state.
+
+**Dart note.** `@Query(...)` is rejected at parse time with a migration message. Use canonical `Query("tool", {args}, {defaults}, refreshSec?)` instead.
 
 ## Builtins
 
@@ -88,15 +90,36 @@ Every statement is classified at parse time as one of:
 | `@Filter` | `@Filter(list, predicateRef)` | Filters `list` by calling the predicate (a comp ref) on each item |
 | `@Each` | `@Each(list, "name", template)` | Materializes `template` once per item with the named loop var (`name.field`) and `$index` bound. The loop name must be a string literal matching the IDENT rule (`[a-z_][a-zA-Z0-9_]*`), not `true`/`false`/`null`, and may not start with `$`. Lazy: not evaluated until needed |
 | `@Map` | `@Map(list, transformRef)` | Maps each element through a comp ref |
-| `@Query` | `@Query(toolName, named: value, ...)` | Only valid as the entire RHS of `$var = @Query(...)`. Runs the named tool exactly once per `(statementId, evaluated-args)` tuple after streaming completes; writes the result through the store. `null` while loading. Errors surface via `Renderer.onError`. Re-fire with `@Run($var)` |
+
+## Query declarations
+
+`Query(...)` is a top-level statement form only (not nested in expressions or component args). It uses **positional arguments only**:
+
+```text
+data = Query("tool_name", {arg1: $binding}, {defaultsObject}, refreshSec?)
+```
+
+| Position | Type | Semantics |
+|---|---|---|
+| 0 | string literal | Tool name registered in `LibraryDefinition` / `ToolRegistry` |
+| 1 | object literal | Arguments passed to the tool (may reference `$` state vars) |
+| 2 | object literal | Default value returned by `getResult(id)` until the fetch completes |
+| 3 | number (optional) | Auto-refresh interval in seconds |
+
+Rules:
+
+- LHS must be a regular identifier (`data`), **not** `$data`.
+- Query results are **not** stored under `$` keys. The renderer resolves bare references (`data.rows`) via `QueryManager.getResult`.
+- Changing a `$` variable referenced in the args object triggers a re-fetch.
+- Re-fire manually with `@Run(data)` (statement id without `$`).
 
 Action-step builtins (only inside **`Action([...])`** on props marked `x-action: true` in the component schema, for example `Button("OK", Action([@Set($count, $count + 1)]), "primary")`. Bare `@Step(...)`, bare `[@Set(...)]` arrays, empty `Action([])`, and invalid step expressions are rejected.)
 
 | Builtin | Signature | Semantics |
 |---|---|---|
 | `@Set` | `@Set(target, value)` | Re-evaluate `value` at click time against the current store, then `store.set(target, evaluated)` |
-| `@Reset` | `@Reset(target1, target2, ...)` | Reset each target to its declared default |
-| `@Run` | `@Run(statementId)` | Re-fire a query or mutation by statement id |
+| `@Reset` | `@Reset(target1, target2, ...)` | Reset each `$` state var to its declared default (query ids like `data` are ignored) |
+| `@Run` | `@Run(statementId)` | Re-fire a query (`data`) or mutation by statement id |
 | `@ToAssistant` | `@ToAssistant(message, context?)` | Enqueue a user message in the chat controller |
 
 The action plan dispatcher executes steps sequentially. `@Run` returning an error halts the plan unless a `catch` field is provided (deferred to v0.2).
@@ -162,7 +185,7 @@ The streaming parser exposes:
 - `meta.orphaned: List<String>` — statements not reachable from `root`
 - `meta.errors: List<OpenUIError>` — parse and evaluation errors
 - `meta.stateDecls: List<StateDecl>` — `$state` declarations with their default values
-- `meta.queries: List<QueryDecl>` — query declarations with statement id (`$`-prefixed), tool name, and named args
+- `meta.queries: List<QueryDecl>` — query declarations with statement id (no `$` prefix), AST slots for tool/args/defaults/refresh, and precomputed `$` deps
 - `meta.mutations: List<MutationDecl>` — mutation declarations
 
 Forward references are allowed: `root = Stack([chart])` may appear before `chart = ...`. Unresolved references at the end of input land in `meta.unresolved` and the rendered tree shows nothing for them.

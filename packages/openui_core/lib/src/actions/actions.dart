@@ -280,10 +280,8 @@ ActionStep? _stepFromAst(AstNode node) {
       final v = node.args.first.value;
       final String statementId;
       if (v is StateRef) {
-        // `@Run($products)` re-fires a `$var = @Query(...)` declaration.
-        // The leading `$` is preserved so the renderer's lookup against
-        // `QueryDecl.statementId` lines up.
-        statementId = '\$${v.name}';
+        // Legacy `@Run($data)` — query ids are bare (`data`), not `$data`.
+        statementId = v.name;
       } else if (v is Reference) {
         statementId = v.name;
       } else {

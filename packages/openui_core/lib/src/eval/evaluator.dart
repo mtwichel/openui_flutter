@@ -34,6 +34,7 @@ class EvalContext {
     Map<String, Object?>? iterationVars,
     Map<String, BuiltinHandler>? builtins,
     List<OpenUIError>? errors,
+    this.resolveRef,
   }) : statements = _buildMap(statements),
        iterationVars = iterationVars ?? const <String, Object?>{},
        builtins = builtins ?? const <String, BuiltinHandler>{},
@@ -49,14 +50,18 @@ class EvalContext {
       },
       builtins = parent.builtins,
       errors = parent.errors,
+      resolveRef = parent.resolveRef,
       _resolving = parent._resolving;
 
   /// Statement map keyed by name. Last-write-wins on duplicates.
   final Map<String, Statement> statements;
 
-  /// The reactive store that backs `$state` lookups. `@Query`-backed
-  /// state vars also resolve here once their tool call completes.
+  /// The reactive store that backs `$state` lookups only.
   final Store store;
+
+  /// Resolves non-`$` statement ids (e.g. query bindings) to live
+  /// values. Wired by the renderer's query manager.
+  final Object? Function(String name)? resolveRef;
 
   /// Iteration scope. `$item` and `$index` inside an `@Each` body are
   /// served from here, taking precedence over the [store].
@@ -162,6 +167,13 @@ Object? evaluate(AstNode node, EvalContext context) {
         ),
       );
       return null;
+    case QueryCall():
+      context.errors.add(
+        const EvaluationError(
+          message: 'cannot evaluate Query call as a value',
+        ),
+      );
+      return null;
   }
 }
 
@@ -182,11 +194,10 @@ Object? _evalReference(String name, EvalContext context) {
   }
   final stmt = context.statements[name];
   if (stmt == null) return null;
-  if (stmt.kind == StatementKind.query || stmt.kind == StatementKind.mutation) {
-    // `@Query`-backed values live in the store under their `$`-prefixed
-    // statement id. Mutation calls have no value semantics — the
-    // dispatcher reaches them through their declaration, not a bare
-    // identifier reference.
+  if (stmt.kind == StatementKind.query) {
+    return context.resolveRef?.call(name);
+  }
+  if (stmt.kind == StatementKind.mutation) {
     return null;
   }
   context._resolving.add(name);

@@ -51,8 +51,8 @@ Renderer(
 );
 ```
 
-The renderer routes `@Query` declarations through `ToolRegistry` lookup after
-confirming the tool exists on the `LibraryDefinition`.
+The renderer routes `Query(...)` declarations through `ToolRegistry` lookup
+after confirming the tool exists on the `LibraryDefinition`.
 
 ## License
 

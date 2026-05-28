@@ -86,13 +86,12 @@ class ParseMeta {
   /// newline before continuing, so subsequent statements are unaffected.
   final List<ParseException> errors;
 
-  /// Reactive state declarations (`$name = expr` where the RHS is not a
-  /// `@Query` builtin or a `Mutation(...)` call). Used to seed the
-  /// reactive store.
+  /// Reactive state declarations (`$name = expr` where the RHS is not
+  /// `Query(...)` or `Mutation(...)`). Used to seed the reactive store.
   final List<StateDecl> stateDecls;
 
-  /// Query declarations (`$name = @Query(toolName, ...)`). Used to
-  /// drive the query manager.
+  /// Query declarations (`name = Query("tool", {args}, {defaults}, …)`).
+  /// Used to drive the query manager.
   final List<QueryDecl> queries;
 
   /// Mutation declarations (`name = Mutation(...)`). Used to populate
@@ -118,8 +117,8 @@ class StateDecl {
   final AstNode defaultValue;
 }
 
-/// A `$var = @Query(toolName, ...)` declaration extracted from a parse
-/// pass.
+/// A `name = Query("tool", {args}, {defaults}, refreshSec?)` declaration
+/// extracted from a parse pass.
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -128,19 +127,34 @@ class QueryDecl {
   /// Creates a [QueryDecl].
   const QueryDecl({
     required this.statementId,
-    required this.toolName,
-    required this.namedArgs,
+    this.toolAST,
+    this.argsAST,
+    this.defaultsAST,
+    this.refreshAST,
+    this.deps = const <String>[],
+    this.complete = true,
   });
 
-  /// The LHS identifier the query is bound to (the query's id),
-  /// including the leading `$`.
+  /// The LHS identifier (no `$` prefix), e.g. `data`.
   final String statementId;
 
-  /// The tool name — the first positional argument of `@Query`.
-  final String toolName;
+  /// First positional arg AST — tool name string literal.
+  final AstNode? toolAST;
 
-  /// The named arguments after the tool name, in source order.
-  final List<Argument> namedArgs;
+  /// Second positional arg AST — arguments object.
+  final AstNode? argsAST;
+
+  /// Third positional arg AST — defaults object.
+  final AstNode? defaultsAST;
+
+  /// Fourth positional arg AST — refresh interval in seconds.
+  final AstNode? refreshAST;
+
+  /// `$` state variable names referenced in [argsAST].
+  final List<String> deps;
+
+  /// False while the `Query(...)` call is still being streamed.
+  final bool complete;
 }
 
 /// A `Mutation(...)` declaration extracted from a parse pass.
@@ -248,16 +262,19 @@ class StreamParser {
           );
         case StatementKind.query:
           final expr = s.expression;
-          if (expr is BuiltinCall && expr.name == '@Query') {
-            final toolName = _toolNameOf(expr);
-            // Skip malformed @Query calls. `validateQueryShape` will
-            // have surfaced the corresponding `ParseException` already.
-            if (toolName == null) break;
+          if (expr is QueryCall) {
+            final args = expr.args;
             queries.add(
               QueryDecl(
                 statementId: s.name,
-                toolName: toolName,
-                namedArgs: _namedArgsOf(expr),
+                toolAST: args.isNotEmpty ? args[0].value : null,
+                argsAST: args.length > 1 ? args[1].value : null,
+                defaultsAST: args.length > 2 ? args[2].value : null,
+                refreshAST: args.length > 3 ? args[3].value : null,
+                deps: collectQueryDeps(
+                  args.length > 1 ? args[1].value : null,
+                ),
+                complete: !incomplete.contains(s.name),
               ),
             );
           }
@@ -354,29 +371,6 @@ StreamParser createStreamingParser({String rootName = 'root'}) {
     prefix: buffer.substring(0, lastBalancedNewlineEnd),
     tail: buffer.substring(lastBalancedNewlineEnd),
   );
-}
-
-/// Extracts the tool-name identifier from a `@Query(toolName, ...)`
-/// call, or `null` when the call's first arg is not a positional
-/// [Reference]. The streaming `_compute` skips emitting a `QueryDecl`
-/// in that case so consumers don't see a half-formed declaration.
-String? _toolNameOf(BuiltinCall call) {
-  if (call.args.isEmpty) return null;
-  final firstArg = call.args.first;
-  if (firstArg.name != null) return null;
-  final firstValue = firstArg.value;
-  if (firstValue is Reference) return firstValue.name;
-  return null;
-}
-
-List<Argument> _namedArgsOf(BuiltinCall call) {
-  if (call.args.length <= 1) return const <Argument>[];
-  return call.args
-      .sublist(1)
-      .where((a) => a.name != null)
-      .toList(
-        growable: false,
-      );
 }
 
 const int _backslash = 0x5C;

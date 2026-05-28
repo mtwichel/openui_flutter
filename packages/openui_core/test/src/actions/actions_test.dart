@@ -253,10 +253,10 @@ void main() {
       expect(plan!.steps, isEmpty);
     });
 
-    test(r'@Run($var) produces a RunStep with $-prefixed statementId', () {
+    test(r'@Run($var) produces a RunStep with bare statementId', () {
       final plan = _planFor(r'a = Action([@Run($products)])');
       final step = plan.steps.single as RunStep;
-      expect(step.statementId, r'$products');
+      expect(step.statementId, 'products');
       expect(step.argsAst, isEmpty);
     });
 

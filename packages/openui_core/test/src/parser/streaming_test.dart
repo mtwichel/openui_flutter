@@ -229,34 +229,19 @@ void main() {
       );
     });
 
-    test(r'@Query bound to a $-prefixed LHS classifies as query', () {
+    test('data = Query(...) extracts QueryDecl with AST slots', () {
       final parser = createStreamingParser();
       final result = parser.push(
-        r'$users = @Query(list_users)'
-        '\n',
-      );
-      expect(result.meta.queries, hasLength(1));
-      final decl = result.meta.queries.single;
-      expect(decl.statementId, r'$users');
-      expect(decl.toolName, 'list_users');
-      expect(decl.namedArgs, isEmpty);
-      expect(result.meta.stateDecls, isEmpty);
-    });
-
-    test('@Query carries named args verbatim', () {
-      final parser = createStreamingParser();
-      final result = parser.push(
-        r'$products = @Query(fetch_products, category: "shoes")'
-        '\n',
+        'data = Query("analytics", {days: \$days}, {rows: []})\n',
       );
       expect(result.meta.errors, isEmpty);
+      expect(result.meta.queries, hasLength(1));
       final decl = result.meta.queries.single;
-      expect(decl.toolName, 'fetch_products');
-      expect(decl.namedArgs.single.name, 'category');
-      expect(
-        decl.namedArgs.single.value,
-        equals(const Literal('shoes', offset: 41)),
-      );
+      expect(decl.statementId, 'data');
+      expect(decl.toolAST, isA<Literal>());
+      expect(decl.argsAST, isA<ObjectLit>());
+      expect(decl.defaultsAST, isA<ObjectLit>());
+      expect(decl.deps, contains('days'));
     });
 
     test('mutation declaration', () {
@@ -288,8 +273,7 @@ void main() {
         final result = parser.push(
           r'$count = 0'
           '\n'
-          r'$users = @Query(list_users, q: "active")'
-          '\n'
+          'users = Query("list_users", {q: "active"}, {rows: []})\n'
           'del = Mutation(name: "delete")\n',
         );
         // Spot-check that the meta types preserve the raw ASTs.
@@ -301,10 +285,9 @@ void main() {
         expect(decl.defaultValue, isA<Literal>());
 
         final qDecl = result.meta.queries.single;
-        expect(qDecl.statementId, r'$users');
-        expect(qDecl.toolName, 'list_users');
-        expect(qDecl.namedArgs.single.name, 'q');
-        expect(qDecl.namedArgs.single.value, isA<Literal>());
+        expect(qDecl.statementId, 'users');
+        expect(qDecl.toolAST, isA<Literal>());
+        expect(qDecl.argsAST, isA<ObjectLit>());
 
         final mDecl = result.meta.mutations.single;
         expect(mDecl.statementId, 'del');
@@ -333,26 +316,26 @@ void main() {
       expect(result.meta.errors, isEmpty);
     });
 
-    test('mid-stream partial @Query does not surface a shape error', () {
-      // Tool name has not been completed; autoClose patches the tail
-      // but the validator must skip the in-flight statement.
+    test('mid-stream partial Query does not surface a shape error', () {
       final parser = createStreamingParser();
-      final result = parser.push(r'$products = @Query(fetch_produc');
+      final result = parser.push('data = Query("fetch_produc');
       expect(
-        result.meta.errors.where((e) => e.message.contains('@Query')),
+        result.meta.errors.where((e) => e.message.contains('Query')),
         isEmpty,
       );
-      expect(result.meta.incomplete, [r'$products']);
+      expect(result.meta.incomplete, ['data']);
     });
 
-    test('committed invalid @Query surfaces a shape error', () {
+    test('committed invalid dollar-data = Query surfaces a shape error', () {
       final parser = createStreamingParser();
       final result = parser.push(
-        'data = @Query(tool)\ntail = 1\n',
+        r'$data = Query("tool", {}, {rows: []})'
+        '\n'
+        'tail = 1\n',
       );
       expect(
         result.meta.errors.where(
-          (e) => e.message.contains('must be the entire RHS'),
+          (e) => e.message.contains('regular identifiers'),
         ),
         hasLength(1),
       );
@@ -405,11 +388,7 @@ void main() {
       );
       expect(
         () => result.meta.queries.add(
-          const QueryDecl(
-            statementId: r'$x',
-            toolName: 'tool',
-            namedArgs: <Argument>[],
-          ),
+          const QueryDecl(statementId: 'x'),
         ),
         throwsUnsupportedError,
       );

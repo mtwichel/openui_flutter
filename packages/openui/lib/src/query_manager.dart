@@ -3,29 +3,52 @@
 // ignore_for_file: experimental_member_use
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:meta/meta.dart';
 import 'package:openui/src/tool_registry.dart';
 import 'package:openui_core/openui_core.dart';
 
-/// Per-renderer gate that turns `@Query` declarations into one-shot
-/// tool calls.
+/// Evaluated query node passed to [QueryManager.evaluateQueries].
+@experimental
+class QueryNode {
+  /// Creates a [QueryNode].
+  const QueryNode({
+    required this.statementId,
+    required this.toolName,
+    required this.args,
+    required this.defaults,
+    this.deps,
+    this.refreshInterval,
+    this.complete = true,
+  });
+
+  /// Statement name without `$`, e.g. `data`.
+  final String statementId;
+
+  /// Resolved tool name string.
+  final String toolName;
+
+  /// Resolved arguments record for the tool call.
+  final Object? args;
+
+  /// Resolved defaults returned before fetch completes.
+  final Object? defaults;
+
+  /// Evaluated dependency slice used in the cache key.
+  final Object? deps;
+
+  /// Auto-refresh interval in seconds, if any.
+  final double? refreshInterval;
+
+  /// False while the query call is still being streamed.
+  final bool complete;
+}
+
+/// Reactive data fetching for canonical `Query(...)` declarations.
 ///
-/// The manager has no result storage of its own. Results are written
-/// straight to the [Store] via `store.set(decl.statementId, value.result)`,
-/// which the renderer already subscribes to for reactive rebuilds.
-/// Failures are routed to [_onError] (the renderer's existing error
-/// sink). The only state the manager keeps is `_fired`: the most
-/// recently dispatched evaluated-args map per `statementId`, which
-/// gates re-fires.
-///
-/// `@Run($var)` invalidates a query by clearing its `_fired` entry and
-/// calling [ensureFired] again. Args are re-evaluated at fire time
-/// against the live [EvalContext], so a `@Set` ahead of `@Run` is
-/// reflected in the new call.
-///
-/// Mutations keep their pre-`@Query` dispatcher path via [fireMutation]
-/// — they're explicitly out of scope for this iteration.
+/// Owns query results; does not write to [Store]. The renderer wires
+/// [EvalContext.resolveRef] to [getResult].
 ///
 /// Marked `@experimental` per D12.
 @experimental
@@ -34,7 +57,6 @@ class QueryManager {
   QueryManager({
     required this.library,
     required this.toolRegistry,
-    required this.store,
     required void Function(OpenUIError) onError,
   }) : _onError = onError;
 
@@ -44,96 +66,141 @@ class QueryManager {
   /// Tool executors keyed by tool name.
   final ToolRegistry toolRegistry;
 
-  /// The reactive store that receives resolved query values.
-  final Store store;
-
   final void Function(OpenUIError) _onError;
 
-  final Map<String, Map<String, Object?>> _fired =
-      <String, Map<String, Object?>>{};
+  final Map<String, _QueryEntry> _queries = <String, _QueryEntry>{};
+  final Map<String, _CacheEntry> _cache = <String, _CacheEntry>{};
+  final Set<void Function()> _listeners = <void Function()>{};
   bool _disposed = false;
 
-  /// Fires the query identified by [decl] when its
-  /// `(statementId, evaluated-args)` fingerprint differs from the
-  /// last fire. Subsequent calls with the same args are no-ops.
-  ///
-  /// Args are evaluated against [ctx] before the fingerprint compare,
-  /// so a `@Run` that re-runs `ensureFired` after a `@Set` re-issues
-  /// the call with fresh values.
-  void ensureFired(QueryDecl decl, EvalContext ctx) {
-    if (_disposed) return;
-    final evaluatedArgs = <String, Object?>{
-      for (final arg in decl.namedArgs)
-        if (arg.name != null) arg.name!: evaluate(arg.value, ctx),
-    };
-    final last = _fired[decl.statementId];
-    if (last != null && _mapEquals(last, evaluatedArgs)) return;
-    // Set the in-flight gate synchronously so a second `ensureFired`
-    // landing in the same micro-task tick short-circuits before
-    // dispatching a duplicate tool call.
-    _fired[decl.statementId] = evaluatedArgs;
-
-    final toolDef = library.tool(decl.toolName);
-    if (toolDef == null) {
-      _onError(
-        EvaluationError(
-          message: 'Unknown tool: ${decl.toolName}',
-          statementId: decl.statementId,
-        ),
-      );
-      return;
-    }
-    final executor = toolRegistry[decl.toolName];
-    if (executor == null) {
-      _onError(
-        MissingToolExecutorError(
-          toolName: decl.toolName,
-          statementId: decl.statementId,
-        ),
-      );
-      return;
-    }
-    unawaited(
-      executor(evaluatedArgs)
-          .then((value) {
-            if (_disposed) return;
-            if (value.isError) {
-              _onError(
-                EvaluationError(
-                  message: value.result?.toString() ?? 'Tool call failed',
-                  statementId: decl.statementId,
-                ),
-              );
-              return;
-            }
-            store.set(decl.statementId, value.result);
-          })
-          .catchError((Object error, StackTrace _) {
-            if (_disposed) return;
-            _onError(
-              error is OpenUIError
-                  ? error
-                  : EvaluationError(
-                      message: error.toString(),
-                      statementId: decl.statementId,
-                    ),
-            );
-          }),
-    );
+  /// Registers listeners for query result changes. Returns unsubscribe.
+  void Function() subscribe(void Function() listener) {
+    _listeners.add(listener);
+    return () => _listeners.remove(listener);
   }
 
-  /// Drops the fingerprint for [decl] and re-runs [ensureFired]
-  /// against [ctx]. Used by the renderer's `@Run($var)` path and by
-  /// tests covering re-fire semantics.
-  void invalidate(QueryDecl decl, EvalContext ctx) {
+  void _notify() {
+    for (final listener in [..._listeners]) {
+      listener();
+    }
+  }
+
+  /// Updates active queries and fires fetches when needed.
+  void evaluateQueries(List<QueryNode> nodes) {
     if (_disposed) return;
-    _fired.remove(decl.statementId);
-    ensureFired(decl, ctx);
+
+    final activeIds = nodes.map((n) => n.statementId).toSet();
+
+    for (final sid in _queries.keys.toList()) {
+      if (!activeIds.contains(sid)) {
+        final q = _queries.remove(sid)!;
+        q.timer?.cancel();
+        _cleanupCacheEntry(q.cacheKey);
+        if (q.prevCacheKey != null) {
+          _cleanupCacheEntry(q.prevCacheKey!);
+        }
+      }
+    }
+
+    for (final node in nodes) {
+      if (!node.complete) {
+        _queries[node.statementId] = _QueryEntry(
+          toolName: node.toolName,
+          args: node.args,
+          defaults: node.defaults,
+          cacheKey: '__incomplete__:${node.statementId}',
+        );
+        continue;
+      }
+
+      final cacheKey = _buildCacheKey(
+        node.toolName,
+        node.args,
+        node.deps,
+      );
+      final existing = _queries[node.statementId];
+
+      if (existing != null) {
+        if (existing.cacheKey != cacheKey) {
+          existing.prevCacheKey = existing.cacheKey;
+        }
+        existing
+          ..toolName = node.toolName
+          ..args = node.args
+          ..defaults = node.defaults
+          ..cacheKey = cacheKey;
+      } else {
+        _queries[node.statementId] = _QueryEntry(
+          toolName: node.toolName,
+          args: node.args,
+          defaults: node.defaults,
+          cacheKey: cacheKey,
+        );
+      }
+
+      final q = _queries[node.statementId]!;
+      final entry = _cache[cacheKey];
+      final hasSettledData = entry != null && entry.settled && !entry.inFlight;
+      if (!hasSettledData && !(entry?.inFlight ?? false)) {
+        unawaited(_executeFetch(cacheKey, node.statementId));
+      }
+
+      final newInterval = node.refreshInterval ?? 0;
+      if (newInterval != q.refreshInterval) {
+        q.timer?.cancel();
+        q.timer = null;
+        if (newInterval > 0) {
+          q.timer = Timer.periodic(
+            Duration(milliseconds: (newInterval * 1000).round()),
+            (_) {
+              if (_disposed) return;
+              final current = _cache[q.cacheKey];
+              if (current?.inFlight ?? false) return;
+              unawaited(_executeFetch(q.cacheKey, node.statementId));
+            },
+          );
+        }
+        q.refreshInterval = newInterval;
+      }
+    }
+
+    _notify();
+  }
+
+  /// Returns the current value for [statementId] (defaults, live, or
+  /// last-good while refetching).
+  Object? getResult(String statementId) {
+    final q = _queries[statementId];
+    if (q == null) return null;
+    final entry = _cache[q.cacheKey];
+    if (entry != null && entry.data != null) return entry.data;
+    if (q.prevCacheKey != null) {
+      final prev = _cache[q.prevCacheKey!];
+      if (prev != null && prev.data != null) return prev.data;
+    }
+    return q.defaults;
+  }
+
+  /// Re-fetches [statementIds], or all queries when omitted.
+  void invalidate([List<String>? statementIds]) {
+    if (_disposed) return;
+    final targets = statementIds != null && statementIds.isNotEmpty
+        ? statementIds.where(_queries.containsKey).toList()
+        : _queries.keys.toList();
+    for (final sid in targets) {
+      final q = _queries[sid];
+      if (q == null) continue;
+      final entry = _cache[q.cacheKey];
+      if (entry?.inFlight ?? false) {
+        q.needsRefetch = true;
+      } else {
+        unawaited(_executeFetch(q.cacheKey, sid));
+      }
+    }
   }
 
   /// Fires a mutation by [statementId]. Returns the resolved value on
-  /// success (mutations are not cached). Errors are wrapped as
-  /// [OpenUIError] and rethrown so the dispatcher can halt the plan.
+  /// success. Errors are wrapped as [OpenUIError] and rethrown.
   Future<Object?> fireMutation(
     String statementId,
     List<Argument> args,
@@ -154,10 +221,135 @@ class QueryManager {
     }
   }
 
-  /// Releases the manager. In-flight futures still complete; their
-  /// results are discarded.
+  /// Releases the manager and cancels refresh timers.
   void dispose() {
     _disposed = true;
+    for (final q in _queries.values) {
+      q.timer?.cancel();
+    }
+    _listeners.clear();
+  }
+
+  Future<void> _executeFetch(String cacheKey, String statementId) async {
+    final q = _queries[statementId];
+    if (q == null) return;
+
+    final fetchKey = cacheKey;
+    final toolName = q.toolName;
+    final args = q.args;
+
+    var entry = _cache[fetchKey];
+    if (entry == null) {
+      entry = _CacheEntry(inFlight: true);
+      _cache[fetchKey] = entry;
+    } else {
+      entry.inFlight = true;
+    }
+    _notify();
+
+    final toolDef = library.tool(toolName);
+    if (toolDef == null) {
+      _finishFetchError(
+        statementId: statementId,
+        fetchKey: fetchKey,
+        message: 'Unknown tool: $toolName',
+      );
+      return;
+    }
+    final executor = toolRegistry[toolName];
+    if (executor == null) {
+      _finishFetchError(
+        statementId: statementId,
+        fetchKey: fetchKey,
+        message: 'Missing executor for tool: $toolName',
+        toolName: toolName,
+      );
+      return;
+    }
+
+    try {
+      final recordArgs = args is Map<String, Object?>
+          ? args
+          : args is Map
+          ? Map<String, Object?>.from(args)
+          : const <String, Object?>{};
+      final value = await executor(recordArgs);
+      if (_disposed) return;
+      final current = _queries[statementId];
+      if (current == null || current.cacheKey != fetchKey) {
+        entry.inFlight = false;
+        return;
+      }
+      if (value.isError) {
+        entry.settled = true;
+        _onError(
+          EvaluationError(
+            message: value.result?.toString() ?? 'Tool call failed',
+            statementId: statementId,
+          ),
+        );
+      } else {
+        entry
+          ..data = value.result
+          ..settled = true;
+        if (current.prevCacheKey != null && current.prevCacheKey != fetchKey) {
+          final prevKey = current.prevCacheKey!;
+          current.prevCacheKey = null;
+          _cleanupCacheEntry(prevKey);
+        }
+      }
+    } on Object catch (error) {
+      if (_disposed) return;
+      final current = _queries[statementId];
+      if (current != null && current.cacheKey == fetchKey) {
+        _onError(
+          error is OpenUIError
+              ? error
+              : EvaluationError(
+                  message: error.toString(),
+                  statementId: statementId,
+                ),
+        );
+      }
+    } finally {
+      entry.inFlight = false;
+      final current = _queries[statementId];
+      if (current != null && current.cacheKey == fetchKey) {
+        entry.settled = true;
+        if (current.needsRefetch) {
+          current.needsRefetch = false;
+          unawaited(_executeFetch(current.cacheKey, statementId));
+        }
+      }
+      _notify();
+    }
+  }
+
+  void _finishFetchError({
+    required String statementId,
+    required String fetchKey,
+    required String message,
+    String? toolName,
+  }) {
+    final entry = _cache[fetchKey];
+    entry?.inFlight = false;
+    entry?.settled = true;
+    _onError(
+      toolName != null
+          ? MissingToolExecutorError(
+              toolName: toolName,
+              statementId: statementId,
+            )
+          : EvaluationError(message: message, statementId: statementId),
+    );
+    _notify();
+  }
+
+  void _cleanupCacheEntry(String cacheKey) {
+    for (final q in _queries.values) {
+      if (q.cacheKey == cacheKey || q.prevCacheKey == cacheKey) return;
+    }
+    _cache.remove(cacheKey);
   }
 
   Future<Object?> _invokeMutation(String statementId, List<Argument> args) {
@@ -185,6 +377,54 @@ class QueryManager {
     }
     return executor(toolArgs);
   }
+}
+
+class _QueryEntry {
+  _QueryEntry({
+    required this.toolName,
+    required this.args,
+    required this.defaults,
+    required this.cacheKey,
+  });
+
+  String toolName;
+  Object? args;
+  Object? defaults;
+  String cacheKey;
+  String? prevCacheKey;
+  double refreshInterval = 0;
+  Timer? timer;
+  bool needsRefetch = false;
+}
+
+class _CacheEntry {
+  _CacheEntry({this.inFlight = false});
+
+  Object? data;
+  bool inFlight;
+  bool settled = false;
+}
+
+String _buildCacheKey(String toolName, Object? args, Object? deps) {
+  final depsKey = deps != null ? '::${_stableStringify(deps)}' : '';
+  return '$toolName::${_stableStringify(args)}$depsKey';
+}
+
+String _stableStringify(Object? value) {
+  return jsonEncode(
+    value,
+    toEncodable: (val) {
+      if (val is Map) {
+        final sorted = <String, Object?>{};
+        for (final key in val.keys.map((k) => k.toString()).toList()..sort()) {
+          sorted[key] = val[key];
+        }
+        return sorted;
+      }
+      if (val == null) return '__undefined__';
+      return val;
+    },
+  );
 }
 
 String? _stringArg(List<Argument> args, String name) {
@@ -215,14 +455,4 @@ Object? _literalValue(AstNode node) {
   if (node is Literal) return node.value;
   if (node is NullLiteral) return null;
   return null;
-}
-
-bool _mapEquals(Map<String, Object?> a, Map<String, Object?> b) {
-  if (identical(a, b)) return true;
-  if (a.length != b.length) return false;
-  for (final entry in a.entries) {
-    if (!b.containsKey(entry.key)) return false;
-    if (b[entry.key] != entry.value) return false;
-  }
-  return true;
 }

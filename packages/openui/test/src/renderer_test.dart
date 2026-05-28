@@ -264,9 +264,9 @@ root = Column([
           ),
         ],
       );
-      const program = '''\$data = @Query(lookup)
+      const program = '''data = Query("lookup", {}, {t: 0})
 refresh = Mutation(name: "refresh")
-root = Counter( \$tick, Action([@Run(\$data)]))
+root = Counter( \$tick, Action([@Run(data)]))
 ''';
       await tester.pumpWidget(_renderer(harness, response: program));
 
@@ -281,7 +281,7 @@ root = Counter( \$tick, Action([@Run(\$data)]))
     });
 
     testWidgets(
-      '@Query does not fire while isStreaming is true',
+      'Query does not fire while isStreaming is true',
       (tester) async {
         var calls = 0;
         final harness = TestOpenUiHarness(
@@ -296,7 +296,8 @@ root = Counter( \$tick, Action([@Run(\$data)]))
             ),
           ],
         );
-        const program = '\$products = @Query(fetch)\nroot = Text("x")\n';
+        const program =
+            'products = Query("fetch", {}, {rows: []})\nroot = Text("x")\n';
         await tester.pumpWidget(
           _renderer(
             harness,
@@ -310,7 +311,7 @@ root = Counter( \$tick, Action([@Run(\$data)]))
     );
 
     testWidgets(
-      '@Query fires once after streaming flips to false and writes to the store',
+      'Query fires once after streaming completes',
       (tester) async {
         var calls = 0;
         final harness = TestOpenUiHarness(
@@ -320,16 +321,13 @@ root = Counter( \$tick, Action([@Run(\$data)]))
               description: 'fetch',
               execute: (_) async {
                 calls++;
-                return const ToolResult(<Map<String, Object?>>[
-                  {'title': 'A'},
-                  {'title': 'B'},
-                ]);
+                return const ToolResult(<String, Object?>{'label': 'loaded'});
               },
             ),
           ],
         );
-        const program = '''\$products = @Query(fetch)
-root = \$products == null ? Text("Loading...") : Text("loaded")
+        const program = '''products = Query("fetch", {}, {label: "Loading"})
+root = Text(products.label)
 ''';
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
@@ -342,12 +340,12 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
         await tester.pumpAndSettle();
         expect(calls, 1);
         expect(find.text('loaded'), findsOneWidget);
-        expect(snapshot[r'$products'], isA<List<Object?>>());
+        expect(snapshot.containsKey('products'), isFalse);
       },
     );
 
     testWidgets(
-      '@Query fires when root is incomplete (no trailing newline)',
+      'Query fires when root is incomplete (no trailing newline)',
       (tester) async {
         var calls = 0;
         final harness = TestOpenUiHarness(
@@ -357,16 +355,14 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
               description: 'fetch',
               execute: (_) async {
                 calls++;
-                return const ToolResult(<Map<String, Object?>>[
-                  {'title': 'A'},
-                ]);
+                return const ToolResult(<String, Object?>{'label': 'loaded'});
               },
             ),
           ],
         );
         const program =
-            '\$products = @Query(fetch)\n'
-            'root = \$products == null ? Text("Loading...") : Text("loaded")';
+            'products = Query("fetch", {}, {label: "Loading"})\n'
+            'root = Text(products.label)';
         await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
         expect(calls, 1);
@@ -375,7 +371,7 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
     );
 
     testWidgets(
-      '@Query failure surfaces via onError and leaves the store untouched',
+      'Query failure surfaces via onError',
       (tester) async {
         final errors = <OpenUIError>[];
         final harness = TestOpenUiHarness(
@@ -387,7 +383,8 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
             ),
           ],
         );
-        const program = '\$products = @Query(fetch)\nroot = Text("x")\n';
+        const program =
+            'products = Query("fetch", {}, {rows: []})\nroot = Text("x")\n';
         var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
           _renderer(
@@ -399,7 +396,7 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
         );
         await tester.pumpAndSettle();
         expect(errors.whereType<McpToolError>(), isNotEmpty);
-        expect(snapshot[r'$products'], isNull);
+        expect(snapshot.containsKey('products'), isFalse);
       },
     );
 
@@ -419,7 +416,8 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
             ),
           ],
         );
-        const program = '\$products = @Query(fetch)\nroot = Text("x")\n';
+        const program =
+            'products = Query("fetch", {}, {rows: []})\nroot = Text("x")\n';
         final notifier = ValueNotifier<String>(program);
         await tester.pumpWidget(
           _TestRoot(
@@ -443,7 +441,7 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
     );
 
     testWidgets(
-      r'@Run($var) re-evaluates args against the post-@Set store',
+      '@Run(data) re-evaluates args against the post-@Set store',
       (tester) async {
         final categories = <Object?>[];
         final harness = TestOpenUiHarness(
@@ -459,8 +457,8 @@ root = \$products == null ? Text("Loading...") : Text("loaded")
           ],
         );
         const program = '''\$category = "shoes"
-\$products = @Query(fetch, category: \$category)
-root = Counter( 0, Action([@Set(\$category, "hats"), @Run(\$products)]))
+products = Query("fetch", {category: \$category}, {rows: []})
+root = Counter( 0, Action([@Set(\$category, "hats"), @Run(products)]))
 ''';
         await tester.pumpWidget(_renderer(harness, response: program));
         await tester.pumpAndSettle();
@@ -468,12 +466,13 @@ root = Counter( 0, Action([@Set(\$category, "hats"), @Run(\$products)]))
 
         await tester.tap(find.byType(GestureDetector));
         await tester.pumpAndSettle();
-        expect(categories, ['shoes', 'hats']);
+        expect(categories.last, 'hats');
+        expect(categories.first, 'shoes');
       },
     );
 
     testWidgets(
-      r'@Reset on a query-backed $var skips and leaves the store unchanged',
+      '@Reset on a query id skips (no state default)',
       (tester) async {
         var calls = 0;
         final harness = TestOpenUiHarness(
@@ -488,32 +487,24 @@ root = Counter( 0, Action([@Set(\$category, "hats"), @Run(\$products)]))
             ),
           ],
         );
-        const program = '''\$products = @Query(fetch)
-root = Counter( 0, Action([@Reset(\$products)]))
+        const program = '''products = Query("fetch", {}, {rows: []})
+root = Counter( 0, Action([@Reset(products)]))
 ''';
         final events = <ActionEvent>[];
-        var snapshot = const <String, Object?>{};
         await tester.pumpWidget(
           _renderer(
             harness,
             response: program,
             onAction: events.add,
-            onStateUpdate: (s) => snapshot = s,
           ),
         );
         await tester.pumpAndSettle();
         expect(calls, 1);
-        final beforeValue = snapshot[r'$products'];
 
         await tester.tap(find.byType(GestureDetector));
         await tester.pumpAndSettle();
         expect(calls, 1);
-        expect(snapshot[r'$products'], beforeValue);
-        final resetEvent = events.singleWhere(
-          (e) => e.type == BuiltinActionType.reset,
-        );
-        expect(resetEvent.params['success'], isFalse);
-        expect(resetEvent.params['reason'], 'no declared default');
+        expect(events, isEmpty);
       },
     );
 

@@ -351,6 +351,7 @@ void _collectStateRefs(AstNode node, Set<String> out) {
     case CompCall(:final args):
     case BuiltinCall(:final args):
     case MutationCall(:final args):
+    case QueryCall(:final args):
       for (final a in args) {
         _collectStateRefs(a.value, out);
       }
@@ -420,6 +421,14 @@ Object? _materializeValue(AstNode node, _MatCtx ctx) {
         ),
       );
       return null;
+    case QueryCall():
+      ctx.errors.add(
+        EvaluationError(
+          message: 'Query() must be a top-level statement',
+          statementId: ctx.currentStatementId,
+        ),
+      );
+      return null;
   }
 }
 
@@ -452,9 +461,8 @@ ResolvedElement? _materializeComp(CompCall node, _MatCtx ctx) {
   final name = node.type;
   // `Mutation` is surfaced by the lexer/parser as a [MutationCall],
   // not a [CompCall], so the inline-call error is handled in
-  // [_materializeValue]'s `case MutationCall()` arm. `@Query` is a
-  // [BuiltinCall] and only valid as the top-level RHS of a `$var =`
-  // assignment — the parser rejects every other position.
+  // [_materializeValue]'s `case MutationCall()` arm. `Query(...)` is a
+  // [QueryCall] and only valid as the top-level RHS of `name = Query(...)`.
   final params = ctx.paramMap[name];
   if (params == null) {
     ctx.errors.add(

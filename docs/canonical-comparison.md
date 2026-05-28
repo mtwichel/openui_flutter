@@ -30,7 +30,7 @@ This document compares **OpenUI Lang** as defined by the canonical reference imp
 | Gap | Impact |
 |-----|--------|
 | **Positional vs named component args** | **Partial** — positional-only syntax + render-path mapping shipped; canonical Zod **property order** still differs for some components (`Stack`, `Button`, …) until schema reorder |
-| **`Query(...)` vs `$var = @Query(...)`** | **High** — different statement form, loading semantics, defaults |
+| **`Query(...)` vs `$var = @Query(...)`** | **Partial** — canonical `Query(...)` parses; full dashboard parity still needs array pluck |
 | **`Action([...])` / `action` prop vs `onClick: [...]`** | **Resolved** — `action` + `Action([...])`; bare arrays rejected |
 | **Array pluck** (`data.rows.title`) | **High** — breaks canonical Table/Chart column idioms |
 | **Builtin set** (`@Sum`, `@Filter` shape, etc.) | **High** for data-heavy UIs |
@@ -56,7 +56,7 @@ Restoring strict 1:1 parity requires a product decision on whether to support ca
 | Topic | Canonical (v0.5) | Flutter port | Parity |
 |-------|------------------|--------------|--------|
 | Component arguments | **Positional only** — mapped to props by Zod/schema key order ([spec core rules](https://www.openui.com/docs/openui-lang/specification-v05)) | **Positional-only**; named component args rejected at parse; mapped by Dart schema property order | **Partial** (order) |
-| Query statements | `data = Query("tool", {args}, {defaults}, refreshSec?)` | `$var = @Query(toolName, named: value, …)` only; `Query(...)` rejected at parse | **No** |
+| Query statements | `data = Query("tool", {args}, {defaults}, refreshSec?)` | `data = Query("tool", {args}, {defaults}, refreshSec?)`; `@Query` removed | **Partial** |
 | Mutation | `result = Mutation("tool", {args})` positional | `Mutation(name: "...", args: {...})` named | **Partial** |
 | Button actions | `Button("Label", Action([@Set(...)]))` — prop **`action`** | `Button("Label", Action([@Set(...)]))` — prop **`action`**; bare arrays rejected | **Yes** |
 | `@OpenUrl` | Spec + `ACTION_STEPS` in lang-core | Not in `actions.dart` dispatcher | **No** |
@@ -110,21 +110,10 @@ data = Query("analytics", {days: $days}, {rows: []})
 chart = LineChart(data.rows.day, [Series("Views", data.rows.views)])
 ```
 
-**Flutter today:**
+**Flutter today:** same `Query(...)` declaration; example app still uses named component props in scripts.
 
-```text
-$days = "7"
-$analytics = @Query(analytics, days: $days)
-root = Card(children: [
-  TextContent(text: "Showing last " + $days + " days", size: "large-heavy"),
-  Select(value: $days, options: ["7", "30"]),
-  LineChart(labels: $analytics.rows.day, series: [/* … */])
-])
-```
+**What still breaks:**
 
-**What breaks:**
-
-- `Query(...)` statement form — parse error; must use `@Query`.
 - `data.rows.day` array pluck — evaluates to `null` in Flutter `_evalMember` (no pluck).
 - `Select("days", $days, [...])` positional — props not bound.
 - `LineChart` / `Series` — `Series` not in Flutter standard library; chart prop shapes differ.
@@ -160,7 +149,7 @@ btns = Buttons([Button("Submit", Action([@ToAssistant("Submit")]), "primary")])
 | `@Round`, `@Abs`, `@Floor`, `@Ceil` | Yes | **No** | |
 | `@Each` | `(array, varName, template)` lazy | Same | Largely aligned |
 | `@Map` | **No** | Yes | Flutter-only |
-| `@Query` | **No** (statement-level `Query` instead) | Yes (eval no-op; `QueryManager` fires) | Flutter-only surface |
+| `@Query` | **No** (statement-level `Query` instead) | **No** (parse error; use `Query(...)`) | Aligned |
 
 **Canonical registry:** `openui/packages/lang-core/src/parser/builtins.ts`  
 **Flutter registry:** `packages/openui_core/lib/src/eval/builtins.dart`
@@ -228,17 +217,15 @@ Canonical programs are positional-only, so the primary render path must accept t
 
 | Behavior | Canonical (`queryManager.ts`) | Flutter (`query_manager.dart`) |
 |----------|------------------------------|--------------------------------|
-| Declaration | `name = Query("tool", {args}, {defaults}, refreshSec?)` | `$name = @Query(toolName, namedArgs…)` |
-| Loading UI | Renders **defaults** object until fetch completes | Store value **`null`** until fetch; LLM uses `$var == null ? …` |
-| Re-fetch when `$` in query args change | **Yes** — dependency tracking | **No** — one fire per `(statementId, evaluated-args)` fingerprint unless `@Run` |
-| Refresh interval (4th positional arg) | **Yes** — timer lifecycle | **No** |
-| Mutation | `mutation = Mutation("tool", {args})`; run via `@Run(mutation)` | `Mutation(name: "...", args: {...})`; `fireMutation` path separate from `@Query` |
-| Result storage | Query manager + eval context | **Store only** for `@Query` (by design in @Query plan) |
+| Declaration | `name = Query("tool", {args}, {defaults}, refreshSec?)` | Same |
+| Loading UI | Renders **defaults** object until fetch completes | Same via `getResult` |
+| Re-fetch when `$` in query args change | **Yes** — dependency tracking | **Yes** — `_syncQueries` on store change |
+| Refresh interval (4th positional arg) | **Yes** — timer lifecycle | **Yes** |
+| Mutation | `mutation = Mutation("tool", {args})`; run via `@Run(mutation)` | `Mutation(name: "...", args: {...})`; `fireMutation` path |
+| Result storage | Query manager + eval context | `QueryManager` only (store holds `$` state) |
 
-**Intentional break:** [feat-at-query-builtin plan](plan/2026-05-15-feat-at-query-builtin-plan.md) documents replacing `Query(name: …)` with `@Query`.
-
-**Canonical reference:** `openui/packages/lang-core/src/runtime/queryManager.ts` (refresh intervals, invalidation on `$` changes).  
-**Flutter reference:** `packages/openui/lib/src/query_manager.dart` (`ensureFired`, `_fired` fingerprint map).
+**Canonical reference:** `openui/packages/lang-core/src/runtime/queryManager.ts`.  
+**Flutter reference:** `packages/openui/lib/src/query_manager.dart`.
 
 ---
 
@@ -390,10 +377,10 @@ Status key: **Shipped** = in `standardLibraryDefinition()` + `standardComponentR
 | `mergeStatements` | Used in incremental / edit flows | Implemented in `openui_core`; **Renderer never calls it** (Acceptance Gap A17) | Partial |
 | `jsonToOpenUI` | `packages/lang-core/src/parser/serialize.ts` | **Not present** | No |
 | Fence extraction in stream parser | `extractFence` in `parser.ts`; `inlineMode` in prompts | Fences in `parse()` / `mergeStatements` only; **not** in `StreamParser` | No |
-| Prompt flags | `inlineMode`, `toolCalls`, `editMode`, … | `generatePrompt` / `library.prompt()` — teaches `@Query`, named props | Divergent |
+| Prompt flags | `inlineMode`, `toolCalls`, `editMode`, … | `generatePrompt` / `library.prompt()` — teaches canonical `Query(...)`, named props | Partial |
 | Validation error codes | Rich set (`unknown-component`, `inline-reserved`, …) | Partial via `parse.dart`; renderer path differs | Partial |
 
-**Prompt divergence:** Canonical system prompts enforce positional-only and `Query(...)` / `Action([...])`. Flutter `packages/openui_core/lib/src/prompt/prompt.dart` documents `$var = @Query(toolName, namedArg: value, …)` and named component style.
+**Prompt divergence:** Canonical and Flutter prompts both document positional `Query(...)` / `Action([...])`. Component calls in Flutter prompts may still teach named props where the Dart port accepts them.
 
 ---
 
@@ -429,7 +416,7 @@ Documented acceptance gaps ([lang-reference.md](lang-reference.md)):
 Ordered for **language** 1:1 first; widgets can trail.
 
 1. **Syntax compatibility layer** — Accept canonical positional component calls; map to named props via schema key order in `evaluateElementProps`. Accept `Query(...)` / `Mutation(...)` and aliases `action` / `Action([...])` alongside current forms (or migrate with a breaking-change window).
-2. **Evaluator parity** — Array pluck; full data builtin set; `@Filter` canonical overload (or dual overload). Decide fate of `@Map` and `@Query`.
+2. **Evaluator parity** — Array pluck; full data builtin set; `@Filter` canonical overload (or dual overload). Decide fate of `@Map`.
 3. **Query manager parity** — Defaults object, reactive re-fetch when `$` in args change, refresh interval; document or align loading semantics (`null` vs defaults).
 4. **Prompt + fixtures** — Regenerate prompts/examples from canonical `openuiExamples` / `openuiChatExamples`; cross-repo golden tests.
 5. **Component library** — Close checklist §5.2; `Form` + validation rules.

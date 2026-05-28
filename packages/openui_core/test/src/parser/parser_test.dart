@@ -9,6 +9,7 @@
 // own contract suites in subsequent tasks.
 
 import 'package:openui_core/openui_core.dart';
+import 'package:openui_core/src/parser/parser.dart' show collectQueryDeps;
 import 'package:test/test.dart';
 
 void main() {
@@ -255,7 +256,7 @@ void main() {
     });
 
     test(
-      'classifyStatement uses order-of-checks: Mutation > @Query > '
+      'classifyStatement uses order-of-checks: Mutation > Query > '
       'STATEVAR > value',
       () {
         // Mutation regardless of LHS shape.
@@ -273,11 +274,11 @@ void main() {
           ),
           StatementKind.mutation,
         );
-        // @Query builtin classifies as query.
+        // QueryCall classifies as query before $ LHS check.
         expect(
           classifyStatement(
-            r'$x',
-            BuiltinCall('@Query', const <Argument>[], offset: 0),
+            'data',
+            QueryCall(const <Argument>[], offset: 0),
           ),
           StatementKind.query,
         );
@@ -632,14 +633,21 @@ void main() {
       );
     });
 
-    test('legacy Query(...) raises a migration ParseException', () {
+    test('Query(...) parses as QueryCall', () {
       expect(
-        () => parseExpression('Query(name: "x")'),
+        parseExpression('Query("tool", {}, {rows: []})'),
+        isA<QueryCall>(),
+      );
+    });
+
+    test('@Query raises a migration ParseException', () {
+      expect(
+        () => parseExpression('@Query(tool)'),
         throwsA(
           isA<ParseException>().having(
             (e) => e.message,
             'message',
-            contains('@Query'),
+            contains('no longer supported'),
           ),
         ),
       );
@@ -840,73 +848,72 @@ void main() {
       expect(program.statements.single.name, r'$count');
     });
 
-    test(r'classifies $var = @Query(tool) RHS as query', () {
-      final program = parseProgram(r'$users = @Query(list_users)');
+    test('classifies data = Query(...) RHS as query', () {
+      final program = parseProgram(
+        r'data = Query("analytics", {days: $days}, {rows: []})',
+      );
       expect(program.errors, isEmpty);
       expect(program.statements.single.kind, StatementKind.query);
-      final expr = program.statements.single.expression as BuiltinCall;
-      expect(expr.name, '@Query');
-      expect(expr.args.single.value, isA<Reference>());
+      expect(program.statements.single.name, 'data');
+      final expr = program.statements.single.expression as QueryCall;
+      expect((expr.args.first.value as Literal).value, 'analytics');
     });
 
-    test('legacy users = Query(name: "list") emits a migration error', () {
-      final program = parseProgram('users = Query(name: "list")');
-      expect(program.errors, hasLength(1));
-      expect(program.errors.single.message, contains('@Query'));
-    });
-
-    test('@Query with named args yields a QueryDecl-shaped BuiltinCall', () {
+    test('collectQueryDeps finds nested state refs in args object', () {
       final program = parseProgram(
-        r'$products = @Query(fetch_products, category: "shoes")',
+        r'data = Query("t", {days: $days, meta: {by: $by}}, {rows: []})',
       );
       expect(program.errors, isEmpty);
-      final expr = program.statements.single.expression as BuiltinCall;
-      expect(expr.args.first.value, isA<Reference>());
-      expect(expr.args[1].name, 'category');
+      final call = program.statements.single.expression as QueryCall;
+      final argsObject = call.args[1].value;
+      expect(collectQueryDeps(argsObject), containsAll(['days', 'by']));
     });
 
-    test('@Query without a tool name records a ParseException', () {
-      final program = parseProgram(r'$x = @Query()');
+    test(r'$data = Query(...) is rejected', () {
+      final program = parseProgram(
+        r'$data = Query("tool", {}, {rows: []})',
+      );
       expect(program.errors, hasLength(1));
       expect(
         program.errors.single.message,
-        contains('tool-name identifier'),
+        contains('regular identifiers'),
       );
     });
 
-    test('@Query with a string-literal first arg records an error', () {
-      final program = parseProgram(r'$x = @Query("not_a_ref")');
+    test('@Query is rejected with migration message', () {
+      final program = parseProgram(r'$users = @Query(list_users)');
+      expect(program.errors, isNotEmpty);
+      expect(program.errors.first.message, contains('no longer supported'));
+    });
+
+    test('Query with named args records an error', () {
+      final program = parseProgram(
+        'data = Query("tool", category: "shoes")',
+      );
       expect(program.errors, hasLength(1));
       expect(
         program.errors.single.message,
-        contains('tool-name identifier'),
+        contains('positional arguments'),
       );
     });
 
-    test('@Query with extra positional args records an error', () {
-      final program = parseProgram(r'$x = @Query(tool, "positional")');
+    test('Query without a tool name records a ParseException', () {
+      final program = parseProgram('data = Query()');
       expect(program.errors, hasLength(1));
       expect(
         program.errors.single.message,
-        contains('only accepts named arguments'),
+        contains('string tool name'),
       );
     });
 
-    test('@Query on a value LHS records an error', () {
-      final program = parseProgram('data = @Query(tool)');
-      expect(program.errors, hasLength(1));
-      expect(
-        program.errors.single.message,
-        contains('must be the entire RHS'),
+    test('Query nested inside an array records an error', () {
+      final program = parseProgram(
+        'root = Stack([Query("tool", {}, {rows: []})])',
       );
-    });
-
-    test('@Query nested inside an array records an error', () {
-      final program = parseProgram('root = Stack([@Query(tool)])');
       expect(program.errors, hasLength(1));
       expect(
         program.errors.single.message,
-        contains('must be the entire RHS'),
+        contains('top-level assignment'),
       );
     });
 

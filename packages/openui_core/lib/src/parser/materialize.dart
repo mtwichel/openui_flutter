@@ -44,6 +44,7 @@ class ElementNode {
     CompCall(:final type) => type,
     BuiltinCall(:final name) => name,
     MutationCall() => 'Mutation',
+    QueryCall() => 'Query',
     _ => null,
   };
 
@@ -197,6 +198,7 @@ void _collectReferences(AstNode node, Set<String> out) {
     case CompCall(:final args):
     case BuiltinCall(:final args):
     case MutationCall(:final args):
+    case QueryCall(:final args):
       for (final a in args) {
         _collectReferences(a.value, out);
       }

@@ -22,7 +22,8 @@ v0.1. The package ships:
 - `ErrorBoundary` — per-element error capture with last-good fallback.
 - `FormStateCache` — `TextEditingController` cache keyed by
   `(formName, fieldName)` with a 250 ms grace window.
-- `QueryManager` — `@Query` / `@Run` cache backed by a `ToolRegistry`.
+- `QueryManager` — canonical `Query(...)` lifecycle (`evaluateQueries`,
+  `getResult`, refresh timers) backed by a `ToolRegistry`.
 - `RendererScope` — `InheritedWidget` exposing the store and form-state
   cache to component implementations.
 

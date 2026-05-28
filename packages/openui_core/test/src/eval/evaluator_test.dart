@@ -121,28 +121,26 @@ void main() {
       expect(ctx.errors, isEmpty);
     });
 
-    test(
-      '@Query reference returns null until the store gets the result',
-      () {
-        // `$products` is bound to a `@Query` declaration. The bare
-        // identifier `products` (no `$`) still classifies as the same
-        // statement — but the evaluator should return `null` rather
-        // than reading from the gone `queryResults` map. The actual
-        // query value lives in the store under `$products` and is
-        // read via `StateRef`.
-        final program = parseProgram(
-          r'$products = @Query(fetch)',
-        );
-        final ctx = EvalContext(
-          statements: program.statements,
-          store: Store(),
-        );
-        expect(
-          evaluate(const Reference(r'$products', offset: 0), ctx),
-          isNull,
-        );
-      },
-    );
+    test('query reference uses resolveRef', () {
+      final program = parseProgram(
+        'data = Query("fetch", {}, {rows: []})',
+      );
+      final ctx = EvalContext(
+        statements: program.statements,
+        store: Store(),
+        resolveRef: (name) => name == 'data'
+            ? const {
+                'rows': [1],
+              }
+            : null,
+      );
+      expect(
+        evaluate(const Reference('data', offset: 0), ctx),
+        const {
+          'rows': [1],
+        },
+      );
+    });
 
     test(
       'Mutation reference resolves to null (no value semantics)',

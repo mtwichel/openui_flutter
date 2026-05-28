@@ -74,11 +74,11 @@ void main() {
       );
       expect(
         result,
-        contains(r'$var = @Query(toolName, namedArg: value, ...)'),
+        contains('Query("tool", {args}, {defaults}'),
       );
       expect(result, contains('top-level assignment'));
-      expect(result, contains(r'`$var == null ? loading : content`'));
-      expect(result, contains('re-fetch when those vars change via `@Set`'));
+      expect(result, contains('default value shown while loading'));
+      expect(result, contains('re-fetch when those vars change'));
     });
 
     test('component with description renders Name(props) — description', () {

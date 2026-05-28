@@ -189,7 +189,7 @@ void main() {
         'root = "hi"\n'
         r'$count = 0'
         '\n'
-        r'$users = @Query(list_users)'
+        'users = Query("list_users", {}, {rows: []})'
         '\n'
         'del = Mutation(name: "delete")\n',
       );

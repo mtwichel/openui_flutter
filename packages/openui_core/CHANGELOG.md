@@ -1,3 +1,10 @@
+## 0.0.1-dev.3
+
+- **BREAKING**: Restore canonical `Query("tool", {args}, {defaults}, refreshSec?)`
+  statements. Remove `@Query` builtin. Query results resolve via
+  `EvalContext.resolveRef` (not the store). `QueryDecl` carries AST slots
+  and `deps` instead of `toolName` / `namedArgs`.
+
 ## 0.0.1-dev.2
 
 - **BREAKING**: Replace `Library<W>`, `Component<W>`, and `Tool` with serializable

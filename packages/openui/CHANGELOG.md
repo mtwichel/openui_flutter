@@ -1,3 +1,9 @@
+## 0.0.1-dev.3
+
+- **BREAKING**: `QueryManager` port — `evaluateQueries`, `getResult`,
+  `invalidate`, `subscribe`; no store writes for query ids. Renderer
+  wires `resolveRef` and re-fetches when `$` deps in query args change.
+
 ## 0.0.1-dev.2
 
 - **BREAKING**: `Renderer` now requires `library: LibraryDefinition`,

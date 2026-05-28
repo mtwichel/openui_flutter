@@ -245,11 +245,13 @@ void main() {
       expect(result.root!.props['text'], 'hi');
     });
 
-    test('reports nested @Query as a parse violation', () {
-      final program = parseProgram('root = Stack([@Query(x)])');
+    test('reports nested Query as a parse violation', () {
+      final program = parseProgram(
+        'root = Stack([Query("tool", {}, {rows: []})])',
+      );
       expect(
         program.errors.any(
-          (e) => e.message.contains(r'@Query must be the entire RHS of a $var'),
+          (e) => e.message.contains('top-level assignment'),
         ),
         isTrue,
       );
@@ -411,7 +413,7 @@ void main() {
       () {
         final result = parse(
           'root = Title("anchor")\n'
-          r'$q = @Query(list, name: $name)'
+          r'data = Query("list", {name: $name}, {rows: []})'
           '\n'
           r'$m = Mutation(name: $other)'
           '\n',
@@ -422,21 +424,13 @@ void main() {
       },
     );
 
-    test(
-      r'query-backed $var passes through Title as a StateRef at parse time',
-      () {
-        final result = _parse(
-          r'$q = @Query(x)'
-          '\n'
-          r'root = Title($q)'
-          '\n',
-        );
-        expect(result.root, isNotNull);
-        final text = result.root!.props['text'];
-        expect(text, isA<StateRef>());
-        expect((text! as StateRef).name, 'q');
-      },
-    );
+    test('query-backed id materializes to null at parse time', () {
+      final result = _parse(
+        'data = Query("x", {}, {label: "hi"})\n'
+        'root = Title("ok")\n',
+      );
+      expect(result.root, isNotNull);
+    });
   });
 
   group('ResolvedElement', () {

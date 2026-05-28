@@ -462,8 +462,34 @@ final class MutationCall extends AstNode {
   String toString() => 'MutationCall($args)';
 }
 
-/// A single argument inside a [CompCall], [BuiltinCall], or
-/// [MutationCall].
+/// A `Query("tool", {args}, {defaults}, refreshSec?)` call.
+///
+/// Emitted by the parser when a comp-call's type is exactly `Query`.
+/// Arguments are positional only: tool name string, args object,
+/// defaults object, optional refresh interval.
+@experimental
+@immutable
+final class QueryCall extends AstNode {
+  /// Creates a query-call node.
+  QueryCall(List<Argument> args, {required super.offset})
+    : args = List.unmodifiable(args);
+
+  /// Positional arguments, in source order.
+  final List<Argument> args;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is QueryCall && _listEq(other.args, args);
+
+  @override
+  int get hashCode => Object.hash(QueryCall, Object.hashAll(args));
+
+  @override
+  String toString() => 'QueryCall($args)';
+}
+
+/// A single argument inside a [CompCall], [BuiltinCall],
+/// [MutationCall], or [QueryCall].
 ///
 /// Positional args have `name == null`; `key: expr` syntax produces
 /// named args.
@@ -542,7 +568,7 @@ final class Statement {
 ///
 /// Order of checks (in [classifyStatement]):
 /// 1. RHS is a `MutationCall` → [mutation]
-/// 2. RHS is `@Query(...)` (a `BuiltinCall` named `@Query`) → [query]
+/// 2. RHS is `Query(...)` (a [QueryCall]) → [query]
 /// 3. LHS is a `STATEVAR` → [state]
 /// 4. otherwise → [value]
 @experimental
@@ -553,7 +579,7 @@ enum StatementKind {
   /// `$name = ...` where the RHS is not a query or mutation.
   state,
 
-  /// `$name = @Query(tool, ...)`.
+  /// `name = Query("tool", {args}, {defaults}, refreshSec?)`.
   query,
 
   /// `name = Mutation(...)`.
@@ -564,9 +590,7 @@ enum StatementKind {
 @experimental
 StatementKind classifyStatement(String name, AstNode expression) {
   if (expression is MutationCall) return StatementKind.mutation;
-  if (expression is BuiltinCall && expression.name == '@Query') {
-    return StatementKind.query;
-  }
+  if (expression is QueryCall) return StatementKind.query;
   if (name.startsWith(r'$')) return StatementKind.state;
   return StatementKind.value;
 }

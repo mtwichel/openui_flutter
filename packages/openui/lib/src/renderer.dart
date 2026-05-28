@@ -102,6 +102,7 @@ class _RendererState extends State<Renderer> {
   ParseResult? _lastResult;
   List<OpenUIError> _lastReportedErrors = const <OpenUIError>[];
   void Function()? _storeUnsubscribe;
+  void Function()? _queryManagerUnsubscribe;
 
   // "Last good root" cache. Mid-stream, autoClose patches the pending
   // tail differently on every chunk, so a single tick can produce a
@@ -150,6 +151,7 @@ class _RendererState extends State<Renderer> {
   @override
   void dispose() {
     _storeUnsubscribe?.call();
+    _queryManagerUnsubscribe?.call();
     _queryManager?.dispose();
     _formStateCache.dispose();
     _store.dispose();
@@ -157,18 +159,46 @@ class _RendererState extends State<Renderer> {
   }
 
   QueryManager _buildQueryManager() {
-    return QueryManager(
+    _queryManagerUnsubscribe?.call();
+    final manager = QueryManager(
       library: widget.library,
       toolRegistry: widget.toolRegistry,
-      store: _store,
       onError: _reportError,
     );
+    _queryManagerUnsubscribe = manager.subscribe(() {
+      if (!mounted) return;
+      setState(() {});
+    });
+    return manager;
   }
 
   void _handleStoreChange(StoreChangeOrigin _) {
     if (!mounted) return;
     widget.onStateUpdate?.call(_store.getSnapshot());
-    setState(() {});
+    final result = _lastResult;
+    if (result != null) {
+      _syncQueries(result);
+    }
+  }
+
+  /// Strips a leading `$` from legacy `@Run($data)` action steps.
+  String _normalizeRunStatementId(String statementId) =>
+      statementId.startsWith(r'$') ? statementId.substring(1) : statementId;
+
+  String _evaluatedToolName(
+    AstNode toolAst,
+    EvalContext ctx,
+    String statementId,
+  ) {
+    final value = evaluate(toolAst, ctx);
+    if (value is String) return value;
+    _reportError(
+      EvaluationError(
+        message: 'Query tool name must be a string',
+        statementId: statementId,
+      ),
+    );
+    return '';
   }
 
   void _runPipeline() {
@@ -209,7 +239,7 @@ class _RendererState extends State<Renderer> {
     );
     _wasStreaming = widget.isStreaming;
 
-    _fireReadyQueries(result);
+    _syncQueries(result);
 
     widget.onParseResult?.call(result);
     _maybeReportErrors(result);
@@ -274,19 +304,37 @@ class _RendererState extends State<Renderer> {
     ctx.errors.forEach(_reportError);
     if (result != null) {
       _maybeReportErrors(result);
-      _fireReadyQueries(result);
+      _syncQueries(result);
     }
   }
 
-  void _fireReadyQueries(ParseResult result) {
+  void _syncQueries(ParseResult result) {
     final manager = _queryManager;
     if (manager == null || widget.isStreaming) return;
-    final incomplete = result.meta.incomplete.toSet();
-    final fireCtx = _buildEvalContext(result);
-    for (final query in result.meta.queries) {
-      if (incomplete.contains(query.statementId)) continue;
-      manager.ensureFired(query, fireCtx);
-    }
+    final ctx = _buildEvalContext(result);
+    final nodes = <QueryNode>[
+      for (final q in result.meta.queries) _evaluateQueryNode(q, ctx),
+    ];
+    manager.evaluateQueries(nodes);
+  }
+
+  QueryNode _evaluateQueryNode(QueryDecl q, EvalContext ctx) {
+    final relevantDeps = <String, Object?>{
+      for (final dep in q.deps) '\$$dep': _store.get('\$$dep'),
+    };
+    return QueryNode(
+      statementId: q.statementId,
+      toolName: q.toolAST != null
+          ? _evaluatedToolName(q.toolAST!, ctx, q.statementId)
+          : '',
+      args: q.argsAST != null ? evaluate(q.argsAST!, ctx) : null,
+      defaults: q.defaultsAST != null ? evaluate(q.defaultsAST!, ctx) : null,
+      deps: relevantDeps.isNotEmpty ? relevantDeps : null,
+      refreshInterval: q.refreshAST != null
+          ? (evaluate(q.refreshAST!, ctx) as num?)?.toDouble()
+          : null,
+      complete: q.complete,
+    );
   }
 
   Future<void> _onRun(
@@ -296,7 +344,7 @@ class _RendererState extends State<Renderer> {
   ) async {
     final manager = _queryManager;
     if (manager == null) return;
-    final id = step.statementId;
+    final id = _normalizeRunStatementId(step.statementId);
     if (result != null) {
       for (final m in result.meta.mutations) {
         if (m.statementId != id) continue;
@@ -305,7 +353,8 @@ class _RendererState extends State<Renderer> {
       }
       for (final q in result.meta.queries) {
         if (q.statementId != id) continue;
-        manager.invalidate(q, _buildEvalContext(result));
+        manager.invalidate([id]);
+        _syncQueries(result);
         return;
       }
     }
@@ -328,10 +377,12 @@ class _RendererState extends State<Renderer> {
 
   EvalContext _buildEvalContext(ParseResult? result) {
     final statements = result?.statements ?? const <Statement>[];
+    final manager = _queryManager;
     return EvalContext(
       statements: statements,
       store: _store,
       builtins: functionalBuiltins,
+      resolveRef: manager?.getResult,
     );
   }
 
@@ -392,6 +443,9 @@ class _RendererState extends State<Renderer> {
         }
         final stmt = ctx.statements[name];
         if (stmt == null) return const SizedBox.shrink();
+        if (stmt.kind == StatementKind.query) {
+          return _wrapPrimitive(evaluate(node, ctx));
+        }
         _expanding.add(name);
         try {
           return _renderAst(stmt.expression, ctx, statementHint: name);
@@ -422,6 +476,7 @@ class _RendererState extends State<Renderer> {
       case IndexAccess():
       case ObjectLit():
       case MutationCall():
+      case QueryCall():
         final value = evaluate(node, ctx);
         return _wrapPrimitive(value);
       case Ternary(:final condition, :final then, :final otherwise):
